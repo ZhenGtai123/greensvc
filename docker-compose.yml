@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: greensvc-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: greensvc
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: greensvc-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: greensvc-backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/greensvc
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - VISION_API_URL=${VISION_API_URL:-http://host.docker.internal:8000}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - DEBUG=false
+    volumes:
+      - ./packages/backend/data:/app/data
+      - ./packages/backend/outputs:/app/outputs
+      - ./packages/backend/temp:/app/temp
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: greensvc-celery-worker
+    command: celery -A app.core.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/greensvc
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - VISION_API_URL=${VISION_API_URL:-http://host.docker.internal:8000}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+    volumes:
+      - ./packages/backend/data:/app/data
+      - ./packages/backend/outputs:/app/outputs
+      - ./packages/backend/temp:/app/temp
+    depends_on:
+      - redis
+      - postgres
+      - backend
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./packages/frontend
+      dockerfile: Dockerfile
+    container_name: greensvc-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:

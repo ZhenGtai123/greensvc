@@ -1,0 +1,131 @@
+"""
+GreenSVC API - FastAPI Application
+Urban greenspace visual analysis backend
+"""
+
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.config import get_settings
+from app.core.database import init_db_async
+from app.api.routes import health, config, metrics, projects, vision, indicators, tasks, auth
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events"""
+    # Startup
+    settings = get_settings()
+    settings.ensure_directories()
+    logger.info("GreenSVC API starting up...")
+    logger.info(f"Data directory: {settings.data_path}")
+    logger.info(f"Vision API URL: {settings.vision_api_url}")
+
+    # Initialize database tables
+    try:
+        await init_db_async()
+        logger.info("Database tables initialized")
+    except Exception as e:
+        logger.warning(f"Database initialization skipped: {e}")
+
+    yield
+
+    # Shutdown
+    logger.info("GreenSVC API shutting down...")
+
+
+def create_app() -> FastAPI:
+    """Create and configure FastAPI application"""
+    settings = get_settings()
+
+    app = FastAPI(
+        title="GreenSVC API",
+        description="Urban greenspace visual analysis API",
+        version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        lifespan=lifespan,
+    )
+
+    # CORS middleware for React frontend
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:3000",   # Create React App default
+            "http://localhost:5173",   # Vite default
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Include routers
+    app.include_router(
+        health.router,
+        tags=["Health"],
+    )
+    app.include_router(
+        config.router,
+        prefix="/api/config",
+        tags=["Configuration"],
+    )
+    app.include_router(
+        metrics.router,
+        prefix="/api/metrics",
+        tags=["Metrics"],
+    )
+    app.include_router(
+        projects.router,
+        prefix="/api/projects",
+        tags=["Projects"],
+    )
+    app.include_router(
+        vision.router,
+        prefix="/api/vision",
+        tags=["Vision Analysis"],
+    )
+    app.include_router(
+        indicators.router,
+        prefix="/api/indicators",
+        tags=["Indicators"],
+    )
+    app.include_router(
+        tasks.router,
+        prefix="/api/tasks",
+        tags=["Background Tasks"],
+    )
+    app.include_router(
+        auth.router,
+        prefix="/api/auth",
+        tags=["Authentication"],
+    )
+
+    return app
+
+
+# Create app instance
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    settings = get_settings()
+    uvicorn.run(
+        "app.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
+    )

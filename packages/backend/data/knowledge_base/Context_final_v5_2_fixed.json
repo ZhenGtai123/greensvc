@@ -1,0 +1,3065 @@
+[
+  {
+    "context_id": "CTX_Amiruzzaman2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_NA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban neighborhood visual diversity is quantified from large collections of street-view images sampled along neighborhood street networks (e.g., points every ~20 m). AI-based image segmentation extracts semantic categories (e.g., road, building, green, terrain, sky), and multiple diversity indices (e.g., entropy, Simpson, McIntosh, Gini; plus a Horizontal View Index) are computed to relate visual diversity/inequality to neighborhood socio-demographics (e.g., population, density, income, home prices) and crime metrics using correlation analysis. Results are intended for comparing neighborhoods and understanding built/natural environment patterns; correlations do not imply causality.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Amiruzzaman2023_2",
+      "EVD_Amiruzzaman2023_4",
+      "EVD_Amiruzzaman2023_3",
+      "EVD_Amiruzzaman2023_1",
+      "IOM_Amiruzzaman2023_1",
+      "IOM_Amiruzzaman2023_3",
+      "IOM_Amiruzzaman2023_4",
+      "IOM_Amiruzzaman2023_2"
+    ],
+    "source": {
+      "citation": "Amiruzzaman, M., Zhao, Y., Amiruzzaman, S., Karpinski, A. C., & Wu, T. H. (2023). An AI-based framework for studying visual diversity of urban neighborhoods and its relationship with socio-demographic variables. Journal of Computational Social Science, 6(1), 315–337.",
+      "doi": "10.1007/s42001-022-00197-1"
+    }
+  },
+  {
+    "context_id": "CTX_An2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_4",
+      "space_type_id": "SET_RES",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Metropolitan housing market context in Busan, South Korea. Street-level greenness was measured from Google Street View images (green index based on pixel classification) and spatially interpolated/assigned to housing units by averaging the nearest 20/50/100 images to address non-uniform image coverage. Hedonic (OLS) price models controlled for property characteristics, environmental amenities (e.g., distance to green space and water), built environment (e.g., distance to subway), demographics, and seasonality. Findings reflect relationships between visual street greenness, proximity to green space, and housing prices in a dense urban residential setting; interpretation may depend on local context where street greenery can correlate with older neighborhoods or road buffers.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_An2023_1",
+      "IOM_An2023_1"
+    ],
+    "source": {
+      "citation": "An, S., Jang, H., Kim, H., Song, Y., & Ahn, K. (2023). Assessment of street-level greenness and its association with housing prices in a metropolitan area. Scientific Reports, 13(1).",
+      "doi": "10.1038/s41598-023-49845-0"
+    }
+  },
+  {
+    "context_id": "CTX_Cai2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Outdoor pedestrian walking experiment in a high-density Hong Kong street environment along predetermined routes; participants wore ambulatory sensors (skin conductance) and GPS while street-view/isovist-based visual exposure factors were linked to locations to model physiological stress with spatial machine learning.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Cai2023_1",
+      "EVD_Cai2023_2",
+      "EVD_Cai2023_3",
+      "IOM_Cai2023_1",
+      "IOM_Cai2023_2",
+      "IOM_Cai2023_3"
+    ],
+    "source": {
+      "citation": "Cai, M., Xiang, L., & Ng, E. (2023). How does the visual environment influence pedestrian physiological stress? Evidence from high-density cities using ambulatory technology and spatial machine learning. Sustainable Cities and Society, 96, 104695.",
+      "doi": "10.1016/j.scs.2023.104695"
+    }
+  },
+  {
+    "context_id": "CTX_Chan2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study conducted in Taipei City, Taiwan, using Google Street View (GSV) road-network sampling at 30 m intervals (2018–2022) to compute Green View Index (GVI 2.0) and relate it to grid-based monthly average temperature and temperature difference. Applicable to subtropical, high-density urban areas where street-level greenery (street trees and vertical greening) may not be well captured by satellite NDVI; analysis integrates GSV-derived indicators (GVI, sky view factor, building view factor), satellite NDVI (MODIS 250 m; Landsat 8 30 m), land use, traffic volume, altitude, and building area, modeled with spatial methods (e.g., geographically weighted regression).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Chan2024_1",
+      "EVD_Chan2024_2",
+      "EVD_Chan2024_3",
+      "IOM_Chan2024_1",
+      "IOM_Chan2024_3",
+      "IOM_Chan2024_2"
+    ],
+    "source": {
+      "citation": "Chan, T.-C., Lee, P.-H., Lee, Y.-T., & Tang, J.-H. (2024). Exploring the spatial association between the distribution of temperature and urban morphology with green view index. PLOS ONE, 19(5), e0301921.",
+      "doi": "10.1371/journal.pone.0301921"
+    }
+  },
+  {
+    "context_id": "CTX_Chen2020_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study area is Shenzhen, China (dense subtropical city). Outcome is dockless shared bicycle departure volume density (rides/ha) over two days (~902,000 rides). Key exposure is street greening measured at eye level (Green View Index from street-view images) and overhead greenness (Green Coverage Index from SPOT-5 imagery). Models control for bicycle infrastructure (available bicycle density, greenway density), land use/building environment (floor area ratio, building density, land-use entropy, POI density), and traffic environment (road density, transit station density, intersection density). Findings indicate eye-level greening (Green View Index) is positively associated with shared bicycle use across multiple time periods, while overhead greenness (Green Coverage Index) shows weak/non-significant associations.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Chen2020_4",
+      "EVD_Chen2020_2",
+      "EVD_Chen2020_3",
+      "EVD_Chen2020_1",
+      "EVD_Chen2020_5",
+      "IOM_Chen2020_5",
+      "IOM_Chen2020_4",
+      "IOM_Chen2020_2",
+      "IOM_Chen2020_3",
+      "IOM_Chen2020_6",
+      "IOM_Chen2020_1"
+    ],
+    "source": {
+      "citation": "Chen, J., Zhou, C., & Li, F. (2020). Quantifying the green view indicator for assessing urban greening quality: An analysis based on Internet-crawling street view data. Ecological Indicators, 113, 106192.",
+      "doi": "10.1016/j.ecolind.2020.106192"
+    }
+  },
+  {
+    "context_id": "CTX_Chen2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban road greenery assessment in downtown Changsha (within the Second Ring). Road network from OpenStreetMap; atypical roads (residential roads, paths, footways, links) excluded. Sampling points generated along roads in ArcGIS with a minimum spacing of 200 m, yielding 16,688 points. Baidu Street View Images (fish-eye 360-degree) collected at sampling points. Semantic segmentation performed using a deep learning FCN trained on the ADE_20K dataset to extract tree/grass/vegetation pixel shares; GVI computed as the aggregated greenery proportion visible in SVIs and mapped/compared across districts and streets.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Chen2022_2",
+      "EVD_Chen2022_1",
+      "IOM_Chen2022_1",
+      "IOM_Chen2022_2"
+    ],
+    "source": {
+      "citation": "Chen, Y., Zhang, Q., Deng, Z., Fan, X., Xu, Z., Kang, X., Pan, K., & Guo, Z. (2022). Research on Green View Index of Urban Roads Based on Street View Image Recognition: A Case Study of Changsha Downtown Areas. Sustainability, 14(23), 16063.",
+      "doi": "10.3390/su142316063"
+    }
+  },
+  {
+    "context_id": "CTX_Chen2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_A",
+      "space_type_id": "SET_PRK",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Automatic assessment of public open spaces (e.g., parks, gardens, plazas, playgrounds, waterfront promenades) using Google Street View imagery with computer vision and supervised machine learning. Study compares POS quality across six dimensions using both subjective perception scores (survey-labelled SVI, Random Forest prediction) and objective indicators from GIS and remote sensing. Applied to public open spaces in Hong Kong and Singapore; results mapped and compared across the two cities. Not focused on urban streets.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Chen2023_1",
+      "IOM_Chen2023_1"
+    ],
+    "source": {
+      "citation": "Chen, S., & Biljecki, F. (2023). Automatic assessment of public open spaces using street view imagery. Cities, 137, 104329.",
+      "doi": "10.1016/j.cities.2023.104329"
+    }
+  },
+  {
+    "context_id": "CTX_Chen2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CSB"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_URB",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study evaluates implied urban nature vitality (IUNV) in San Francisco by combining census socio-demographic variables (CDC Social Vulnerability Index / ACS), street view image features extracted via computer vision (including street-adjacent greenery such as trees and small green areas), and geotagged Flickr photos clustered/labelled to represent urban nature-related activity and perceptions. Analysis is conducted at spatial units within the city and relates IUNV to accessibility to urban green space (e.g., within ~1000 m walking distance), land use entropy, road density, and street-level features such as trees and sculptures.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Chen2024_1",
+      "IOM_Chen2024_1"
+    ],
+    "source": {
+      "citation": "Chen, M., Cai, Y., Guo, S., Sun, R., Song, Y., & Shen, X. (2024). Evaluating implied urban nature vitality in San Francisco: An interdisciplinary approach combining census data, street view images, and social media analysis. Urban Forestry & Urban Greening, 95, 128289.",
+      "doi": "10.1016/j.ufug.2024.128289"
+    }
+  },
+  {
+    "context_id": "CTX_Cheng2017_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Study uses Tencent Street View panoramic images sampled along streets in Nanjing, China, and validates computed visual perception indices (e.g., salient region saturation, visual entropy, green view index, sky opening index) against questionnaire ratings from 100 volunteers viewing the panoramic images.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Cheng2017_2",
+      "EVD_Cheng2017_1",
+      "IOM_Cheng2017_1",
+      "IOM_Cheng2017_2"
+    ],
+    "source": {
+      "citation": "Cheng, L., Chu, S., Zong, W., Li, S., Wu, J., & Li, M. (2017). Use of Tencent Street View Imagery for Visual Perception of Streets. ISPRS International Journal of Geo-Information, 6(9), 265.",
+      "doi": "10.3390/ijgi6090265"
+    }
+  },
+  {
+    "context_id": "CTX_Cheng2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_PRK",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Rural-to-urban migrants living in Wuhan, China; analysis compares inner-city versus inner-suburb neighborhood contexts and links urban green space quantity/quality (e.g., park density, park area ratio, street-level Green View Index, satisfaction, social media ratings, greenspace disorder, presence of recreational plaza-type parks) with mental health (GHQ-12) and perceived everyday discrimination using multilevel structural equation modeling.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Cheng2024_1",
+      "IOM_Cheng2024_1"
+    ],
+    "source": {
+      "citation": "Cheng, H., Li, Z., Gou, F., Wang, Z., & Zhai, W. (2024). Urban green space, perceived everyday discrimination and mental health among rural-to-urban migrants: A multilevel analysis in Wuhan, China. BMC Public Health, 24(1).",
+      "doi": "10.1186/s12889-024-20269-3"
+    }
+  },
+  {
+    "context_id": "CTX_Chiang2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Street-level outdoor thermal comfort study in Taichung City, Taiwan, comparing hot season (June–September) and cool season (October–March). Sky view factor (SVF) and greenery view index (GVI) were quantified from street imagery (fisheye photos and Google Street View panoramas) using deep learning semantic segmentation (ADE20K; DeepLabV3 ResNeSt-269) and related to objective thermal comfort (PET) and subjective thermal sensation votes (TSV) for pedestrians.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Chiang2023_4",
+      "EVD_Chiang2023_6",
+      "EVD_Chiang2023_2",
+      "EVD_Chiang2023_3",
+      "EVD_Chiang2023_1",
+      "EVD_Chiang2023_5",
+      "IOM_Chiang2023_3",
+      "IOM_Chiang2023_4",
+      "IOM_Chiang2023_6",
+      "IOM_Chiang2023_1",
+      "IOM_Chiang2023_2",
+      "IOM_Chiang2023_5"
+    ],
+    "source": {
+      "citation": "Chiang, Y.-C., Liu, H.-H., Li, D., & Ho, L.-C. (2023). Quantification through deep learning of sky view factor and greenery on urban streets during hot and cool seasons. Landscape and Urban Planning, 232, 104679.",
+      "doi": "10.1016/j.landurbplan.2022.104679"
+    }
+  },
+  {
+    "context_id": "CTX_Dai2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study analyzes correlations between street-level visual space indicators (e.g., greenness, openness, blueness, enclosure, walkability, imageability, traffic flow) and residents' psychological perception scores (beautiful, boring, safe, lively, wealthy, depressing) using street-view images and deep learning in Wuhan, China. Applicable to urban street environments where street-view imagery is available and perceptions are inferred from image-based indicators and human-machine adversarial scoring.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Dai2021_2",
+      "EVD_Dai2021_3",
+      "EVD_Dai2021_4",
+      "EVD_Dai2021_1",
+      "IOM_Dai2021_3",
+      "IOM_Dai2021_2",
+      "IOM_Dai2021_4",
+      "IOM_Dai2021_1"
+    ],
+    "source": {
+      "citation": "Dai, L., Zheng, C., Dong, Z., Yao, Y., Wang, R., Zhang, X., Ren, S., Zhang, J., Song, X., & Guan, Q. (2021). Analyzing the correlation between visual space and residents' psychology in Wuhan, China using street-view images and deep-learning technique. City and Environment Interactions, 11, 100069.",
+      "doi": "10.1016/j.cacint.2021.100069"
+    }
+  },
+  {
+    "context_id": "CTX_Dong2018_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street environment within the Sixth Ring Road area of Beijing, China. Street greenery was assessed from a pedestrian perspective using Tencent Street View pictures sampled every 100 m along major roads (e.g., motorways, expressways, major roads, national/provincial roads). Green View Index (GVI) was computed from six horizontal-direction images per sampling site using image segmentation to quantify visible green vegetation; results were aggregated to road-segment and district levels.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Dong2018_4",
+      "EVD_Dong2018_2",
+      "EVD_Dong2018_3",
+      "EVD_Dong2018_1",
+      "IOM_Dong2018_3",
+      "IOM_Dong2018_2",
+      "IOM_Dong2018_4",
+      "IOM_Dong2018_1"
+    ],
+    "source": {
+      "citation": "Dong, R., Zhang, Y., & Zhao, J. (2018). How Green Are the Streets Within the Sixth Ring Road of Beijing? An Analysis Based on Tencent Street View Pictures and the Green View Index. International Journal of Environmental Research and Public Health, 15(7), 1367.",
+      "doi": "10.3390/ijerph15071367"
+    }
+  },
+  {
+    "context_id": "CTX_Fang2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Street-level sky openness (sky view factor, SVF) estimated from Google Street View panoramic images sampled every 100 m along main roads in the Hakata Station area, Fukuoka, Japan. Images should be from spring/summer to avoid leaf-off conditions affecting SVF. SVF computed as the proportion of pixels classified as sky after semantic segmentation. Walkability measured via a modified Walk Score using locally adapted POI categories/weights; association tested using Pearson correlation across 334 sampling points.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Fang2022_2",
+      "EVD_Fang2022_1",
+      "IOM_Fang2022_1",
+      "IOM_Fang2022_2"
+    ],
+    "source": {
+      "citation": "Fang, Q., Inoue, T., ZHIQIU, X., & Qiang, L. (2022). Street Sky Openness Estimation Based on Deep Learning——Case Study of Hakata Station Area, Fukuoka. Proceedings of the 58th ISOCARP World Planning Congress.",
+      "doi": "10.47472/f945HVJk"
+    }
+  },
+  {
+    "context_id": "CTX_Gao2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_1",
+      "space_type_id": "SET_CBD",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Center area of Shenzhen, China. Study examines spatial associations between urban greenness (eye-level greenness from street-view images via deep-learning segmentation, and overhead greenness via NDVI from Landsat 8) and dockless bike-sharing usage. Usage is aggregated within Thiessen-polygon buffers and analyzed separately for weekdays, weekends, and national holidays using geographically weighted regression (GWR) to capture spatially varying relationships; built-environment covariates include road/intersection, transit, building, land-use, and population-related densities.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Gao2021_1",
+      "IOM_Gao2021_1"
+    ],
+    "source": {
+      "citation": "Gao, F., Li, S., Tan, Z., Zhang, X., Lai, Z., & Tan, Z. (2021). How Is Urban Greenness Spatially Associated with Dockless Bike Sharing Usage on Weekdays, Weekends, and Holidays? ISPRS International Journal of Geo-Information, 10(4), 238.",
+      "doi": "10.3390/ijgi10040238"
+    }
+  },
+  {
+    "context_id": "CTX_Gao2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street spatial quality assessment using Baidu Street View Images within the Second Ring Road of Changsha, China. 360° street view images (1024×512) captured in August 2019 were semantically segmented with an FCN model (ADE_20K) to extract pixel proportions of streetscape elements. Street space quality was evaluated via six indicators: sky visibility index (SVI), green visual index (GVI), interface enclosure index (IEI), public–facility convenience index (PCI), traffic recognition (TR), and motorization degree (MD), with spatial visualization/analysis by administrative region using ArcGIS.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Gao2024_3",
+      "EVD_Gao2024_1",
+      "EVD_Gao2024_4",
+      "EVD_Gao2024_2",
+      "IOM_Gao2024_1",
+      "IOM_Gao2024_2",
+      "IOM_Gao2024_4",
+      "IOM_Gao2024_5"
+    ],
+    "source": {
+      "citation": "Gao, L., Xiang, X., Chen, W., Nong, R., Zhang, Q., Chen, X., & Chen, Y. (2024). Research on Urban Street Spatial Quality Based on Street View Image Segmentation. Sustainability, 16(16), 7184.",
+      "doi": "10.3390/su16167184"
+    }
+  },
+  {
+    "context_id": "CTX_Guan2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Perceived street-scene complexity modelling using manually selected street-view panoramic images from multiple Chinese cities (Shanghai, with transfer tests to Hangzhou and Xi'an). Panoramas were screened to exclude unqualified images (over/underexposed or with excessive interferers) and excluded elevated roads, tunnels, and indoor parking lots. Scenes included residential, commercial, and office areas. Human participants (a deliberately homogeneous group, mostly ages 20–29) rated each panorama on a 1–5 complexity scale; average scores across participants were used as ground truth. Features integrated visual, structural (e.g., road network/branches/nodes), and semantic (e.g., POI counts and spatial patterns) information; Random Forest regression achieved best performance when using all feature dimensions.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Guan2022_1",
+      "IOM_Guan2022_1"
+    ],
+    "source": {
+      "citation": "Guan, F., Fang, Z., Wang, L., Zhang, X., Zhong, H., & Huang, H. (2022). Modelling people's perceived scene complexity of real-world environments using street-view panoramas and open geodata. ISPRS Journal of Photogrammetry and Remote Sensing, 186, 315–331.",
+      "doi": "10.1016/j.isprsjprs.2022.02.012"
+    }
+  },
+  {
+    "context_id": "CTX_Guo2025_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Case study in Wuhan, China (central urban areas) assessing inequities in street-level green visibility using time-series Baidu Street View images. Residential locations were aggregated to 250 m hexagonal grid centroids, and green visibility (GVI) was calculated from street-view sampling points within a 1000 m buffer around each residential aggregation point to represent daily living space access.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Guo2025_2",
+      "EVD_Guo2025_1",
+      "IOM_Guo2025_2",
+      "IOM_Guo2025_1"
+    ],
+    "source": {
+      "citation": "Guo, X., Liu, C., Bi, S., & Tang, Y. (2025). Identification of Inequities in Green Visibility and Ways to Increase Greenery in Neighborhoods: A Case Study of Wuhan, China. Applied Sciences, 15(2), 742.",
+      "doi": "10.3390/app15020742"
+    }
+  },
+  {
+    "context_id": "CTX_Hao2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban street environments in major districts of Hangzhou, Zhejiang Province, China, assessed during full-leaf seasons (spring, summer, fall) using panoramic street-view images. Street greening quality is quantified via semantic segmentation (e.g., grass/flowers/shrubs/trees) and indicators such as Plant Color Richness, Plant Level Diversity, Green View Index, and Tree–Sky View Factor/line of sight, and linked to emotional perception scores (pleasure, relaxation, boredom, anxiety/worry) modeled with random forest and interpreted with SHAP.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Hao2024_2",
+      "EVD_Hao2024_1",
+      "IOM_Hao2024_2",
+      "IOM_Hao2024_1",
+      "IOM_Hao2024_3"
+    ],
+    "source": {
+      "citation": "Hao, N., Li, X., Han, D., & Nie, W. (2024). Quantifying the Impact of Street Greening during Full-Leaf Seasons on Emotional Perception: Guidelines for Resident Well-Being. Forests, 15(1), 119.",
+      "doi": "10.3390/f15010119"
+    }
+  },
+  {
+    "context_id": "CTX_Helbich2019_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_4",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ELD"
+    },
+    "applicability": {
+      "conditions": "Study conducted in Beijing, China, examining associations between objectively measured street-view green and blue space exposure around residential neighborhoods and geriatric depressive symptoms (GDS-15). Exposure was derived from Tencent street view images (2012) segmented using a fully convolutional neural network; analyses used multilevel linear models and propensity score matching with individual covariates (e.g., age, gender, education, hukou, marital status).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Helbich2019_2",
+      "EVD_Helbich2019_1",
+      "IOM_Helbich2019_1",
+      "IOM_Helbich2019_2"
+    ],
+    "source": {
+      "citation": "Helbich, M., Yao, Y., Liu, Y., Zhang, J., Liu, P., & Wang, R. (2019). Using deep learning to examine street view green and blue spaces and their associations with geriatric depression in Beijing, China. Environment International, 126, 107–117.",
+      "doi": "10.1016/j.envint.2019.02.013"
+    }
+  },
+  {
+    "context_id": "CTX_Hou2025_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study focuses on the high-density urban area within Chengdu's Third Ring Road (Chengdu, China). It coordinates construction of an urban ecological network and a street green space network using Baidu street-view imagery to compute Green View Index (GVI) and ArcGIS-based spatial analyses (e.g., Getis-Ord Gi* hot/cold spots; bivariate spatial autocorrelation with ecological resistance surfaces). Applicable to dense inner-city street networks where street-view coverage is available and where ecological network connectivity and street-level greening are jointly assessed.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Hou2025_1",
+      "IOM_Hou2025_1"
+    ],
+    "source": {
+      "citation": "Hou, S., Yu, Y., Jung, T., & Han, X. (2025). How to Coordinate Urban Ecological Networks and Street Green Space Construction? Insights from a Multi-Scale Perspective. Land, 14(1), 26.",
+      "doi": "10.3390/land14010026"
+    }
+  },
+  {
+    "context_id": "CTX_Hu2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_URB",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Pilot case study in Osaka City, Japan, evaluating urban greening by integrating horizontal green coverage ratio (GCR) from Sentinel-2 NDVI (satellite imagery dated 2021-10-02) and vertical green view index (GVI) from Google Street View images (mainly captured in 2019) using semantic segmentation (e.g., PSPNet). Analysis unit is elementary school administrative districts (generated July 2022) to represent residents' daily experience; results are mapped and analyzed in ArcGIS. Method is intended to be transferable to other cities, with data sources/tools varying by availability.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Hu2023_1",
+      "EVD_Hu2023_2",
+      "IOM_Hu2023_2",
+      "IOM_Hu2023_1",
+      "IOM_Hu2023_3"
+    ],
+    "source": {
+      "citation": "Hu, A., Yabuki, N., Fukuda, T., Kaga, H., Takeda, S., & Matsuo, K. (2023). Harnessing multiple data sources and emerging technologies for comprehensive urban green space evaluation. Cities, 143, 104562.",
+      "doi": "10.1016/j.cities.2023.104562"
+    }
+  },
+  {
+    "context_id": "CTX_Huang2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_A",
+      "space_type_id": "SET_PRK",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban park green spaces in Nanchang, China. Visual greenery exposure was quantified using panoramic street-view images (Baidu Street View) to compute a Panoramic Green View Index (PGVI). Emotional perception was inferred from facial expressions in user-uploaded social media photos (Sina Microblog) analyzed with FireFACE v1.0, focusing on 2020–2021 due to COVID-19 mask effects. Findings apply to visitors experiencing park streetscapes where visible greenery varies independently from top-down greenness (e.g., NDVI).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Huang2022_1",
+      "IOM_Huang2022_4"
+    ],
+    "source": {
+      "citation": "Huang, C., Hu, T., Duan, Y., Li, Q., Chen, N., Wang, Q., Zhou, M., & Rao, P. (2022). Effect of urban morphology on air pollution distribution in high-density urban blocks based on mobile monitoring and machine learning. Building and Environment, 219, 109173.",
+      "doi": "10.1016/j.buildenv.2022.109173"
+    }
+  },
+  {
+    "context_id": "CTX_Jin2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street spatial quality measurement using street view images in the central urban area of Shenyang (central city/central district). Indicators are derived from semantic segmentation of street view imagery (e.g., green visual index, street width/openness, enclosure, motorization, spatial feasibility, public-facility convenience, vehicle interference, interface transparency) and correlated with subjective perception scores across a large street sample (3,262 streets). Applicable to evaluating and mapping street quality patterns and informing differentiated street improvement strategies in dense urban street networks.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Jin2023_2",
+      "EVD_Jin2023_1",
+      "IOM_Jin2023_2",
+      "IOM_Jin2023_1"
+    ],
+    "source": {
+      "citation": "Jin, K., Yang, T., & Guo, W. (2023). Urban Street Quality Measurement Methods Combining Street View Images. 2023 2nd International Conference on Artificial Intelligence and Intelligent Information Processing (AIIIP), 29–38.",
+      "doi": "10.1109/AIIIP61647.2023.00012"
+    }
+  },
+  {
+    "context_id": "CTX_Jing2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Residents in central Guangzhou, China, in highly urbanized neighborhoods. Street-view greenery was measured along the road network using Baidu Street View images captured every 50 m in four directions (0/90/180/270 degrees) and extracted via deep-learning semantic segmentation (FCN-8s). Outcome is residents' fear of neighborhood crime; analyses control for individual and neighborhood characteristics and test mediation via perceived physical/social incivilities and social integration.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Jing2021_1",
+      "EVD_Jing2021_2",
+      "IOM_Jing2021_2",
+      "IOM_Jing2021_1"
+    ],
+    "source": {
+      "citation": "Jing, F., Liu, L., Zhou, S., Song, J., Wang, L., Zhou, H., Wang, Y., & Ma, R. (2021). Assessing the Impact of Street-View Greenery on Fear of Neighborhood Crime in Guangzhou, China. International Journal of Environmental Research and Public Health, 18(1), 311.",
+      "doi": "10.3390/ijerph18010311"
+    }
+  },
+  {
+    "context_id": "CTX_Jing2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban road greening assessment in Shenzhen (Nanshan, Futian, Luohu). Road network segmented every 100 m to create sampling points; street-level Green View Index (GVI) computed from Baidu panoramic street-view images using DeepLabV3+ semantic segmentation (vegetation pixel proportion). NDVI derived from Landsat via Google Earth Engine using maximum NDVI from five consecutive images near July 2023 after cloud filtering. Study highlights that dense high-rise built form and reflective building materials can obstruct/complicate remote sensing, causing NDVI null or underestimated values; recommends using GVI as a supplement for built-up areas.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Jing2024_2",
+      "EVD_Jing2024_1",
+      "IOM_Jing2024_3",
+      "IOM_Jing2024_2",
+      "IOM_Jing2024_1"
+    ],
+    "source": {
+      "citation": "Jing, X., Li, Z., Chen, H., & Zhang, C. (2024). \"Is What We See Always Real?\" A Comparative Study of Two-Dimensional and Three-Dimensional Urban Green Spaces: The Case of Shenzhen's Central District. Forests, 15(6), 983.",
+      "doi": "10.3390/f15060983"
+    }
+  },
+  {
+    "context_id": "CTX_Kameoka2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban streetscape greenery assessment using Google Street View images collected outdoors in Kyoto City, Japan. Images were 640×640 pixels (API free-plan maximum), horizontal view, and multiple headings per coordinate. The method focuses on overall greenery coverage (not vegetation types/conditions) and uses a CNN trained on many small image patches generated from fewer manually drawn greenery rectangles (CPM) to reduce annotation effort. Intended for mapping/quantifying street-level greenery (e.g., GVI) across target districts.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Kameoka2022_1",
+      "IOM_Kameoka2022_1"
+    ],
+    "source": {
+      "citation": "Kameoka, T., Uchida, A., Sasaki, Y., & Ise, T. (2022). Assessing streetscape greenery with deep neural network using Google Street View. Breeding Science, 72(1), 107–114.",
+      "doi": "10.1270/jsbbs.21073"
+    }
+  },
+  {
+    "context_id": "CTX_Kang2020_1",
+    "climate": {
+      "koppen_zone_id": "KPN_XX"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_UNSPECIFIED",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "This paper is a narrative review of public health studies that sense and audit urban physical/built environments using street view imagery (e.g., Google/Baidu/Tencent Street View). It discusses methods to represent built-environment elements and scenes from eye-level street imagery and summarizes associations with health outcomes (e.g., walking behaviors, depression/anxiety, restorative effects). The scope is global across many cities/countries rather than a single study site, so no single climate zone, LCZ, or specific user group is uniquely applicable.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Kang2020_5",
+      "EVD_Kang2020_1",
+      "EVD_Kang2020_3",
+      "EVD_Kang2020_4",
+      "EVD_Kang2020_2",
+      "IOM_Kang2020_2",
+      "IOM_Kang2020_3",
+      "IOM_Kang2020_1",
+      "IOM_Kang2020_6",
+      "IOM_Kang2020_5"
+    ],
+    "source": {
+      "citation": "Kang, Y., Zhang, F., Gao, S., Lin, H., & Liu, Y. (2020). A review of urban physical environment sensing using street view imagery in public health studies. Annals of GIS, 26(3), 261–275.",
+      "doi": "10.1080/19475683.2020.1791954"
+    }
+  },
+  {
+    "context_id": "CTX_Kawshalya2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_AF"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban streetscape study in Colombo, Sri Lanka (tropical context). Visual perception assessed using 48 Google Street View Images (SVIs) of streets within a 1 km radius from Colpetty Junction; outcomes include perceived safety, comfort/preference, and perceived complexity, compared against objective visual complexity measures (Shannon Diversity Index and Fractal Dimension).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Kawshalya2022_1",
+      "EVD_Kawshalya2022_3",
+      "EVD_Kawshalya2022_4",
+      "IOM_Kawshalya2022_1",
+      "IOM_Kawshalya2022_2",
+      "IOM_Kawshalya2022_4"
+    ],
+    "source": {
+      "citation": "Kawshalya, L. W. G., Weerasinghe, U. G. D., & Chandrasekara, D. P. (2022). The impact of visual complexity on perceived safety and comfort of the users: A study on urban streetscape of Sri Lanka. PLOS ONE, 17(8), e0272074.",
+      "doi": "10.1371/journal.pone.0272074"
+    }
+  },
+  {
+    "context_id": "CTX_Ki2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Study conducted in Seoul, Republic of Korea. Neighborhood street greenery exposure was measured using Google Street View images sampled at 50 m intervals and deep-learning semantic segmentation to compute Green View Index (GVI). Built-environment variables (including GVI, park area, street trees, intersections, land-use mix, traffic safety, distance to transportation, water area) were calculated within a 500 m buffer around respondents' residences. Outcomes were self-reported walking time near home in the last week, separated into utilitarian and leisure walking, with controls for individual/household factors and self-selection variables (walking will and residential location choice).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Ki2021_1",
+      "EVD_Ki2021_4",
+      "EVD_Ki2021_5",
+      "EVD_Ki2021_3",
+      "EVD_Ki2021_2",
+      "IOM_Ki2021_6",
+      "IOM_Ki2021_5",
+      "IOM_Ki2021_1",
+      "IOM_Ki2021_4",
+      "IOM_Ki2021_2"
+    ],
+    "source": {
+      "citation": "Ki, D., & Lee, S. (2021). Analyzing the effects of Green View Index of neighborhood streets on walking time using Google Street View and deep learning. Landscape and Urban Planning, 205, 103920.",
+      "doi": "10.1016/j.landurbplan.2020.103920"
+    }
+  },
+  {
+    "context_id": "CTX_Larkin2019_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CSB"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study conducted in the Portland, Oregon Metropolitan Statistical Area (MSA), using georeferenced Google Street View (GSV) images to measure visible greenness (Green View Index) and compare/augment bird's-eye greenspace measures (e.g., NDVI, tree cover, distance to parks). Images have variable temporal coverage (years 2007–2016) and are more frequently captured in clear summer months; about 20% of sampled images were taken in other seasons. Potential biases include uneven spatial/temporal GSV coverage (especially rural areas) and pixel-based classification errors that may misclassify manmade green objects (e.g., green cars/signs) as greenspace; machine learning is suggested to improve utility.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Larkin2019_1",
+      "IOM_Larkin2019_2"
+    ],
+    "source": {
+      "citation": "Larkin, A., & Hystad, P. (2019). Evaluating street view exposure measures of visible green space for health research. Journal of Exposure Science & Environmental Epidemiology, 29(4), 447–456.",
+      "doi": "10.1038/s41370-018-0017-1"
+    }
+  },
+  {
+    "context_id": "CTX_Larkin2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_XX"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study uses Place Pulse 2.0 Google Street View image locations sampled across 56 cities in 32 countries (multiple climates). Built environment perceptions (safety, lively, beauty) are predicted using street-level visible features from segmented street view images and compared to GIS/remote sensing measures (e.g., NDVI within 250 m; other GIS variables sampled around image locations). Applicable to urban street environments where street view imagery and GIS/remote sensing covariates are available; results emphasize that street-level visible features explain more variance in perceptions than GIS/remote sensing alone.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Larkin2021_1",
+      "EVD_Larkin2021_2",
+      "IOM_Larkin2021_1",
+      "IOM_Larkin2021_2"
+    ],
+    "source": {
+      "citation": "Larkin, A., Gu, X., Chen, L., & Hystad, P. (2021). Predicting perceptions of the built environment using GIS, satellite and street view image approaches. Landscape and Urban Planning, 216, 104257.",
+      "doi": "10.1016/j.landurbplan.2021.104257"
+    }
+  },
+  {
+    "context_id": "CTX_Lee2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_URB_AGG",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Narrative review of deep learning-based semantic segmentation methods and datasets for measuring urban greenness from both plan-view aerial imagery (satellite/UAV/airplane) and street-view imagery (e.g., GVI). Includes discussion of datasets such as ISPRS Potsdam/Vaihingen (plan-view) and Cityscapes/ADE20K (street-view/scene parsing), and an example application measuring urban greenness across 31 major cities in China using a high-resolution urban green space dataset (UGSet) from Gaofen-2 satellite imagery. Applicable to general urban contexts rather than a single site.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Lee2024_1",
+      "IOM_Lee2024_1"
+    ],
+    "source": {
+      "citation": "Lee, D.H. et al. (2024). A Review on Recent Deep Learning-Based Semantic Segmentation for Urban Greenness Measurement. Sensors, 24, 2245.",
+      "doi": "10.3390/s24072245"
+    }
+  },
+  {
+    "context_id": "CTX_Lei2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street-space planning and design using IoT street-view data and FCN-8s semantic segmentation to estimate Green Looking Ratio (GLR) and relate GLR to citizen satisfaction across four street types. Data quality depends on IoT device placement, coverage, and environmental conditions (lighting/weather); multiple devices at different locations/angles plus regular maintenance/calibration are recommended. Model training uses cross-entropy loss with SGD (initial learning rate 0.001, decays 10% every 10,000 iterations over 50,000 iterations; momentum 0.9; weight decay 0.0005).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Lei2024_3",
+      "EVD_Lei2024_2",
+      "EVD_Lei2024_4",
+      "EVD_Lei2024_1",
+      "IOM_Lei2024_5",
+      "IOM_Lei2024_2",
+      "IOM_Lei2024_4",
+      "IOM_Lei2024_1"
+    ],
+    "source": {
+      "citation": "Lei, Y., Zhou, H., Xue, L., Yuan, L., Liu, Y., Wang, M., & Wang, C. (2024). Evaluating and Comparing Human Perceptions of Streets in Two Megacities by Integrating Street-View Images, Deep Learning, and Space Syntax. Buildings, 14(6), 1847.",
+      "doi": "10.3390/buildings14061847"
+    }
+  },
+  {
+    "context_id": "CTX_Li2015_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Street-level urban greenery assessment using Google Street View (GSV) images and a modified Green View Index (GVI). Study uses randomly generated sample sites along the road network and computes visible greenness from 360° horizontal coverage (six directions) and multiple vertical view angles (three pitches), totaling 18 GSV images per site. Intended to represent greenness pedestrians can see; vegetation is extracted from RGB imagery via an automatic unsupervised classification approach, with noted challenges from shadows and confusion with manmade green objects due to lack of near-infrared bands.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Li2015_2",
+      "EVD_Li2015_1",
+      "IOM_Li2015_2",
+      "IOM_Li2015_1"
+    ],
+    "source": {
+      "citation": "Li, X., Zhang, C., & Li, W. (2015). Does the Visibility of Greenery Increase Perceived Safety in Urban Areas? Evidence from the Place Pulse 1.0 Dataset. ISPRS International Journal of Geo-Information, 4(3), 1166–1183.",
+      "doi": "10.3390/ijgi4031166"
+    }
+  },
+  {
+    "context_id": "CTX_Li2017_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Street-level urban landscape mapping using Google Street View panoramas in Boston, Massachusetts. The study quantifies streetscape characteristics including street greenery (modified Green View Index) and street canyon openness (Sky View Factor) from publicly accessible GSV imagery, using automated image processing and geometric transformation to generate fisheye views for SVF estimation. Applicable to city-scale street environments, including contrasts between downtown areas with lower greenery and suburban areas with higher greenery.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Li2017_2",
+      "EVD_Li2017_1",
+      "IOM_Li2017_1",
+      "IOM_Li2017_2"
+    ],
+    "source": {
+      "citation": "Li, X., Ratti, C., & Seiferling, I. (2017). Mapping Urban Landscapes Along Streets Using Google Street View. Lecture Notes in Geoinformation and Cartography, 341–356.",
+      "doi": "10.1007/978-3-319-57336-6_24"
+    }
+  },
+  {
+    "context_id": "CTX_Li2018_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Street-level walking activity analysis in Boston, Massachusetts using passively collected anonymous smartphone GPS trajectories (activity-tracking app) map-matched to OpenStreetMap streets, combined with Google Street View–derived streetscape metrics (e.g., sky view factor/street enclosure from buildings and trees, and green view index from green-season images), plus Walk Score and population; associations estimated with regression models accounting for spatial autocorrelation and stratified by land use type.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Li2018_2",
+      "EVD_Li2018_5",
+      "EVD_Li2018_1",
+      "EVD_Li2018_4",
+      "EVD_Li2018_6",
+      "EVD_Li2018_3",
+      "IOM_Li2018_3",
+      "IOM_Li2018_4",
+      "IOM_Li2018_6",
+      "IOM_Li2018_8",
+      "IOM_Li2018_5",
+      "IOM_Li2018_7"
+    ],
+    "source": {
+      "citation": "Li, X., Ratti, C., & Seiferling, I. (2018). Quantifying the shade provision of street trees in urban landscape: A case study in Boston, USA, using Google Street View. Landscape and Urban Planning, 169, 81–91.",
+      "doi": "10.1016/j.landurbplan.2017.08.011"
+    }
+  },
+  {
+    "context_id": "CTX_Li2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Roadside urban thermal environment study using street view images to quantify roadside vegetation types (grass, shrubs, trees) and relate them to land surface temperature (LST) retrieved from a Landsat-8 image (30 m resolution) acquired around 10:52 a.m. Beijing time on 2 Nov 2019. Study area is Guangzhou; analyses include hotspot analysis (Getis-Ord Gi*) and geographically weighted regression (GWR) with buffers and sampling aligned to 30 m intervals.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Li2022_1",
+      "IOM_Li2022_1"
+    ],
+    "source": {
+      "citation": "Li, B., Xing, H., Cao, D., Yang, G., & Zhang, H. (2022). Exploring the Effects of Roadside Vegetation on the Urban Thermal Environment Using Street View Images. International Journal of Environmental Research and Public Health, 19(3), 1272.",
+      "doi": "10.3390/ijerph19031272"
+    }
+  },
+  {
+    "context_id": "CTX_Li2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_XX"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_URB",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Nationwide China urban analysis using street view images (four directions per point) from 2013–2022 and satellite remote sensing to compute 2D and 3D urban landscape indicators (greenness, grayness, openness, crowding) and relate them to city socioeconomic profiles (GDP per capita, urban population rate, built-up area per capita, hospital count) across many cities and functional zones.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Li2024_2",
+      "EVD_Li2024_9",
+      "EVD_Li2024_10",
+      "EVD_Li2024_4",
+      "EVD_Li2024_1",
+      "EVD_Li2024_6",
+      "EVD_Li2024_3",
+      "EVD_Li2024_8",
+      "EVD_Li2024_5",
+      "IOM_Li2024_11",
+      "IOM_Li2024_10",
+      "IOM_Li2024_3",
+      "IOM_Li2024_1",
+      "IOM_Li2024_4",
+      "IOM_Li2024_2",
+      "IOM_Li2024_6",
+      "IOM_Li2024_8",
+      "IOM_Li2024_12"
+    ],
+    "source": {
+      "citation": "Li, X., Shang, W.-L., Liu, Q., Liu, X., Lyu, Z., & Ochieng, W. (2024). Towards a sustainable city: Deciphering the determinants of restorative park and spatial patterns. Sustainable Cities and Society, 104, 105292.",
+      "doi": "10.1016/j.scs.2024.105292"
+    }
+  },
+  {
+    "context_id": "CTX_Li2025_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Applies to rapidly urbanizing, high-density urban neighborhoods in Wuhan, China, where ischemic heart disease (IHD) hospitalization counts are analyzed at the community level (2016–2018) in relation to multiple urban green space indicators (including street-view Green View Index) and built-environment factors; effects may vary spatially and may be attenuated in compact, traffic- and heat-impacted districts with limited open space.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Li2025_1",
+      "EVD_Li2025_2",
+      "IOM_Li2025_2",
+      "IOM_Li2025_1"
+    ],
+    "source": {
+      "citation": "Li, X., Liu, Q., Liu, X., & Ren, Y. (2025). Greener is healthier: Unraveling the distinction of health impacts of urban green indicators in Wuhan, China. Sustainable Cities and Society, 125, 106318.",
+      "doi": "10.1016/j.scs.2025.106318"
+    }
+  },
+  {
+    "context_id": "CTX_Liang2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_AF"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study area is the main island of Singapore. Visual environment patterns are derived from multi-year street view imagery aggregated to H3 hexagon research units (resolution 10) and connected via the road network as an undirected graph. Visual indicators represent inherent physical environment components (sky, vegetation, building, road) with temporary objects excluded, and perceptual attributes are also analyzed. Applicable to street-level urban visual environment characterization and its spatial distribution and temporal evolution across the city.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Liang2023_4",
+      "EVD_Liang2023_3",
+      "EVD_Liang2023_2",
+      "EVD_Liang2023_1",
+      "IOM_Liang2023_4",
+      "IOM_Liang2023_1",
+      "IOM_Liang2023_3",
+      "IOM_Liang2023_2"
+    ],
+    "source": {
+      "citation": "Liang, X., Zhao, T., & Biljecki, F. (2023). Revealing spatio-temporal evolution of urban visual environments with street view imagery. Landscape and Urban Planning, 237, 104802.",
+      "doi": "10.1016/j.landurbplan.2023.104802"
+    }
+  },
+  {
+    "context_id": "CTX_Liu2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_RES",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Cross-sectional study of urban residents in Guangzhou, China, examining associations between access to natural outdoor environments (green and blue spaces) around the home (1000 m buffer) and subjective well-being components (life satisfaction, positive affect, negative affect). Access was measured using both street-view imagery with deep learning (streetscape visibility metrics) and satellite-derived metrics, and modeled using seemingly unrelated regression with socioeconomic heterogeneity analyses.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Liu2021_2",
+      "EVD_Liu2021_3",
+      "EVD_Liu2021_1",
+      "IOM_Liu2021_2",
+      "IOM_Liu2021_3",
+      "IOM_Liu2021_1"
+    ],
+    "source": {
+      "citation": "Liu, Y., Xiao, T., Liu, Y., Yao, Y., & Wang, R. (2021). Natural outdoor environments and subjective well-being in Guangzhou, China: Comparing different measures of access. Urban Forestry & Urban Greening, 59, 127027.",
+      "doi": "10.1016/j.ufug.2021.127027"
+    }
+  },
+  {
+    "context_id": "CTX_Liu2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study conducted on main streets within the third ring area of Wuhan, China. Analysis used 15,199 valid street-view images (excluding tunnels, viaducts, and poor lighting) and Landsat 8 land surface temperature imagery (30 m resolution) with <5% cloud cover from 15 September 2018. Focus on street green space morphology and surrounding built environment indicators to model nonlinear cooling effects (SUHI/LST).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Liu2022_1",
+      "EVD_Liu2022_2",
+      "IOM_Liu2022_2",
+      "IOM_Liu2022_1"
+    ],
+    "source": {
+      "citation": "Liu, Z., Ma, X., Hu, L., Liu, Y., Lu, S., Chen, H., & Tan, Z. (2022). Nonlinear Cooling Effect of Street Green Space Morphology: Evidence from a Gradient Boosting Decision Tree and Explainable Machine Learning Approach. Land, 11(12), 2220.",
+      "doi": "10.3390/land11122220"
+    }
+  },
+  {
+    "context_id": "CTX_Liu2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Case study in Harbin, China, measuring legibility of public open spaces using street view images (SVIs). SVIs with major occlusions (e.g., trucks, buses, other objects) were manually removed; remaining images were classified with a DCNN and interpreted with Grad-CAM. Human validation used an online survey where adult professionals and non-professionals watched a 15-second panoramic animation of a spatial segment, then selected the matching SVI from multiple choices and clicked on image regions reflecting their decision process. Authors note potential sensitivity to season, daylight, and weather at image collection time, and possible bias from using animated panoramas and the limited sensory information in SVIs.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Liu2023_5",
+      "EVD_Liu2023_1",
+      "EVD_Liu2023_3",
+      "EVD_Liu2023_4",
+      "EVD_Liu2023_2",
+      "IOM_Liu2023_1",
+      "IOM_Liu2023_3",
+      "IOM_Liu2023_2",
+      "IOM_Liu2023_5",
+      "IOM_Liu2023_6",
+      "IOM_Liu2023_4"
+    ],
+    "source": {
+      "citation": "Liu, W., Hu, X., Song, Z., & Yuan, X. (2023). Identifying the integrated visual characteristics of greenway landscape: A focus on human perception. Sustainable Cities and Society, 99, 104937.",
+      "doi": "10.1016/j.scs.2023.104937"
+    }
+  },
+  {
+    "context_id": "CTX_Long2019_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_3",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Editorial overview of methods for measuring human-scale urban form and performance, including street-view image analysis. Mentions a case in the Hutong area of Beijing using Tencent Street View imagery (2012 and 2016) to assess visual quality of street space and its temporal variation; context is human-scale street environments in dense historic urban fabric.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Long2019_2",
+      "EVD_Long2019_1",
+      "IOM_Long2019_2",
+      "IOM_Long2019_1"
+    ],
+    "source": {
+      "citation": "Long, Y., & Ye, Y. (2019). Measuring human-scale urban form and its performance. Landscape and Urban Planning, 191, 103612.",
+      "doi": "10.1016/j.landurbplan.2019.103612"
+    }
+  },
+  {
+    "context_id": "CTX_Lu2018_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Hong Kong SAR (China) public rental housing residents; eye-level street greenness exposure measured from Google Street View images using PSPNet within 400 m and 800 m circular buffers around geocoded dwelling locations; outcome focused on walking behavior from a population-level survey; cross-sectional design with reduced residential self-selection due to public housing scheme.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Lu2018_4",
+      "EVD_Lu2018_2",
+      "EVD_Lu2018_1",
+      "EVD_Lu2018_3",
+      "IOM_Lu2018_2",
+      "IOM_Lu2018_5",
+      "IOM_Lu2018_4",
+      "IOM_Lu2018_1"
+    ],
+    "source": {
+      "citation": "Lu, Y. (2018). The Association of Urban Greenness and Walking Behavior: Using Google Street View and Deep Learning Techniques to Estimate Residents' Exposure to Urban Greenness. International Journal of Environmental Research and Public Health, 15(8), 1576.",
+      "doi": "10.3390/ijerph15081576"
+    }
+  },
+  {
+    "context_id": "CTX_Luo2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Mega-city context in Chengdu, China. Physical activity measured as cycling and running intensity from Strava heatmap trajectories aggregated to 250 m × 250 m grids (December 2021). Built environment assessed with human-scale streetscape indicators derived from Baidu 360° street-view semantic segmentation (green view index, sky view index, road view index) plus urban form and transport controls (e.g., FAR, land-use mix, road density, bus stations). Spatial heterogeneity analyzed using GWR to estimate locally varying associations between streetscape/built environment and cycling/running.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Luo2022_1",
+      "EVD_Luo2022_3",
+      "EVD_Luo2022_2",
+      "IOM_Luo2022_3",
+      "IOM_Luo2022_1",
+      "IOM_Luo2022_2"
+    ],
+    "source": {
+      "citation": "Luo, P., Yu, B., Li, P., & Liang, P. (2022). Spatially varying impacts of the built environment on physical activity from a human-scale view: Using street view data. Frontiers in Environmental Science, 10.",
+      "doi": "10.3389/fenvs.2022.1021081"
+    }
+  },
+  {
+    "context_id": "CTX_Ma2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_CMP",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "University campus walking spaces in Wuxi, Jiangsu Province, China, evaluated for perceived restorative quality using street view images and in-field questionnaires with students rating images on a 7-point Likert scale; visual features include low-level color/edge metrics and higher-level semantic/depth features extracted via pretrained deep learning models and OpenCV, with restorative quality modeled using machine learning (GBDT) against PRS-11-related ratings.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Ma2023_1",
+      "IOM_Ma2023_1"
+    ],
+    "source": {
+      "citation": "Ma, H., Xu, Q., & Zhang, Y. (2023). High or low? Exploring the restorative effects of visual levels on campus spaces using machine learning and street view imagery. Urban Forestry & Urban Greening, 88, 128087.",
+      "doi": "10.1016/j.ufug.2023.128087"
+    }
+  },
+  {
+    "context_id": "CTX_Meng2020_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Case study in Tianhe District, Guangzhou (China). Human perception of greenery and open spaces is proxied using Baidu street view images sampled every 100 m along secondary roads; greenery and open space are represented by segmented greenery pixels and sky pixels, interpolated to continuous surfaces using IDW, and related to urban poverty (modified IMD) using GWR.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Meng2020_3",
+      "EVD_Meng2020_1",
+      "EVD_Meng2020_2",
+      "IOM_Meng2020_2",
+      "IOM_Meng2020_1",
+      "IOM_Meng2020_3"
+    ],
+    "source": {
+      "citation": "Meng, Y., Xing, H., Yuan, Y., Wong, M. S., & Fan, K. (2020). Sensing urban poverty: From the perspective of human perception-based greenery and open-space landscapes. Computers, Environment and Urban Systems, 84, 101544.",
+      "doi": "10.1016/j.compenvurbsys.2020.101544"
+    }
+  },
+  {
+    "context_id": "CTX_Meng2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_A",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Study conducted in Kitakyushu, Fukuoka, Japan (a coastal city). Urban green-space visual comfort was assessed using Google Street View panoramic images sampled at 100 m intervals (61,357 points; 39,593 images, April–October). Landscape elements in street-view images were segmented with DeepLabV3+ using the ADE20K dataset, and combined with 2D remote-sensing indicators from Landsat-8 (30 m; June 2024) such as NDVI, NDBI, FCV, and landscape diversity.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Meng2024_8",
+      "EVD_Meng2024_6",
+      "EVD_Meng2024_1",
+      "EVD_Meng2024_3",
+      "EVD_Meng2024_5",
+      "EVD_Meng2024_2",
+      "EVD_Meng2024_4",
+      "IOM_Meng2024_3",
+      "IOM_Meng2024_8",
+      "IOM_Meng2024_4",
+      "IOM_Meng2024_1",
+      "IOM_Meng2024_2",
+      "IOM_Meng2024_10",
+      "IOM_Meng2024_9"
+    ],
+    "source": {
+      "citation": "Meng, Y., Shi, J., Lyu, M., Sun, D., & Fukuda, H. (2024). Research into the Influence Mechanisms of Visual-Comfort and Landscape Indicators of Urban Green Spaces. Land, 13(10), 1688.",
+      "doi": "10.3390/land13101688"
+    }
+  },
+  {
+    "context_id": "CTX_Ni2025_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Summer urban community street thermal comfort assessment using 1 m evaluation units. Inputs include drone-derived high-resolution DOM/DSM (DJI M300 RTK; DOM ~4.7 cm) for buildings/trees/roads, UMEP (QGIS) pixel-based shadow mapping including vegetation canopy, street-view imagery for Green View Index (GVI), and GIS/Python (ArcGIS 10.8) road width calculation at 1 m intervals for cycling and pedestrian paths. Multi-scale indicators analyzed at 10 m and 200 m scales; comfort scoring via AHP-TOPSIS to produce a greenway/street comfort evaluation map prioritizing shading protection and spatial efficiency.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Ni2025_2",
+      "EVD_Ni2025_3",
+      "IOM_Ni2025_2",
+      "IOM_Ni2025_3"
+    ],
+    "source": {
+      "citation": "Ni, Y., Lin, L., Xia, H., & Wang, X. (2025). Urban Street Greening and Resident Comfort: An Integrated Approach Based on High-Precision Shadow Distribution and Facade Visual Assessment. Sustainability, 17(3), 1026.",
+      "doi": "10.3390/su17031026"
+    }
+  },
+  {
+    "context_id": "CTX_Nishio2019_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study area is Shibuya, Tokyo, Japan. Sky view factor (SVF) was calculated along streets using Google Street View panoramic images and image processing, then mapped and statistically compared across land-use zoning (e.g., quasi-residential and commercial districts) and road contexts (including wide trunk roads and intersections). Validation included comparison of SVF from Google Street View with SVF derived from fisheye-lens photographs at selected points.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Nishio2019_3",
+      "EVD_Nishio2019_2",
+      "EVD_Nishio2019_1",
+      "IOM_Nishio2019_2",
+      "IOM_Nishio2019_1",
+      "IOM_Nishio2019_3"
+    ],
+    "source": {
+      "citation": "Nishio, S., & Ito, F. (2019). Application of Method for Calculating Sky View Factor Using Google Street View: Relation Between Sky View Factor and Physical Elements in Urban Space. Proceedings of the ICA, 2, 1–8.",
+      "doi": "10.5194/ica-proc-2-92-2019"
+    }
+  },
+  {
+    "context_id": "CTX_ORegan2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFB"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street-level study assessing associations between Google Street View-derived greenspace (Green View Index, plus NDVI and GVI:NDVI) and particulate air pollution (PM2.5, PM10, PM1) measured by a distributed PurpleAir sensor network. Analysis used multiple buffer radii (100 m, 250 m, 500 m, 1000 m, 2000 m) around 12 monitoring stations, with models adjusted for temperature, humidity, and traffic volumes. Study location is Cork, Ireland, representing an oceanic climate and typical mixed urban street environments rather than a single park or indoor setting.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_ORegan2022_2",
+      "EVD_ORegan2022_3",
+      "EVD_ORegan2022_1",
+      "IOM_ORegan2022_1",
+      "IOM_ORegan2022_3",
+      "IOM_ORegan2022_2"
+    ],
+    "source": {
+      "citation": "O'Regan, A. C., Byrne, R., Hellebust, S., & Nyhan, M. M. (2022). Associations between Google Street View-derived urban greenspace metrics and air pollution measured using a distributed sensor network. Sustainable Cities and Society, 87, 104221.",
+      "doi": "10.1016/j.scs.2022.104221"
+    }
+  },
+  {
+    "context_id": "CTX_Ogawa2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban streetscape subjective-perception modeling using street-view images in Setagaya Ward, Tokyo (Japan). Web-based survey with pairwise comparisons across 22 subjective perception items; large-scale labeling (10,000 pairs × 22 items × 40 respondents) used to train/evaluate a multi-label ConvNeXt-B model for predicting subjective perception scores from street-view imagery. Applicable to human-centered street design and planning interventions where perceptions such as openness, safety, cleanliness, attractiveness, etc. are of interest.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Ogawa2024_3",
+      "EVD_Ogawa2024_2",
+      "EVD_Ogawa2024_4",
+      "EVD_Ogawa2024_1",
+      "EVD_Ogawa2024_5",
+      "IOM_Ogawa2024_2",
+      "IOM_Ogawa2024_3",
+      "IOM_Ogawa2024_5",
+      "IOM_Ogawa2024_4",
+      "IOM_Ogawa2024_1"
+    ],
+    "source": {
+      "citation": "Ogawa, Y., Oki, T., Zhao, C., Sekimoto, Y., & Shimizu, C. (2024). Evaluating the subjective perceptions of streetscapes using street-view images. Landscape and Urban Planning, 247, 105073.",
+      "doi": "10.1016/j.landurbplan.2024.105073"
+    }
+  },
+  {
+    "context_id": "CTX_Qi2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFB"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Copenhagen Municipality (Denmark) street-level green visibility assessment using Google Street View imagery. Green View Index (0–100%) computed by aggregating semantic-segmentation pixel shares of vegetation classes (tree, grass, plant/flora) from street-view images; results mapped on 250×250 m grids and validated (overall RMSE 0.07; overall MAPE 33.92%) with a noted tendency to underestimate GVI in most cases.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Qi2024_1",
+      "EVD_Qi2024_2",
+      "IOM_Qi2024_4",
+      "IOM_Qi2024_1"
+    ],
+    "source": {
+      "citation": "Qi, L., Hu, Y., Bu, R., Xiong, Z., Li, B., Zhang, C., Liu, H., & Li, C. (2024). Spatial-temporal patterns and influencing factors of the Building Green View Index: A new approach for quantifying 3D urban greenery visibility. Sustainable Cities and Society, 111, 105518.",
+      "doi": "10.1016/j.scs.2024.105518"
+    }
+  },
+  {
+    "context_id": "CTX_Qin2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_UNSPECIFIED",
+      "space_type_id": "SET_HWY",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_NA"
+    },
+    "applicability": {
+      "conditions": "Highway greening landscape spatial quality evaluation using driving-perspective, high-definition street-view/scene images collected along the Beijing section of the Beijing-Tibet Expressway (from Madian Bridge to the Beijing municipal boundary). Quantitative indicators are extracted via deep-learning panoptic segmentation (Panoptic-DeepLab) and color analysis (K-means clustering in RGB/HSV) to characterize visible green and related landscape structure; applicable to highway corridors including plain and mountainous segments and special sections such as sound barriers, hard walls/slope protection, elevated bridges, and tunnel entrances/exits.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Qin2024_2",
+      "EVD_Qin2024_1",
+      "IOM_Qin2024_1",
+      "IOM_Qin2024_2"
+    ],
+    "source": {
+      "citation": "Qin, X., Yang, D., & Wangari, V. W. (2024). Quantitative characterization and evaluation of highway greening landscape spatial quality based on deep learning. Environmental Impact Assessment Review, 107, 107559.",
+      "doi": "10.1016/j.eiar.2024.107559"
+    }
+  },
+  {
+    "context_id": "CTX_Qiu2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Street-level perceptual quality measurement in Pudong District, Shanghai using Baidu Street View images with consistent camera settings, combined with POI data and OSM road networks. Public perceptions were collected via an online pairwise-comparison survey (23 mostly architecture-student volunteers; 3,120 valid entries) to create ranked 0–10 labels using the TrueSkill algorithm, then used as training data to predict four perceptual qualities across the district. Best suited where street view imagery is available; segmentation relied on pre-trained models and the rater sample was limited and not randomly selected.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Qiu2022_1",
+      "EVD_Qiu2022_2",
+      "IOM_Qiu2022_2",
+      "IOM_Qiu2022_1"
+    ],
+    "source": {
+      "citation": "Qiu, W., Li, W., Liu, X., & Huang, X. (2022). Subjectively Measured Streetscape Qualities for Shanghai with Large-Scale Application of Computer Vision and Machine Learning. Proceedings of the 2021 DigitalFUTURES, 242–251.",
+      "doi": "10.1007/978-981-16-5983-6_23"
+    }
+  },
+  {
+    "context_id": "CTX_Qiu2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_A",
+      "space_type_id": "SET_PRK",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban green space landscape images evaluated for public ecosystem aesthetic perception using a PEAP framework that combines deep-learning-extracted landscape elements/features with eye-tracking indicators and perception questionnaire selections. Images were standardized (31° horizontal × 21° vertical view; 3968×2976 px) and a subset of 24 test images was selected based on cumulative selection frequencies across quality categories. Deep learning was implemented with Keras/TensorFlow (CUDA acceleration) and trained using the ADE20K annotated image dataset; indicator scores were derived from the probability of an image being selected under each landscape concept indicator.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Qiu2023_3",
+      "EVD_Qiu2023_1",
+      "EVD_Qiu2023_4",
+      "IOM_Qiu2023_1",
+      "IOM_Qiu2023_4",
+      "IOM_Qiu2023_3"
+    ],
+    "source": {
+      "citation": "Qiu, Y., Pan, H., Kalantari, Z., Giusti, M., & Che, S. (2023). The natural focus: Combining deep learning and eye-tracking to understand public perceptions of urban ecosystem aesthetics. Ecological Indicators, 156, 111181.",
+      "doi": "10.1016/j.ecolind.2023.111181"
+    }
+  },
+  {
+    "context_id": "CTX_Rui2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Applies to visual evaluation of urban street landscape spatial quality using open street-view images in the main urban area of Fuzhou (Gulou, Taijiang, Cangshan, and Jin'an districts). Indicators are extracted via semantic segmentation and evaluated using ELO scoring and a random forest model, then mapped across thousands of street points.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Rui2023_2",
+      "EVD_Rui2023_1",
+      "IOM_Rui2023_2",
+      "IOM_Rui2023_1"
+    ],
+    "source": {
+      "citation": "Rui, Q., & Cheng, H. (2023). Quantifying the spatial quality of urban streets with open street view images: A case study of the main urban area of Fuzhou. Ecological Indicators, 156, 111204.",
+      "doi": "10.1016/j.ecolind.2023.111204"
+    }
+  },
+  {
+    "context_id": "CTX_Sakamoto2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_4",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Cross-sectional study in Sendai City, Japan, examining associations between neighbourhood street greenery at different vertical viewing angles (from Google Street View images segmented with DeepLab v3+) and residents' leisure walking time. Neighbourhood defined as road-network buffer within 1000 m of residence; analysis uses multilevel mixed-effects models with individual covariates and random intercept at elementary school district level.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Sakamoto2023_3",
+      "EVD_Sakamoto2023_2",
+      "EVD_Sakamoto2023_1",
+      "IOM_Sakamoto2023_3",
+      "IOM_Sakamoto2023_2",
+      "IOM_Sakamoto2023_1"
+    ],
+    "source": {
+      "citation": "Sakamoto, S., Kogure, M., Hanibuchi, T., Nakaya, N., Hozawa, A., & Nakaya, T. (2023). Effects of greenery at different heights in neighbourhood streetscapes on leisure walking: A cross-sectional study using machine learning of streetscape images in Sendai City, Japan. International Journal of Health Geographics, 22(1).",
+      "doi": "10.1186/s12942-023-00351-6"
+    }
+  },
+  {
+    "context_id": "CTX_Sanchez2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFB"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Street-level greenness visibility (GVI) modelling framework using open-source street view imagery (Mapillary) sampled along street networks (e.g., points every 50 m) and semantic segmentation; missing street-view locations can be supplemented with satellite-derived NDVI from Sentinel-2 (10 m) with NDVI values below 0 removed to exclude non-vegetated pixels. Method evaluates image availability/usability and compares Mapillary-based GVI with Google Street View (GSV) GVI across multiple global cities; intended for scalable citywide street-network applications rather than a single neighbourhood type.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Sanchez2024_1",
+      "IOM_Sanchez2024_1"
+    ],
+    "source": {
+      "citation": "Sánchez, I. A. V., & Labib, S. M. (2024). Accessing eye-level greenness visibility from open-source street view images: A methodological development and implementation in multi-city and multi-country contexts. Sustainable Cities and Society, 103, 105262.",
+      "doi": "10.1016/j.scs.2024.105262"
+    }
+  },
+  {
+    "context_id": "CTX_Shao2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_XX"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "City-scale assessment of perceived visual comfort on urban streets using Baidu street view images (2019) and AI-based semantic segmentation to compute street indicator percentages, followed by clustering of street types and an online questionnaire (Likert scale) where participants rate comfort of sampled street images. Conducted across four Chinese megacities (Beijing, Shanghai, Guangzhou, Shenzhen) with results mapped using GIS and kernel density analysis; ratings are image-based and collected online, so they may differ from in-person comfort in real settings.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Shao2023_3",
+      "EVD_Shao2023_2",
+      "EVD_Shao2023_1",
+      "EVD_Shao2023_4",
+      "IOM_Shao2023_2",
+      "IOM_Shao2023_1",
+      "IOM_Shao2023_4",
+      "IOM_Shao2023_3"
+    ],
+    "source": {
+      "citation": "Shao, Y., Yin, Y., Xue, Z., & Ma, D. (2023). Assessing and Comparing the Visual Comfort of Streets across Four Chinese Megacities Using AI-Based Image Analysis and the Perceptive Evaluation Method. Land, 12(4), 834.",
+      "doi": "10.3390/land12040834"
+    }
+  },
+  {
+    "context_id": "CTX_Shen2018_1",
+    "climate": {
+      "koppen_zone_id": "KPN_AF"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_1",
+      "space_type_id": "SET_CBD",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Visual analytics of human-scale urban form using large-scale street-view imagery and semantic segmentation (e.g., greenery, sky, building, road, vehicle). Users explore and compare areas of interest (AOIs) and streets via interactive views (AOI/Street explorers, ranking and comparison workflows). Example comparisons include Greater London (City of London as a dense center) versus Singapore, and district-level comparisons (e.g., Hong Kong). Classification is preprocessed offline; the system does not support on-demand analysis of street views queried at runtime.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Shen2018_2",
+      "EVD_Shen2018_1",
+      "IOM_Shen2018_1",
+      "IOM_Shen2018_2"
+    ],
+    "source": {
+      "citation": "Shen, Q., Zeng, W., Ye, Y., Arisona, S. M., Schubiger, S., Burkhard, R., & Qu, H. (2018). StreetVizor: Visual Exploration of Human-Scale Urban Forms Based on Street Views. IEEE Transactions on Visualization and Computer Graphics, 24(1), 1004–1013.",
+      "doi": "10.1109/TVCG.2017.2744159"
+    }
+  },
+  {
+    "context_id": "CTX_Song2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_B",
+      "space_type_id": "SET_CMP",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Outdoor pedestrian spaces on Changwon National University campus (Changwon, Republic of Korea) in a temperate climate with hot, humid summers. Measurements taken at 16 points with varying sky/vegetation/artificial view factors near trees and some buildings; includes shaded and sun-exposed locations. Mobile cart instruments measured radiation fluxes, meteorological parameters, land-surface temperature, and mean radiant temperature during late May daytime conditions.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Song2023_1",
+      "EVD_Song2023_4",
+      "EVD_Song2023_2",
+      "EVD_Song2023_3",
+      "IOM_Song2023_2",
+      "IOM_Song2023_4",
+      "IOM_Song2023_5",
+      "IOM_Song2023_1"
+    ],
+    "source": {
+      "citation": "Song, J., Zhu, X., & Yu, X. (2023). Monitoring and mapping vegetation greenery in residential communities using street view images and a Normalized Vegetation Greenery Index: A case study in Beijing, China. Frontiers in Forests and Global Change, 6.",
+      "doi": "10.3389/ffgc.2023.1071569"
+    }
+  },
+  {
+    "context_id": "CTX_Stancato2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Case study in Milan (Local Identity Nuclei 22, NIL Città Studi). The method analyzes street-level perceived urban greenery using street view images and semantic segmentation to compute Green View Index (GVI) and derive directional visual vectors, producing a vector field representation (Visual Greenery Field) across the street network.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Stancato2024_1",
+      "IOM_Stancato2024_1"
+    ],
+    "source": {
+      "citation": "Stancato, G. (2024). The Visual Greenery Field: Representing the Urban Green Visual Continuum with Street View Image Analysis. Sustainability, 16(21), 9512.",
+      "doi": "10.3390/su16219512"
+    }
+  },
+  {
+    "context_id": "CTX_Sun2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_RES",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban residential communities in Dalian, a secondary hilly coastal city in northeastern China. Survey conducted July–August 2018 in urban centers with similar economic backgrounds. Focus on associations between multiple greenery measures (e.g., NDVI from 30 m satellite imagery and street-level greenness) and residents' physical activity and health outcomes, with slope/topography considered (objective slope variability and perceived hilly streets).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Sun2022_1",
+      "IOM_Sun2022_1"
+    ],
+    "source": {
+      "citation": "Sun, P., Song, Y., & Lu, W. (2022). Effect of Urban Green Space in the Hilly Environment on Physical Activity and Health Outcomes: Mediation Analysis on Multiple Greenery Measures. Land, 11(5), 612.",
+      "doi": "10.3390/land11050612"
+    }
+  },
+  {
+    "context_id": "CTX_Sun2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_4",
+      "space_type_id": "SET_CST",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Coastal street segments in southern Qingdao, China (about 17.15 km). Street-level greenery was quantified using street view images (GVI as the pixel proportion of visible green vegetation, via semantic segmentation such as DeepLabV3+). Visual comfort (VICO) was rated by adult participants on a 5-point scale after viewing each street view image for 20 seconds; relationships between GVI and VICO were analyzed using Pearson correlation and regression. Findings are most applicable to pedestrian eye-level perception on urban coastal streets with mixed historic, transitional, and modern districts.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Sun2023_1",
+      "EVD_Sun2023_2",
+      "EVD_Sun2023_3",
+      "IOM_Sun2023_3",
+      "IOM_Sun2023_1",
+      "IOM_Sun2023_2"
+    ],
+    "source": {
+      "citation": "Sun, D., Ji, X., Gao, W., Zhou, F., Yu, Y., Meng, Y., Yang, M., Lin, J., & Lyu, M. (2023). The Relation between Green Visual Index and Visual Comfort in Qingdao Coastal Streets. Buildings, 13(2), 457.",
+      "doi": "10.3390/buildings13020457"
+    }
+  },
+  {
+    "context_id": "CTX_Tao2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study conducted in Zhengzhou, China, focusing on central urban districts. Streetscape perceptions (greenness, openness, enclosure, walkability, imageability) were derived from Baidu Street View images at 20,002 sampling points. Human activity density was estimated from Baidu map brightness via Baidu API using four consecutive days of data (weekdays and weekends) collected between May 2017 and February 2019. Spatial correlation between human activity density and perception scores was analyzed using entropy weighting and bivariate Moran’s I (ArcGIS and GeoDA).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Tao2022_3",
+      "EVD_Tao2022_2",
+      "EVD_Tao2022_1",
+      "IOM_Tao2022_2",
+      "IOM_Tao2022_3",
+      "IOM_Tao2022_1"
+    ],
+    "source": {
+      "citation": "Tao, Y., Wang, Y., Wang, X., Tian, G., & Zhang, S. (2022). Measuring the Correlation between Human Activity Density and Streetscape Perceptions: An Analysis Based on Baidu Street View Images in Zhengzhou, China. Land, 11(3), 400.",
+      "doi": "10.3390/land11030400"
+    }
+  },
+  {
+    "context_id": "CTX_Tong2020_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street greenery assessment in Nanjing, China (Gulou, Xuanwu, Jianye, Qinhuai, and northern Yuhuatai). Uses street-level Tencent Street View images (six directions per site) with semantic segmentation (PSPNet) to compute Green View Index (GVI), plus Landsat 8 satellite imagery (30 m, October 2013) to compute NDVI, and a vegetation structure diversity indicator (VSD) to capture tree–shrub–herb layering. Road network sourced from OpenStreetMap with topological correction; urban functional zones from a 500 m × 500 m grid dataset.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Tong2020_3",
+      "EVD_Tong2020_1",
+      "EVD_Tong2020_2",
+      "EVD_Tong2020_4",
+      "IOM_Tong2020_2",
+      "IOM_Tong2020_4",
+      "IOM_Tong2020_1",
+      "IOM_Tong2020_3"
+    ],
+    "source": {
+      "citation": "Tong, M., She, J., Tan, J., Li, M., Ge, R., & Gao, Y. (2020). Evaluating Street Greenery by Multiple Indicators Using Street-Level Imagery and Satellite Images: A Case Study in Nanjing, China. Forests, 11(12), 1347.",
+      "doi": "10.3390/f11121347"
+    }
+  },
+  {
+    "context_id": "CTX_Tong2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_CMP",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study conducted in Nanjing, China (Nanjing University Gulou campus and surrounding streets). Uses 360-degree Baidu Street View panoramas re-projected to fisheye images and semantic segmentation to compute street view factors (SVF, TVF, BVF) across different vertical viewing angle ranges; applicable to campus-adjacent urban streets with mature street trees and building enclosure where vertical viewing angle selection affects visual indices.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Tong2022_1",
+      "IOM_Tong2022_1"
+    ],
+    "source": {
+      "citation": "Tong, Z., & Gong, C. (2022). Integrating Characteristics of Vertical Viewing Angle into Quantitative Analysis of Street View Photos. 2022 29th International Conference on Geoinformatics, 1–6.",
+      "doi": "10.1109/Geoinformatics57846.2022.9963807"
+    }
+  },
+  {
+    "context_id": "CTX_Torkko2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DFB"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Street-level perceived greenery study conducted at multiple outdoor study sites in Helsinki, Finland. On-site interviews were conducted 8–19 June 2021 between 2:30 pm and 8:15 pm in sunny or partly cloudy weather at around 20°C. Perceived greenery ratings were compared against several computational greenery measures derived from ground-level photographs, LiDAR/point clouds, and top-down remote sensing/land cover within buffers (50 m buffer found to best match perceived greenery).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Torkko2023_2",
+      "EVD_Torkko2023_1",
+      "IOM_Torkko2023_1",
+      "IOM_Torkko2023_2"
+    ],
+    "source": {
+      "citation": "Torkko, J., Poom, A., Willberg, E., & Toivonen, T. (2023). How to best map greenery from a human perspective? Comparing computational measurements with human perception. Frontiers in Sustainable Cities, 5.",
+      "doi": "10.3389/frsc.2023.1160995"
+    }
+  },
+  {
+    "context_id": "CTX_Verma2018_1",
+    "climate": {
+      "koppen_zone_id": "KPN_NA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_CMP",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_UNSPECIFIED"
+    },
+    "applicability": {
+      "conditions": "Data were collected in a smaller, managed institutional (campus) environment with observation points scattered across the study area. Morning and evening datasets were not balanced at every location. The framework uses mobile device orientation (alpha/beta/gamma) and GPS geolocation to filter and geotag images, and applies computer vision (e.g., Places365 scene classification, ADE20K labels, and Faster R-CNN object detection) to quantify visual/environmental attributes such as naturalness, complexity, familiarity, and openness. Results may differ in typical urban areas that are more dynamic and diverse in traffic and interrelated factors; lighting conditions can vary due to overshadowed pockets.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Verma2018_1",
+      "EVD_Verma2018_2",
+      "IOM_Verma2018_1",
+      "IOM_Verma2018_2"
+    ],
+    "source": {
+      "citation": "Verma, D., Jana, A., & Ramamritham, K. (2018). Quantifying Urban Surroundings Using Deep Learning Techniques: A New Proposal. Urban Science, 2(3), 78.",
+      "doi": "10.3390/urbansci2030078"
+    }
+  },
+  {
+    "context_id": "CTX_Wang2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Applies to assessing neighbourhood greenspace quantity and street-level greenspace quality in Guangzhou, China using street view images sampled at many points (four headings per point) and remote-sensing greenspace (Landsat 8, 30 m). Neighbourhood socioeconomic conditions are based on Guangzhou census data. Street-view images are horizontal (vertical angle = 0) and represent streetscapes rather than only within-park environments.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Wang2021_1",
+      "IOM_Wang2021_1"
+    ],
+    "source": {
+      "citation": "Wang, R., Feng, Z., Pearce, J., Yao, Y., Li, X., & Liu, Y. (2021). The distribution of greenspace quantity and quality and their association with neighbourhood socioeconomic conditions in Guangzhou, China: A new approach using deep learning method and street view images. Sustainable Cities and Society, 66, 102664.",
+      "doi": "10.1016/j.scs.2020.102664"
+    }
+  },
+  {
+    "context_id": "CTX_Wang2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_A",
+      "space_type_id": "SET_PRK",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Field study in Zhengzhou, China during winter (cold and dry season). Outdoor thermal comfort assessed via on-site microclimate monitoring (air temperature, relative humidity, wind speed, globe temperature) and questionnaire surveys. Urban greenery exposure quantified from two dimensions: horizontal greenery using Green View Index (GVI) from street-level photos and vertical canopy cover using Tree View Factor (TVF) from upward fisheye images processed in WinSCANOPY. Participants were outdoor users/volunteers surveyed at the sites during measurements; clothing insulation and metabolic rate estimated using ASHRAE 55 and ISO 7730.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Wang2022_3",
+      "EVD_Wang2022_2",
+      "EVD_Wang2022_1",
+      "EVD_Wang2022_5",
+      "EVD_Wang2022_4",
+      "IOM_Wang2022_5",
+      "IOM_Wang2022_2",
+      "IOM_Wang2022_3",
+      "IOM_Wang2022_4",
+      "IOM_Wang2022_1"
+    ],
+    "source": {
+      "citation": "Wang, K., Fang, X., Ma, Y., Xue, S., & Yin, S. (2022). Assessing Effects of Urban Greenery on the Regulation Mechanism of Microclimate and Outdoor Thermal Comfort during Winter in China's Cold Region. Land, 11(9), 1442.",
+      "doi": "10.3390/land11091442"
+    }
+  },
+  {
+    "context_id": "CTX_Wang2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "High-density Hong Kong sidewalk walking context; pedestrian perception of street greening quantified using multi-source indicators (satellite NDVI and Google Street View-based GVI) and weighted by a resident questionnaire to form a walking greening index. Applicable to assessing pedestrian-level greening and perceived walking environment quality in dense urban street networks; note potential limitations of 10 m satellite resolution for wide roads and peri-urban roadside vegetation coverage.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Wang2023_1",
+      "EVD_Wang2023_2",
+      "IOM_Wang2023_1",
+      "IOM_Wang2023_2"
+    ],
+    "source": {
+      "citation": "Wang, H., & van Ameijde, J. (2023). Quantifying the Impact of Pedestrian-level Greening on the Perception of Walking. CAADRIA Proceedings, 2, 451–460.",
+      "doi": "10.52842/conf.caadria.2023.2.451"
+    }
+  },
+  {
+    "context_id": "CTX_Wang2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban greenway and street-level greening assessment using panoramic street-view imagery (Baidu Street View panoramas) and semantic segmentation (DeepLabV3+) to compute PVGVI and relate it to built-environment factors at micro and macro scales; fine-grained urban data collected via Python web scraping and map APIs; study area includes cities in Nanjing.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Wang2024_6",
+      "EVD_Wang2024_8",
+      "EVD_Wang2024_1",
+      "EVD_Wang2024_2",
+      "EVD_Wang2024_5",
+      "EVD_Wang2024_7",
+      "EVD_Wang2024_3",
+      "EVD_Wang2024_4",
+      "IOM_Wang2024_5",
+      "IOM_Wang2024_7",
+      "IOM_Wang2024_1",
+      "IOM_Wang2024_2",
+      "IOM_Wang2024_3",
+      "IOM_Wang2024_8",
+      "IOM_Wang2024_4",
+      "IOM_Wang2024_9"
+    ],
+    "source": {
+      "citation": "Wang, M., Haworth, J., Chen, H., Liu, Y., & Shi, Z. (2024). Investigating the potential of crowdsourced street-level imagery in understanding the spatiotemporal dynamics of cities: A case study of walkability in Inner London. Cities, 153, 105243.",
+      "doi": "10.1016/j.cities.2024.105243"
+    }
+  },
+  {
+    "context_id": "CTX_Wu2020_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study conducted in the main urban area of Kunming (inside Ring Road 2). Street greenery visibility was quantified along transportation routes using Tencent Street View images (captured January 2015) and Tencent digital map road network data. Routes were obtained via the Tencent Direction API, and green vegetation pixels were identified from street-view imagery to compute GVI-UT indicators (total, distance, duration, and normalized per unit distance/time) for different destinations and transportation modes (e.g., walking vs driving).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Wu2020_3",
+      "EVD_Wu2020_1",
+      "EVD_Wu2020_2",
+      "IOM_Wu2020_1",
+      "IOM_Wu2020_2",
+      "IOM_Wu2020_3"
+    ],
+    "source": {
+      "citation": "Wu, D., Gong, J., Liang, J., Sun, J., & Zhang, G. (2020). Analyzing the Influence of Urban Street Greening and Street Buildings on Summertime Air Pollution Based on Street View Image Data. ISPRS International Journal of Geo-Information, 9(9), 500.",
+      "doi": "10.3390/ijgi9090500"
+    }
+  },
+  {
+    "context_id": "CTX_Wu2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_B",
+      "space_type_id": "SET_HIS",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study focuses on residential courtyard microclimate and outdoor thermal comfort using simulated courtyard models calibrated/validated with field data from four historic Chinese gardens in Guangdong Province (Keyuan Garden, Yuyin Hill House, Qinghui Garden, Liangyuan Garden). Simulations compute mean radiant temperature (Tmrt) and wind speed (vair) on uniform grids at ~1.5 m height, and relate these to COMFAcourtyard/thermal discomfort using a data-driven statistical workflow. Weather scenarios vary air temperature (5, 15, 25, 35 C), cloud cover (1/5/9) and wind direction/speed (N/E/S/W; 0.5–3 m/s). Empirical validation uses 2014–2015 on-site thermal sensation votes (ASHRAE 9-point scale) from 1677 questionnaires at 11 points after excluding winter data.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Wu2023_4",
+      "IOM_Wu2023_4"
+    ],
+    "source": {
+      "citation": "Wu, R., Fang, X., Brown, R., Liu, S., & Zhao, H. (2023). Establishing a link between complex courtyard spaces and thermal comfort: A major advancement in evidence-based design. Building and Environment, 245, 110852.",
+      "doi": "10.1016/j.buildenv.2023.110852"
+    }
+  },
+  {
+    "context_id": "CTX_Wu2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_URB",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban green space (UGS) assessment and zoning planning in Shenzhen, China using 739 planning spatial units (average 1.45 km2). Multisource indicators cover accessibility to community/city/natural parks, ecological landscape metrics, quality (street green-view index and NDVI at 30 m), and quantity (green area per capita, green ratio, park density). PCA reduces 14 variables into principal components and SKATER spatial clustering identifies geographically homogeneous subregions for fine-scale planning (e.g., 15-minute life circle).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Wu2024_2",
+      "EVD_Wu2024_1",
+      "IOM_Wu2024_1",
+      "IOM_Wu2024_2"
+    ],
+    "source": {
+      "citation": "Wu, Z., Xu, K., Li, Y., Zhao, X., & Qian, Y. (2024). Application of an Integrated Model for Analyzing Street Greenery through Image Semantic Segmentation and Accessibility: A Case Study of Nanjing City. Forests, 15(3), 561.",
+      "doi": "10.3390/f15030561"
+    }
+  },
+  {
+    "context_id": "CTX_Xiao2020_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_4",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Applies to high-density urban communities in Shanghai, China, examining associations between neighborhood greenness and residents' BMI/obesity. Greenness is measured via three features: green access (e.g., distance to nearest city park), green exposure (satellite NDVI within a 1,000 m community buffer), and eye-level street greenery using a View Green Index (VGI) derived from Baidu Street View images segmented with a deep convolutional neural network (SegNet). Outcomes are BMI classes (normal, overweight, obesity) modeled with multilevel mixed-effects ordered logistic regression controlling for sociodemographics (age, gender, marital status, education, income, job), community location, and self-rated health. Findings are intended for similar dense built environments where vertical/street-level greening is relevant to daily life and walking-scale exposure (about 1 km).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Xiao2020_1",
+      "IOM_Xiao2020_1"
+    ],
+    "source": {
+      "citation": "Xiao, Y., Zhang, Y., Sun, Y., Tao, P., & Kuang, X. (2020). Does Green Space Really Matter for Residents' Obesity? A New Perspective From Baidu Street View. Frontiers in Public Health, 8.",
+      "doi": "10.3389/fpubh.2020.00332"
+    }
+  },
+  {
+    "context_id": "CTX_Xiao2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban adult residents in Liaoning province (northeastern China), sampled from communities in Shenyang, Anshan, and Jinzhou. Exposure is neighborhood street-view greenness within ~800–1500 m buffers around community centroids (street-view images captured May–Aug 2011–2012) and long-term air pollution proxies (3-year annual average PM2.5 and NO2, 2006–2008). Outcomes include BMI and obesity-related measures (e.g., overweight/obesity, waist circumference, waist-hip ratio).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Xiao2021_2",
+      "EVD_Xiao2021_1",
+      "IOM_Xiao2021_2",
+      "IOM_Xiao2021_1"
+    ],
+    "source": {
+      "citation": "Xiao, C., Shi, Q., & Gu, C.-J. (2021). Assessing the Spatial Distribution Pattern of Street Greenery and Its Relationship with Socioeconomic Status and the Built Environment in Shanghai, China. Land, 10(8), 871.",
+      "doi": "10.3390/land10080871"
+    }
+  },
+  {
+    "context_id": "CTX_Xiao2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street greenery assessment in Changchun City, northeastern China, using Baidu Street View images sampled at 278 street points (excluding boundary points, highways, and bridges). Images captured in six horizontal directions and three vertical angles per point (18 images total) to compute Green View Index (GVI) and spatial fairness (Gini coefficient) at the subdistrict scale; demographic and housing variables aligned to 2014.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Xiao2024_1",
+      "EVD_Xiao2024_2",
+      "IOM_Xiao2024_2",
+      "IOM_Xiao2024_1"
+    ],
+    "source": {
+      "citation": "Xiao, L., Wang, W., Ren, Z., Wei, C., & He, X. (2024). Landscape Patterns of Green Spaces Drive the Availability and Spatial Fairness of Street Greenery in Changchun City, Northeastern China. Forests, 15(7), 1074.",
+      "doi": "10.3390/f15071074"
+    }
+  },
+  {
+    "context_id": "CTX_Xin2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_A",
+      "space_type_id": "SET_PRK",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Field study in June in five urban parks in Changchun, China. Micro-climate meteorological factors were monitored and thermal comfort was evaluated, with additional assessment using facial expression emotion scores. Vegetation exposure was characterized using streetscape photos to extract Green View Index (canopy/lawn/grassland) via a DeepLabV3+ model, and plant species were checked by volunteers/professionals.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Xin2024_1",
+      "EVD_Xin2024_4",
+      "EVD_Xin2024_2",
+      "EVD_Xin2024_3",
+      "IOM_Xin2024_3",
+      "IOM_Xin2024_1",
+      "IOM_Xin2024_4",
+      "IOM_Xin2024_2"
+    ],
+    "source": {
+      "citation": "Xin, B., Zhu, C., Geng, J., & Liu, Y. (2024). Emotional Perceptions of Thermal Comfort for People Exposed to Green Spaces Characterized Using Streetscapes in Urban Parks. Land, 13(9), 1515.",
+      "doi": "10.3390/land13091515"
+    }
+  },
+  {
+    "context_id": "CTX_Xu2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_NA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street-view imagery is segmented with the proposed PSAT-Net semantic segmentation model to extract vegetation and compute Green View Index (GVI). The study evaluates how different street-view camera parameters (e.g., pitch/elevation angle, field of view, and heading configurations) influence the resulting GVI values. It is intended for street-level urban scenes captured by vehicle-mounted, pedestrian-carried, or drone-based cameras, and is relevant where lighting conditions vary across capture times.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Xu2024_1",
+      "IOM_Xu2024_1"
+    ],
+    "source": {
+      "citation": "Xu, H., Lu, H., & Liu, S. (2024). Online Street View-Based Approach for Sky View Factor Estimation: A Case Study of Nanjing, China. Applied Sciences, 14(5), 2133.",
+      "doi": "10.3390/app14052133"
+    }
+  },
+  {
+    "context_id": "CTX_Xue2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Eye-level street greenery assessment in Guangzhou, China using Baidu Map panoramic images (requested every 20 m, January 2020). Green View Index (GVI) computed as the proportion of vegetation pixels in four directional images per location point, with vegetation extracted via Visible Difference Vegetation Index (VDVI) thresholding. Results analyzed at point and neighbourhood scales with spatial autocorrelation (Moran's I) and hotspot analysis; correlations examined with land-use/road grade and housing attributes (house price, building age).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Xue2022_2",
+      "EVD_Xue2022_3",
+      "EVD_Xue2022_1",
+      "IOM_Xue2022_3",
+      "IOM_Xue2022_1",
+      "IOM_Xue2022_2"
+    ],
+    "source": {
+      "citation": "Xue, C., Jin, C., Zhou, L., & Li, G. (2022). Exploring the distribution of city street greenery from eye-level: An application of Baidu Map panoramic images data. Geografisk Tidsskrift-Danish Journal of Geography, 122(1), 73–86.",
+      "doi": "10.1080/00167223.2021.2019073"
+    }
+  },
+  {
+    "context_id": "CTX_Ye2019_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_3",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Editorial overview of methods for measuring human-scale urban form and performance, including use of street-view imagery and machine learning. Mentions street canyon solar radiation estimation and a case example in the Hutong area of Beijing using Tencent Street View imagery (2012 and 2016) to assess visual quality and temporal variation of street space.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Ye2019_1",
+      "EVD_Ye2019_6",
+      "EVD_Ye2019_5",
+      "EVD_Ye2019_4",
+      "IOM_Ye2019_5",
+      "IOM_Ye2019_1",
+      "IOM_Ye2019_6",
+      "IOM_Ye2019_7"
+    ],
+    "source": {
+      "citation": "Ye, Y., Zeng, W., Shen, Q., Zhang, X., & Lu, Y. (2019). The visual quality of streets: A human-centred continuous measurement based on machine learning algorithms and street view images. Environment and Planning B: Urban Analytics and City Science, 46(8), 1439–1457.",
+      "doi": "10.1177/2399808319828734"
+    }
+  },
+  {
+    "context_id": "CTX_Yin2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_XX"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_UNSPECIFIED",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Systematic review of street view imagery (SVI) studies supporting Sustainable Development Goals (SDGs). Applicable to street-level environments where SVI is available; focuses on extracting streetscape element features (e.g., presence/absence and proportions of objects like greenery and built elements) and abstract deep-learning features to relate to SDG-related variables (notably SDG 11, SDG 3, SDG 13, SDG 2). Notes privacy/ethics considerations for capturing people on streets and that SVI may not cover SDGs far from streets (e.g., SDG 14).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Yin2023_1",
+      "IOM_Yin2023_1"
+    ],
+    "source": {
+      "citation": "Yin, C., Peng, N., Li, Y., Shi, Y., Yang, S., & Jia, P. (2023). A review on street view observations in support of the sustainable development goals. International Journal of Applied Earth Observation and Geoinformation, 117, 103205.",
+      "doi": "10.1016/j.jag.2023.103205"
+    }
+  },
+  {
+    "context_id": "CTX_Yu2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_4",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban Hong Kong SAR context. Participants carried a GPS-equipped mobile phone for one week (5-second interval) and completed questionnaires and 2-day activity-travel diaries. Dynamic greenspace exposure was measured along GPS trajectories using top-down NDVI and eye-level street-view greenery (Google Street View images sampled every 50 m; PSPNet segmentation). Outcomes include self-reported mental health status (WHO-5) and momentary stress; cross-sectional design.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Yu2024_4",
+      "EVD_Yu2024_1",
+      "IOM_Yu2024_3",
+      "IOM_Yu2024_1"
+    ],
+    "source": {
+      "citation": "Yu, C., & Kwan, M.-P. (2024). Dynamic greenspace exposure, individual mental health status and momentary stress level: A study using multiple greenspace measurements. Health & Place, 86, 103213.",
+      "doi": "10.1016/j.healthplace.2024.103213"
+    }
+  },
+  {
+    "context_id": "CTX_Yue2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_6",
+      "space_type_id": "SET_RES",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ELD"
+    },
+    "applicability": {
+      "conditions": "Study conducted in Dalian, China (a second-tier aging city). Participants were 879 community-dwelling adults aged 60+ years. The study compares multiple objective greenspace exposure metrics (street view-, land use-, and satellite-derived; including NDVI, vegetation coverage, and park coverage) around residences using neighborhood boundaries and walkable buffers (e.g., 300 m). Outcomes are mental wellbeing (place-related emotional wellbeing, emotional wellbeing, evaluative wellbeing) from the WHO SAGE/WAVE 1 questionnaire. Mediation pathways tested via neighborhood environmental perceptions: perceived noise, aesthetics, and satisfaction with recreational opportunities.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Yue2022_1",
+      "EVD_Yue2022_2",
+      "IOM_Yue2022_2",
+      "IOM_Yue2022_1"
+    ],
+    "source": {
+      "citation": "Yue, Y., Yang, D., & Van Dyck, D. (2022). Urban greenspace and mental health in Chinese older adults: Associations across different greenspace measures and mediating effects of environmental perceptions. Health & Place, 76, 102856.",
+      "doi": "10.1016/j.healthplace.2022.102856"
+    }
+  },
+  {
+    "context_id": "CTX_Zang2020_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_1",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ELD"
+    },
+    "applicability": {
+      "conditions": "Study conducted in Hong Kong, a very high-density and compact city. Eye-level street greenery exposure was measured using Baidu Street View images sampled every 50 m along streets (four directions per point) and summarized as a Green View Index (0 to 1) within a buffer around participants' residences. Outcome focused on older adults' total walking time in six neighborhoods (n=180).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zang2020_1",
+      "IOM_Zang2020_1"
+    ],
+    "source": {
+      "citation": "Zang, P., Liu, X., Zhao, Y., Guo, H., Lu, Y., & Xue, C. Q. L. (2020). Eye-Level Street Greenery and Walking Behaviors of Older Adults. International Journal of Environmental Research and Public Health, 17(17), 6130.",
+      "doi": "10.3390/ijerph17176130"
+    }
+  },
+  {
+    "context_id": "CTX_Zeng2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_1",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_NA"
+    },
+    "applicability": {
+      "conditions": "Mobile on-road road surface temperature (RST) measurements along two street-canyon traverse routes (Route A and Route B) on 29 Aug 2018 in a dense urban area with high-rise buildings and street trees. Street-canyon morphology characterized using street-view imagery (semantic segmentation of panoramas to fisheye) to derive view factors (SVF, GVF, BVF) and sun exposure metrics (sunlit ratio, accumulated sunlit hours, screening status). Data aggregated by buffer radii and analyzed with Pearson correlations and multiple linear regression to predict daily maximum RST; reported strong positive SVF and negative GVF relationships with RST and large within-canyon side differences.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zeng2023_1",
+      "EVD_Zeng2023_2",
+      "EVD_Zeng2023_3",
+      "IOM_Zeng2023_2",
+      "IOM_Zeng2023_1",
+      "IOM_Zeng2023_3"
+    ],
+    "source": {
+      "citation": "Zeng, L., Lindberg, F., Zhang, X., Pan, H., & Lu, J. (2023). Road surface temperature evaluated with streetview-derived parameters in a hot and humid megacity. Urban Climate, 51, 101585.",
+      "doi": "10.1016/j.uclim.2023.101585"
+    }
+  },
+  {
+    "context_id": "CTX_ZhangQ2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_3",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Study conducted in the Lilong area in central Shanghai, China, using Baidu Street View images sampled about every 30 m along road centerlines. Visual street-space quality is evaluated from physical components extracted via deep-learning semantic segmentation and POI-based functional diversity within a 15 m buffer. Indicators include greenery, openness (sky ratio), enclosure (buildings/columns/trees), motorization, walkability (pedestrians and paving), and functional diversity; normalized and combined into a street visual quality index.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_ZhangQ2021_1",
+      "EVD_ZhangQ2021_2",
+      "IOM_ZhangQ2021_1",
+      "IOM_ZhangQ2021_2"
+    ],
+    "source": {
+      "citation": "Zhang, Q., Bu, J., & Yi, Y. (2021). Measuring Visual Quality of Street Space Based on Deep Learning and Street View Picture: Pilot in The Lilong Area in Shanghai. Proceedings of the 55th ISOCARP World Planning Congress.",
+      "doi": "10.47472/KJCK4765"
+    }
+  },
+  {
+    "context_id": "CTX_Zhang2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street-level scene perception study in Beijing within the Sixth Ring Road area, using Tencent Street View images sampled along road centerlines (100 m interval) to quantify physical view indices and psychological landsense indices (beauty, safety, liveliness, wealth, depressing, boring) via transfer learning from the MIT Place Pulse dataset. Applicable to block/street-scale urban environments where street-view imagery and land-use context are available.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zhang2021_2",
+      "EVD_Zhang2021_1",
+      "IOM_Zhang2021_2",
+      "IOM_Zhang2021_1"
+    ],
+    "source": {
+      "citation": "Zhang, Y., Li, S., Dong, R., Deng, H., Fu, X., Wang, C., Yu, T., Jia, T., & Zhao, J. (2021). Quantifying physical and psychological perceptions of urban scenes using deep learning. Land Use Policy, 111, 105762.",
+      "doi": "10.1016/j.landusepol.2021.105762"
+    }
+  },
+  {
+    "context_id": "CTX_Zhang2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban street environment study in Zhanjiang City, China, using Baidu Street View images (2020) and deep-learning semantic segmentation to quantify Green View Index (GVI) and street enclosure, then associating these streetscape features with residents' mental health using hospital admission records aggregated to grid buffers (200–1000 m).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zhang2022_2",
+      "EVD_Zhang2022_1",
+      "IOM_Zhang2022_2",
+      "IOM_Zhang2022_1"
+    ],
+    "source": {
+      "citation": "Zhang, A., Zhai, S., Liu, X., Song, G., & Feng, Y. (2022). Investigating the Association between Streetscapes and Mental Health in Zhanjiang, China: Using Baidu Street View Images and Deep Learning. International Journal of Environmental Research and Public Health, 19(24), 16634.",
+      "doi": "10.3390/ijerph192416634"
+    }
+  },
+  {
+    "context_id": "CTX_Zhang2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_DFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Street-level urban greening assessment using Google Street View (360° panoramic) images sampled along the road network at 50 m intervals. DeepLabV3+ semantic segmentation is used to quantify PVGVI and proportions of plant structural categories (trees, grass, bush) and to classify street greening structures (Trees–Bush–Grass, Trees–Grass, Single Trees, Trees–Bush). Applicable to urban, rural, campus, and residential scene types included in the dataset; designed primarily for recognizing greening structures of urban streets.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zhang2023_3",
+      "EVD_Zhang2023_2",
+      "EVD_Zhang2023_5",
+      "EVD_Zhang2023_4",
+      "IOM_Zhang2023_3",
+      "IOM_Zhang2023_4",
+      "IOM_Zhang2023_5",
+      "IOM_Zhang2023_1"
+    ],
+    "source": {
+      "citation": "Zhang, X., Lin, E. S., Tan, P. Y., Qi, J., & Waykool, R. (2023). Assessment of visual landscape quality of urban green spaces using image-based metrics derived from perceived sensory dimensions. Environmental Impact Assessment Review, 102, 107200.",
+      "doi": "10.1016/j.eiar.2023.107200"
+    }
+  },
+  {
+    "context_id": "CTX_Zhang2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_A",
+      "space_type_id": "SET_PRK",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban park visitation behavior under COVID-19 public health threat conditions, using a stated-preference questionnaire survey of park visitors (age >14) in Wuhan, China. Street-scale built environment indicators (e.g., green view index from street-view images, walkability, enclosure, street safety, sky view factor) and route traffic congestion were analyzed alongside park features and socio-demographics to explain changes in park visits across different COVID-19 risk levels and travel modes (walking, cycling, driving, public transport).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zhang2024_2",
+      "EVD_Zhang2024_3",
+      "EVD_Zhang2024_5",
+      "EVD_Zhang2024_13",
+      "EVD_Zhang2024_12",
+      "EVD_Zhang2024_11",
+      "EVD_Zhang2024_10",
+      "EVD_Zhang2024_7",
+      "EVD_Zhang2024_9",
+      "EVD_Zhang2024_8",
+      "EVD_Zhang2024_1",
+      "IOM_Zhang2024_14",
+      "IOM_Zhang2024_2",
+      "IOM_Zhang2024_9",
+      "IOM_Zhang2024_7",
+      "IOM_Zhang2024_8",
+      "IOM_Zhang2024_15",
+      "IOM_Zhang2024_12",
+      "IOM_Zhang2024_1",
+      "IOM_Zhang2024_5",
+      "IOM_Zhang2024_11",
+      "IOM_Zhang2024_3",
+      "IOM_Zhang2024_13"
+    ],
+    "source": {
+      "citation": "Zhang, S., Lu, J., Guo, R., & Yang, Y. (2024). Exploring the Relationship Between Visual Perception of the Urban Riverfront Core Landscape Area and the Vitality of Riverfront Road: A Case Study of Guangzhou. Land, 13(12), 2142.",
+      "doi": "10.3390/land13122142"
+    }
+  },
+  {
+    "context_id": "CTX_Zhao2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_2",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Case study uses street view images sampled along the road network in Tianhe District, Guangzhou (high-density urban context). Deep learning models are trained on Place Pulse 2.0 to predict six subjective perception scores (beautiful, boring, depressing, lively, safe, wealthy) and combined with objective streetscape metrics (e.g., green view index, sky view factor, enclosure, walkability) to map citywide spatial distributions and analyze spatial autocorrelation.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zhao2024_6",
+      "EVD_Zhao2024_4",
+      "EVD_Zhao2024_9",
+      "EVD_Zhao2024_8",
+      "EVD_Zhao2024_3",
+      "EVD_Zhao2024_7",
+      "EVD_Zhao2024_5",
+      "EVD_Zhao2024_2",
+      "EVD_Zhao2024_1",
+      "IOM_Zhao2024_3",
+      "IOM_Zhao2024_7",
+      "IOM_Zhao2024_2",
+      "IOM_Zhao2024_6",
+      "IOM_Zhao2024_5",
+      "IOM_Zhao2024_1",
+      "IOM_Zhao2024_8",
+      "IOM_Zhao2024_10",
+      "IOM_Zhao2024_9"
+    ],
+    "source": {
+      "citation": "Zhao, X., Lu, Y., & Lin, G. (2024). An integrated deep learning approach for assessing the visual qualities of built environments utilizing street view images. Engineering Applications of Artificial Intelligence, 130, 107805.",
+      "doi": "10.1016/j.engappai.2023.107805"
+    }
+  },
+  {
+    "context_id": "CTX_Zheng2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_A",
+      "space_type_id": "SET_GWY",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Summer study in Fuzhou, China (hot and humid region). Data collected on greenways under clear, relatively stable weather and similar lighting to minimize confounding from solar altitude, atmospheric visibility, and weather differences. Visual stimuli were derived from GoPro video converted to 3840×2160 images at 1 frame per second; low-quality or non-distinct sites were removed. Respondents were largely local and had prior summer greenway experience, enabling assessment of visual and thermal perceptions from picture stimuli.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zheng2024_3",
+      "EVD_Zheng2024_5",
+      "EVD_Zheng2024_7",
+      "EVD_Zheng2024_2",
+      "EVD_Zheng2024_4",
+      "EVD_Zheng2024_6",
+      "EVD_Zheng2024_1",
+      "IOM_Zheng2024_6",
+      "IOM_Zheng2024_9",
+      "IOM_Zheng2024_1",
+      "IOM_Zheng2024_2",
+      "IOM_Zheng2024_4",
+      "IOM_Zheng2024_7",
+      "IOM_Zheng2024_8",
+      "IOM_Zheng2024_3"
+    ],
+    "source": {
+      "citation": "Zheng, Y., Lan, S., Zhao, J., Liu, Y., He, S., & Liu, C. (2024). Modeling the Effect of Greenways' Multilevel Visual Characteristics on Thermal Perception in Summer Based on Bayesian Network and Computer Vision. Land, 13(11), 1796.",
+      "doi": "10.3390/land13111796"
+    }
+  },
+  {
+    "context_id": "CTX_Zhou2021_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CWA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Mobile sampling along streets in Xuzhou City, China (warm temperate semihumid monsoon climate). Meteorological variables (air temperature and absolute humidity) and street-view images were collected synchronously at pedestrian height around midday in late summer (September 2, 2020) with a 20 s sampling interval. Street images were segmented using SegNet to compute Green View Index (GVI) and Construction View Index (CVI) representing proportions of visible greenery and built/hard-paved elements in the human visual field along streets.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zhou2021_1",
+      "EVD_Zhou2021_3",
+      "EVD_Zhou2021_2",
+      "IOM_Zhou2021_1",
+      "IOM_Zhou2021_3",
+      "IOM_Zhou2021_2"
+    ],
+    "source": {
+      "citation": "Zhou, H., Tao, G., Yan, X., & Sun, J. (2021). Influences of greening and structures on urban thermal environments: A case study in Xuzhou City, China. Urban Forestry & Urban Greening, 66, 127386.",
+      "doi": "10.1016/j.ufug.2021.127386"
+    }
+  },
+  {
+    "context_id": "CTX_Zhu2022_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Street-side greenery (Green View Index) measured from Baidu Street View panoramic images captured in four directions at sampling points across the street network in Shangcheng District, Hangzhou, China. GVI computed via HSV color thresholding (60–180 degrees as green) and averaged across four directional images per point; accuracy checked using 100 manually interpreted images. Analysis relates GVI to surrounding environmental characteristics (e.g., road hierarchy, land use, water areas, residential parcels, facade/wall design).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zhu2022_2",
+      "EVD_Zhu2022_1",
+      "IOM_Zhu2022_1",
+      "IOM_Zhu2022_2"
+    ],
+    "source": {
+      "citation": "Zhu, J., Qiu, L., Su, Y., Guo, Q., Hu, T., Bao, H., Luo, J., Wu, S., Xu, Q., Wang, Z., & Pan, Y. (2022). Disentangling the effects of the surrounding environment on street-side greenery: Evidence from Hangzhou. Ecological Indicators, 143, 109153.",
+      "doi": "10.1016/j.ecolind.2022.109153"
+    }
+  },
+  {
+    "context_id": "CTX_Zhu2023_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Street-level urban greenery assessment using Green View Index (GVI) derived from standardized street view images (SVIs) from online mapping platforms. Study area is Hangzhou, China, focusing on 593 well-built roads (about 1,658.61 km) in and near the central district (8 districts), excluding tunnels and roads under construction or in peri-urban areas. GVI computed via semantic segmentation (Deeplab-V3+) with vegetation classes (tree, shrub, herb) and compared across road patterns (number of greenery belts/bars) and vegetation structures (e.g., tree-herb, tree-shrub, tree-shrub-herb).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zhu2023_4",
+      "EVD_Zhu2023_2",
+      "EVD_Zhu2023_1",
+      "EVD_Zhu2023_3",
+      "IOM_Zhu2023_2",
+      "IOM_Zhu2023_4",
+      "IOM_Zhu2023_3",
+      "IOM_Zhu2023_1"
+    ],
+    "source": {
+      "citation": "Zhu, H., Nan, X., Yang, F., & Bao, Z. (2023). Utilizing the green view index to improve the urban street greenery index system: A statistical study using road patterns and vegetation structures as entry points. Landscape and Urban Planning, 237, 104780.",
+      "doi": "10.1016/j.landurbplan.2023.104780"
+    }
+  },
+  {
+    "context_id": "CTX_Zhu2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_URB",
+      "space_type_id": "SET_STR",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ADL"
+    },
+    "applicability": {
+      "conditions": "Urban residents' walking exercise preferences analyzed using street view images and smartphone app trajectory data in Changsha, China. Streetscape visual indicators (openness, greenness, enclosure, facilities, blueness, walkability, beauty) derived via semantic segmentation (DeepLabv3) and scenic beauty estimation; preferences compared by time of day, gender, and age groups (primarily 20–40).",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zhu2024_1",
+      "EVD_Zhu2024_3",
+      "EVD_Zhu2024_2",
+      "IOM_Zhu2024_3",
+      "IOM_Zhu2024_1",
+      "IOM_Zhu2024_2"
+    ],
+    "source": {
+      "citation": "Zhu, J., Li, B., Ouyang, H., Wang, Y., & Bai, Z. (2024). Understanding Urban Residents' Walking Exercise Preferences: An Empirical Study Using Street View Images and Trajectory Data. Buildings, 14(2), 549.",
+      "doi": "10.3390/buildings14020549"
+    }
+  },
+  {
+    "context_id": "CTX_Zou2024_1",
+    "climate": {
+      "koppen_zone_id": "KPN_CFA"
+    },
+    "urban_form": {
+      "lcz_type_id": "LCZ_A",
+      "space_type_id": "SET_PRK",
+      "schema_note": "Guideline: lcz_type_id (L_lcz) encodes neighborhood-scale urban morphology and land-cover structure (Local Climate Zone, LCZ). space_type_id (E_settings) encodes the functional/setting type of the studied space (e.g., street, park, residential). They are complementary axes and should not be treated as redundant; do not infer LCZ from space type unless the source explicitly states it or the inference basis is documented in applicability.conditions."
+    },
+    "user": {
+      "age_group_id": "AGE_ALL"
+    },
+    "applicability": {
+      "conditions": "Urban forest park trail-walking context. Case study in the North Park section of Gongqing Forest Park (Shanghai), a large forest landscape area with clear main/secondary roads suitable for walking tours. Walking preference/intensity derived from crowdsourced GPS tracking and kernel density estimation, combined with on-site observations, panoramic street-level imagery, and UAV orthophotos; correlations and OLS used to relate top-view and eye-level scene characteristics to walking preferences. Data collected on non-rainy days from June 10–15 and July 3–10, 2024, between 08:00 and 18:00.",
+      "archetype_id": "ARC_NA"
+    },
+    "linked_records": [
+      "EVD_Zou2024_1",
+      "IOM_Zou2024_1"
+    ],
+    "source": {
+      "citation": "Zou, J., Jiang, H., Ying, W., & Qiu, B. (2024). Scenic Influences on Walking Preferences in Urban Forest Parks from Top-View and Eye-Level Perspectives. Forests, 15(11), 2020.",
+      "doi": "10.3390/f15112020"
+    }
+  }
+]
