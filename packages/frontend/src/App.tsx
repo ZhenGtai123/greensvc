@@ -9,6 +9,8 @@ import VisionAnalysis from './pages/VisionAnalysis';
 import Indicators from './pages/Indicators';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import ProjectWizard from './pages/ProjectWizard';
+import ProjectDetail from './pages/ProjectDetail';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -80,6 +82,9 @@ function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />
+                <Route path="/projects/new" element={<ProjectWizard />} />
+                <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                <Route path="/projects/:projectId/edit" element={<ProjectWizard />} />
                 <Route path="/vision" element={<VisionAnalysis />} />
                 <Route path="/indicators" element={<Indicators />} />
                 <Route path="/calculators" element={<Calculators />} />

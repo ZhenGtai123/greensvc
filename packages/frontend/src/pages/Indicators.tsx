@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Box,
   Container,
   Heading,
   Button,
@@ -10,7 +9,6 @@ import {
   FormLabel,
   Input,
   Textarea,
-  Select,
   SimpleGrid,
   Card,
   CardHeader,
@@ -35,7 +33,6 @@ import {
   Progress,
 } from '@chakra-ui/react';
 import { useKnowledgeBaseSummary, useRecommendIndicators } from '../hooks/useApi';
-import api from '../api';
 import type { IndicatorRecommendation } from '../types';
 import useAppStore from '../store/useAppStore';
 
@@ -228,7 +225,7 @@ function Indicators() {
               </CardHeader>
               <CardBody p={0}>
                 <Accordion allowMultiple>
-                  {recommendations.map((rec, idx) => (
+                  {recommendations.map((rec) => (
                     <AccordionItem key={rec.indicator_id}>
                       <AccordionButton>
                         <HStack flex="1" justify="space-between" pr={2}>

@@ -3,7 +3,16 @@ export interface SpatialZone {
   zone_id: string;
   zone_name: string;
   zone_types: string[];
+  area?: number;
+  status?: string;
   description: string;
+}
+
+export interface SpatialRelation {
+  from_zone: string;
+  to_zone: string;
+  relation_type: string;
+  direction?: string;
 }
 
 export interface UploadedImage {
@@ -33,7 +42,17 @@ export interface Project {
   created_at: string;
   updated_at?: string;
   spatial_zones: SpatialZone[];
+  spatial_relations: SpatialRelation[];
   uploaded_images: UploadedImage[];
+}
+
+export interface SpatialZoneCreate {
+  zone_id?: string;
+  zone_name: string;
+  zone_types?: string[];
+  area?: number;
+  status?: string;
+  description?: string;
 }
 
 export interface ProjectCreate {
@@ -49,6 +68,25 @@ export interface ProjectCreate {
   design_brief?: string;
   performance_dimensions?: string[];
   subdimensions?: string[];
+  spatial_zones?: SpatialZoneCreate[];
+  spatial_relations?: SpatialRelation[];
+}
+
+export interface ProjectUpdate {
+  project_name?: string;
+  project_location?: string;
+  site_scale?: string;
+  project_phase?: string;
+  koppen_zone_id?: string;
+  country_id?: string;
+  space_type_id?: string;
+  lcz_type_id?: string;
+  age_group_id?: string;
+  design_brief?: string;
+  performance_dimensions?: string[];
+  subdimensions?: string[];
+  spatial_zones?: SpatialZoneCreate[];
+  spatial_relations?: SpatialRelation[];
 }
 
 // Calculator types

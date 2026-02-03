@@ -2,6 +2,7 @@ import apiClient from './client';
 import type {
   Project,
   ProjectCreate,
+  ProjectUpdate,
   CalculatorInfo,
   CalculationResult,
   RecommendationResponse,
@@ -30,7 +31,7 @@ export const api = {
       apiClient.get<Project[]>('/api/projects', { params: { limit, offset } }),
     get: (id: string) => apiClient.get<Project>(`/api/projects/${id}`),
     create: (data: ProjectCreate) => apiClient.post<Project>('/api/projects', data),
-    update: (id: string, data: Partial<ProjectCreate>) =>
+    update: (id: string, data: ProjectUpdate) =>
       apiClient.put<Project>(`/api/projects/${id}`, data),
     delete: (id: string) => apiClient.delete(`/api/projects/${id}`),
     export: (id: string) => apiClient.get(`/api/projects/${id}/export`),
@@ -40,6 +41,23 @@ export const api = {
       }),
     deleteZone: (projectId: string, zoneId: string) =>
       apiClient.delete(`/api/projects/${projectId}/zones/${zoneId}`),
+    // Image management
+    uploadImages: (projectId: string, files: File[], zoneId?: string) => {
+      const formData = new FormData();
+      files.forEach(file => formData.append('files', file));
+      if (zoneId) formData.append('zone_id', zoneId);
+      return apiClient.post(`/api/projects/${projectId}/images`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
+    assignImageZone: (projectId: string, imageId: string, zoneId: string | null) =>
+      apiClient.put(`/api/projects/${projectId}/images/${imageId}/zone`, null, {
+        params: { zone_id: zoneId },
+      }),
+    deleteImage: (projectId: string, imageId: string) =>
+      apiClient.delete(`/api/projects/${projectId}/images/${imageId}`),
+    listImages: (projectId: string) =>
+      apiClient.get(`/api/projects/${projectId}/images`),
   },
 
   // Metrics/Calculators

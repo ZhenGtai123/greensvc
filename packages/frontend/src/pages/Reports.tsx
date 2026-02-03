@@ -29,14 +29,8 @@ import {
   StatNumber,
   StatHelpText,
   Divider,
-  Code,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
 } from '@chakra-ui/react';
-import { useCalculators, useProjects } from '../hooks/useApi';
+import { useCalculators } from '../hooks/useApi';
 import useAppStore from '../store/useAppStore';
 import api from '../api';
 
@@ -57,7 +51,6 @@ interface CalculationSummary {
 
 function Reports() {
   const { data: calculators } = useCalculators();
-  const { data: projects } = useProjects();
   const { selectedIndicators } = useAppStore();
   const toast = useToast();
 

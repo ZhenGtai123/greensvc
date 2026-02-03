@@ -5,12 +5,32 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class SpatialZoneCreate(BaseModel):
+    """Schema for creating a spatial zone"""
+    zone_id: str = ""
+    zone_name: str
+    zone_types: list[str] = Field(default_factory=list)
+    area: Optional[float] = None
+    status: str = "existing"
+    description: str = ""
+
+
 class SpatialZone(BaseModel):
     """Spatial zone within a project"""
     zone_id: str
     zone_name: str
     zone_types: list[str] = Field(default_factory=list)
+    area: Optional[float] = None
+    status: str = "existing"
     description: str = ""
+
+
+class SpatialRelation(BaseModel):
+    """Spatial relation between zones"""
+    from_zone: str
+    to_zone: str
+    relation_type: str
+    direction: str = "single"
 
 
 class UploadedImage(BaseModel):
@@ -43,6 +63,10 @@ class ProjectCreate(BaseModel):
     performance_dimensions: list[str] = Field(default_factory=list)
     subdimensions: list[str] = Field(default_factory=list)
 
+    # Spatial data (optional on create)
+    spatial_zones: list[SpatialZoneCreate] = Field(default_factory=list)
+    spatial_relations: list[SpatialRelation] = Field(default_factory=list)
+
 
 class ProjectUpdate(BaseModel):
     """Schema for updating an existing project"""
@@ -58,14 +82,37 @@ class ProjectUpdate(BaseModel):
     design_brief: Optional[str] = None
     performance_dimensions: Optional[list[str]] = None
     subdimensions: Optional[list[str]] = None
+    spatial_zones: Optional[list[SpatialZoneCreate]] = None
+    spatial_relations: Optional[list[SpatialRelation]] = None
 
 
-class ProjectResponse(ProjectCreate):
+class ProjectResponse(BaseModel):
     """Schema for project response"""
     id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    # Basic info
+    project_name: str
+    project_location: str = ""
+    site_scale: str = ""
+    project_phase: str = ""
+
+    # Site Context
+    koppen_zone_id: str = ""
+    country_id: str = ""
+    space_type_id: str = ""
+    lcz_type_id: str = ""
+    age_group_id: str = ""
+
+    # Performance Goals
+    design_brief: str = ""
+    performance_dimensions: list[str] = Field(default_factory=list)
+    subdimensions: list[str] = Field(default_factory=list)
+
+    # Spatial data
     spatial_zones: list[SpatialZone] = Field(default_factory=list)
+    spatial_relations: list[SpatialRelation] = Field(default_factory=list)
     uploaded_images: list[UploadedImage] = Field(default_factory=list)
 
 

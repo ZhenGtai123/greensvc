@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Container,
@@ -8,26 +8,22 @@ import {
   HStack,
   FormControl,
   FormLabel,
-  Input,
   SimpleGrid,
   Card,
   CardHeader,
   CardBody,
   Text,
   Badge,
-  Alert,
-  AlertIcon,
   useToast,
   Spinner,
   Divider,
   Code,
-  Switch,
 } from '@chakra-ui/react';
 import { useConfig, useHealth, useKnowledgeBaseSummary } from '../hooks/useApi';
 import api from '../api';
 
 function Settings() {
-  const { data: config, isLoading: configLoading, refetch: refetchConfig } = useConfig();
+  const { data: config, isLoading: configLoading } = useConfig();
   const { data: health } = useHealth();
   const { data: kbSummary } = useKnowledgeBaseSummary();
   const toast = useToast();

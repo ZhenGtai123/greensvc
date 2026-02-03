@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -23,23 +24,26 @@ import {
   AlertIcon,
   useToast,
   Spinner,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  Input,
   Slider,
   SliderTrack,
   SliderFilledTrack,
   SliderThumb,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel,
 } from '@chakra-ui/react';
-import { useSemanticConfig, useTaskStatus } from '../hooks/useApi';
+import { useSemanticConfig, useTaskStatus, useProject } from '../hooks/useApi';
 import api from '../api';
-import type { SemanticClass } from '../types';
+import type { SemanticClass, UploadedImage } from '../types';
 
 function VisionAnalysis() {
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get('project');
+
   const { data: semanticConfig, isLoading: configLoading } = useSemanticConfig();
+  const { data: project, isLoading: projectLoading } = useProject(projectId || '');
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,21 +55,29 @@ function VisionAnalysis() {
   const [threshold, setThreshold] = useState(0.3);
   const [holeFilling, setHoleFilling] = useState(false);
 
+  // Project image selection
+  const [selectedProjectImages, setSelectedProjectImages] = useState<string[]>([]);
+  const [imageSource, setImageSource] = useState<'upload' | 'project'>(projectId ? 'project' : 'upload');
+
   // Analysis state
   const [analyzing, setAnalyzing] = useState(false);
-  const [results, setResults] = useState<Record<string, string> | null>(null);
   const [statistics, setStatistics] = useState<Record<string, unknown> | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{current: number; total: number} | null>(null);
 
   // Batch task state
-  const [taskId, setTaskId] = useState<string | null>(null);
+  const [taskId] = useState<string | null>(null);
   const { data: taskStatus } = useTaskStatus(taskId);
+
+  // Reset image source when project changes
+  useEffect(() => {
+    setImageSource(projectId ? 'project' : 'upload');
+  }, [projectId]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
-      setResults(null);
       setStatistics(null);
     }
   };
@@ -80,41 +92,104 @@ function VisionAnalysis() {
     setSelectedClasses([]);
   };
 
+  const handleSelectAllImages = () => {
+    if (project?.uploaded_images) {
+      setSelectedProjectImages(project.uploaded_images.map(img => img.image_id));
+    }
+  };
+
+  const handleSelectNoImages = () => {
+    setSelectedProjectImages([]);
+  };
+
+  const toggleImageSelection = (imageId: string) => {
+    setSelectedProjectImages(prev =>
+      prev.includes(imageId)
+        ? prev.filter(id => id !== imageId)
+        : [...prev, imageId]
+    );
+  };
+
   const handleAnalyze = async () => {
-    if (!selectedFile || selectedClasses.length === 0) {
-      toast({ title: 'Please select a file and at least one class', status: 'warning' });
+    if (selectedClasses.length === 0) {
+      toast({ title: 'Please select at least one class', status: 'warning' });
       return;
     }
 
+    const classConfig = semanticConfig?.classes || [];
+    const countability = selectedClasses.map((name) => {
+      const cls = classConfig.find((c) => c.name === name);
+      return cls?.countable || 0;
+    });
+    const openness = selectedClasses.map((name) => {
+      const cls = classConfig.find((c) => c.name === name);
+      return cls?.openness || 0;
+    });
+
     setAnalyzing(true);
-    setResults(null);
     setStatistics(null);
+    setBatchProgress(null);
 
     try {
-      const classConfig = semanticConfig?.classes || [];
-      const countability = selectedClasses.map((name) => {
-        const cls = classConfig.find((c) => c.name === name);
-        return cls?.countable || 0;
-      });
-      const openness = selectedClasses.map((name) => {
-        const cls = classConfig.find((c) => c.name === name);
-        return cls?.openness || 0;
-      });
+      if (imageSource === 'upload' && selectedFile) {
+        // Single file upload analysis
+        const response = await api.vision.analyze(selectedFile, {
+          semantic_classes: selectedClasses,
+          semantic_countability: countability,
+          openness_list: openness,
+          encoder,
+          detection_threshold: threshold,
+          enable_hole_filling: holeFilling,
+        });
 
-      const response = await api.vision.analyze(selectedFile, {
-        semantic_classes: selectedClasses,
-        semantic_countability: countability,
-        openness_list: openness,
-        encoder,
-        detection_threshold: threshold,
-        enable_hole_filling: holeFilling,
-      });
+        if (response.data.status === 'success') {
+          setStatistics(response.data.statistics);
+          toast({ title: 'Analysis complete', status: 'success' });
+        } else {
+          toast({ title: response.data.error || 'Analysis failed', status: 'error' });
+        }
+      } else if (imageSource === 'project' && selectedProjectImages.length > 0) {
+        // Batch analysis using project image paths
+        const imagePaths = selectedProjectImages.map(imgId => {
+          const img = project?.uploaded_images.find(i => i.image_id === imgId);
+          return img?.filepath || '';
+        }).filter(Boolean);
 
-      if (response.data.status === 'success') {
-        setStatistics(response.data.statistics);
-        toast({ title: 'Analysis complete', status: 'success' });
+        let processed = 0;
+        const allResults: Record<string, unknown>[] = [];
+
+        for (const imagePath of imagePaths) {
+          const response = await api.vision.analyzeByPath(imagePath, {
+            semantic_classes: selectedClasses,
+            semantic_countability: countability,
+            openness_list: openness,
+            encoder,
+            detection_threshold: threshold,
+            enable_hole_filling: holeFilling,
+          });
+
+          processed++;
+          setBatchProgress({ current: processed, total: imagePaths.length });
+
+          if (response.data.status === 'success') {
+            allResults.push(response.data.statistics);
+          }
+        }
+
+        // Aggregate results
+        if (allResults.length > 0) {
+          setStatistics({
+            images_processed: allResults.length,
+            total_images: imagePaths.length,
+            results: allResults,
+          });
+          toast({
+            title: `Analysis complete: ${allResults.length}/${imagePaths.length} images processed`,
+            status: 'success'
+          });
+        }
       } else {
-        toast({ title: response.data.error || 'Analysis failed', status: 'error' });
+        toast({ title: 'Please select an image', status: 'warning' });
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Analysis failed';
@@ -122,60 +197,171 @@ function VisionAnalysis() {
     }
 
     setAnalyzing(false);
+    setBatchProgress(null);
   };
 
-  if (configLoading) {
+  if (configLoading || (projectId && projectLoading)) {
     return (
       <Container maxW="container.xl" py={8} textAlign="center">
         <Spinner size="xl" />
-        <Text mt={4}>Loading semantic configuration...</Text>
+        <Text mt={4}>Loading...</Text>
       </Container>
     );
   }
 
   return (
     <Container maxW="container.xl" py={8}>
-      <Heading mb={6}>Vision Analysis</Heading>
+      <HStack justify="space-between" mb={6}>
+        <Heading>Vision Analysis</Heading>
+        {project && (
+          <HStack>
+            <Text color="gray.500">Project:</Text>
+            <Button as={Link} to={`/projects/${projectId}`} variant="link" colorScheme="blue">
+              {project.project_name}
+            </Button>
+          </HStack>
+        )}
+      </HStack>
 
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
         {/* Left: Configuration */}
         <VStack spacing={6} align="stretch">
-          {/* Image Upload */}
+          {/* Image Source */}
           <Card>
             <CardHeader>
-              <Heading size="md">Image Upload</Heading>
+              <Heading size="md">Image Source</Heading>
             </CardHeader>
             <CardBody>
-              <Input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                display="none"
-                onChange={handleFileSelect}
-              />
-              <VStack spacing={4}>
-                <Button
-                  w="full"
-                  colorScheme="blue"
-                  onClick={() => fileInputRef.current?.click()}
+              {project ? (
+                <Tabs
+                  index={imageSource === 'project' ? 0 : 1}
+                  onChange={(idx) => setImageSource(idx === 0 ? 'project' : 'upload')}
                 >
-                  Select Image
-                </Button>
-                {previewUrl && (
-                  <Image
-                    src={previewUrl}
-                    alt="Preview"
-                    maxH="200px"
-                    objectFit="contain"
-                    borderRadius="md"
+                  <TabList>
+                    <Tab>Project Images ({project.uploaded_images.length})</Tab>
+                    <Tab>Upload New</Tab>
+                  </TabList>
+                  <TabPanels>
+                    <TabPanel px={0}>
+                      {project.uploaded_images.length === 0 ? (
+                        <Alert status="info">
+                          <AlertIcon />
+                          No images in project. Upload images in the project page first.
+                        </Alert>
+                      ) : (
+                        <VStack align="stretch" spacing={3}>
+                          <HStack justify="space-between">
+                            <Text fontSize="sm" color="gray.600">
+                              {selectedProjectImages.length} of {project.uploaded_images.length} selected
+                            </Text>
+                            <HStack>
+                              <Button size="xs" onClick={handleSelectAllImages}>All</Button>
+                              <Button size="xs" onClick={handleSelectNoImages}>None</Button>
+                            </HStack>
+                          </HStack>
+                          <SimpleGrid columns={4} spacing={2} maxH="200px" overflowY="auto">
+                            {project.uploaded_images.map((img: UploadedImage) => (
+                              <Box
+                                key={img.image_id}
+                                position="relative"
+                                cursor="pointer"
+                                onClick={() => toggleImageSelection(img.image_id)}
+                                opacity={selectedProjectImages.includes(img.image_id) ? 1 : 0.5}
+                                border={selectedProjectImages.includes(img.image_id) ? '2px solid' : 'none'}
+                                borderColor="blue.500"
+                                borderRadius="md"
+                              >
+                                <Image
+                                  src={`/api/uploads/${projectId}/${img.image_id}_${img.filename}`}
+                                  alt={img.filename}
+                                  h="60px"
+                                  w="100%"
+                                  objectFit="cover"
+                                  borderRadius="md"
+                                  fallback={
+                                    <Box h="60px" bg="gray.200" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
+                                      <Text fontSize="xs">{img.filename}</Text>
+                                    </Box>
+                                  }
+                                />
+                              </Box>
+                            ))}
+                          </SimpleGrid>
+                        </VStack>
+                      )}
+                    </TabPanel>
+                    <TabPanel px={0}>
+                      <VStack spacing={4}>
+                        <Button
+                          w="full"
+                          colorScheme="blue"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          Select Image
+                        </Button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={handleFileSelect}
+                        />
+                        {previewUrl && (
+                          <Image
+                            src={previewUrl}
+                            alt="Preview"
+                            maxH="150px"
+                            objectFit="contain"
+                            borderRadius="md"
+                          />
+                        )}
+                        {selectedFile && (
+                          <Text fontSize="sm" color="gray.600">
+                            {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                          </Text>
+                        )}
+                      </VStack>
+                    </TabPanel>
+                  </TabPanels>
+                </Tabs>
+              ) : (
+                <VStack spacing={4}>
+                  <Alert status="info" size="sm">
+                    <AlertIcon />
+                    <Text fontSize="sm">
+                      Select a project to use existing images, or upload directly.
+                    </Text>
+                  </Alert>
+                  <Button
+                    w="full"
+                    colorScheme="blue"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Select Image
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleFileSelect}
                   />
-                )}
-                {selectedFile && (
-                  <Text fontSize="sm" color="gray.600">
-                    {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-                  </Text>
-                )}
-              </VStack>
+                  {previewUrl && (
+                    <Image
+                      src={previewUrl}
+                      alt="Preview"
+                      maxH="150px"
+                      objectFit="contain"
+                      borderRadius="md"
+                    />
+                  )}
+                  {selectedFile && (
+                    <Text fontSize="sm" color="gray.600">
+                      {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                    </Text>
+                  )}
+                </VStack>
+              )}
             </CardBody>
           </Card>
 
@@ -254,9 +440,15 @@ function VisionAnalysis() {
             size="lg"
             onClick={handleAnalyze}
             isLoading={analyzing}
-            isDisabled={!selectedFile || selectedClasses.length === 0}
+            isDisabled={
+              selectedClasses.length === 0 ||
+              (imageSource === 'upload' && !selectedFile) ||
+              (imageSource === 'project' && selectedProjectImages.length === 0)
+            }
           >
-            Analyze Image
+            {imageSource === 'project' && selectedProjectImages.length > 1
+              ? `Analyze ${selectedProjectImages.length} Images`
+              : 'Analyze Image'}
           </Button>
         </VStack>
 
@@ -265,8 +457,19 @@ function VisionAnalysis() {
           {analyzing && (
             <Alert status="info">
               <AlertIcon />
-              Analyzing image... This may take a few minutes.
+              {batchProgress
+                ? `Analyzing images... ${batchProgress.current}/${batchProgress.total}`
+                : 'Analyzing image... This may take a moment.'}
             </Alert>
+          )}
+
+          {batchProgress && (
+            <Progress
+              value={(batchProgress.current / batchProgress.total) * 100}
+              colorScheme="blue"
+              hasStripe
+              isAnimated
+            />
           )}
 
           {taskStatus && taskStatus.status === 'PROGRESS' && (
@@ -288,27 +491,45 @@ function VisionAnalysis() {
               </CardHeader>
               <CardBody>
                 <VStack align="stretch" spacing={3}>
-                  <HStack justify="space-between">
-                    <Text>Detected Classes:</Text>
-                    <Badge colorScheme="green">{(statistics as Record<string, number>).detected_classes || 0}</Badge>
-                  </HStack>
-                  <HStack justify="space-between">
-                    <Text>Total Classes:</Text>
-                    <Badge>{(statistics as Record<string, number>).total_classes || 0}</Badge>
-                  </HStack>
+                  {(statistics as Record<string, number>).images_processed !== undefined ? (
+                    // Batch results
+                    <>
+                      <HStack justify="space-between">
+                        <Text>Images Processed:</Text>
+                        <Badge colorScheme="green">
+                          {(statistics as Record<string, number>).images_processed} / {(statistics as Record<string, number>).total_images}
+                        </Badge>
+                      </HStack>
+                      <Text fontSize="sm" color="gray.500">
+                        Individual results are saved for each image.
+                      </Text>
+                    </>
+                  ) : (
+                    // Single image results
+                    <>
+                      <HStack justify="space-between">
+                        <Text>Detected Classes:</Text>
+                        <Badge colorScheme="green">{(statistics as Record<string, number>).detected_classes || 0}</Badge>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text>Total Classes:</Text>
+                        <Badge>{(statistics as Record<string, number>).total_classes || 0}</Badge>
+                      </HStack>
 
-                  {(statistics as Record<string, Record<string, unknown>>).class_statistics && (
-                    <Box mt={4}>
-                      <Text fontWeight="bold" mb={2}>Class Distribution:</Text>
-                      <VStack align="stretch" spacing={1} maxH="200px" overflowY="auto">
-                        {Object.entries((statistics as Record<string, Record<string, unknown>>).class_statistics).map(([cls, data]) => (
-                          <HStack key={cls} justify="space-between" fontSize="sm">
-                            <Text noOfLines={1}>{cls}</Text>
-                            <Badge>{String((data as Record<string, number>).percentage?.toFixed(1) || 0)}%</Badge>
-                          </HStack>
-                        ))}
-                      </VStack>
-                    </Box>
+                      {(statistics as Record<string, Record<string, unknown>>).class_statistics && (
+                        <Box mt={4}>
+                          <Text fontWeight="bold" mb={2}>Class Distribution:</Text>
+                          <VStack align="stretch" spacing={1} maxH="200px" overflowY="auto">
+                            {Object.entries((statistics as Record<string, Record<string, unknown>>).class_statistics).map(([cls, data]) => (
+                              <HStack key={cls} justify="space-between" fontSize="sm">
+                                <Text noOfLines={1}>{cls}</Text>
+                                <Badge>{String((data as Record<string, number>).percentage?.toFixed(1) || 0)}%</Badge>
+                              </HStack>
+                            ))}
+                          </VStack>
+                        </Box>
+                      )}
+                    </>
                   )}
                 </VStack>
               </CardBody>
@@ -319,7 +540,9 @@ function VisionAnalysis() {
             <Card>
               <CardBody textAlign="center" py={10}>
                 <Text color="gray.500">
-                  Select an image and classes, then click Analyze to see results.
+                  {project
+                    ? 'Select images from the project, choose classes, then click Analyze.'
+                    : 'Select an image and classes, then click Analyze to see results.'}
                 </Text>
               </CardBody>
             </Card>
