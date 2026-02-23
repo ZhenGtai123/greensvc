@@ -1,12 +1,11 @@
 """
-Gemini API Client Service
-Handles AI-powered indicator recommendations
+Recommendation Service (formerly Gemini Client)
+Handles AI-powered indicator recommendations using any LLM provider.
 """
 
 import json
 import logging
 import re
-from typing import Optional
 
 from app.models.indicator import (
     RecommendationRequest,
@@ -14,32 +13,23 @@ from app.models.indicator import (
     IndicatorRecommendation,
 )
 from app.services.knowledge_base import KnowledgeBase
+from app.services.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
 
 
-class GeminiClient:
-    """Gemini API client for indicator recommendations"""
+class RecommendationService:
+    """LLM-powered indicator recommendation service."""
 
-    def __init__(self, api_key: str, model: str = "gemini-3-pro-preview"):
-        self.api_key = api_key
-        self.model = model
-        self._client = None
+    def __init__(self, llm: LLMClient):
+        self.llm = llm
 
-    def _get_client(self):
-        """Lazy initialization of Gemini client"""
-        if self._client is None:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-                self._client = genai.GenerativeModel(self.model)
-            except ImportError:
-                logger.error("google-generativeai package not installed")
-                raise
-            except Exception as e:
-                logger.error(f"Failed to initialize Gemini client: {e}")
-                raise
-        return self._client
+    @property
+    def model(self) -> str:
+        return self.llm.model
+
+    def check_api_key(self) -> bool:
+        return self.llm.check_connection()
 
     def _build_prompt(
         self,
@@ -134,7 +124,7 @@ Return ONLY the JSON array, no additional text.
         return prompt
 
     def _parse_response(self, response_text: str) -> list[dict]:
-        """Parse Gemini response to extract JSON"""
+        """Parse LLM response to extract JSON"""
         try:
             # Try direct JSON parse
             return json.loads(response_text)
@@ -157,7 +147,7 @@ Return ONLY the JSON array, no additional text.
             except json.JSONDecodeError:
                 pass
 
-        logger.error(f"Failed to parse Gemini response: {response_text[:500]}")
+        logger.error(f"Failed to parse LLM response: {response_text[:500]}")
         return []
 
     async def recommend_indicators(
@@ -165,12 +155,12 @@ Return ONLY the JSON array, no additional text.
         request: RecommendationRequest,
         knowledge_base: KnowledgeBase,
     ) -> RecommendationResponse:
-        """Get indicator recommendations from Gemini"""
+        """Get indicator recommendations from LLM"""
         try:
-            if not self.api_key:
+            if not self.llm.check_connection():
                 return RecommendationResponse(
                     success=False,
-                    error="Gemini API key not configured"
+                    error=f"LLM provider ({self.llm.provider}) not configured"
                 )
 
             if not knowledge_base.loaded:
@@ -179,23 +169,22 @@ Return ONLY the JSON array, no additional text.
             # Build prompt
             prompt = self._build_prompt(request, knowledge_base)
 
-            # Call Gemini API
-            client = self._get_client()
-            response = client.generate_content(prompt)
+            # Call LLM
+            response_text = await self.llm.generate(prompt)
 
-            if not response or not response.text:
+            if not response_text:
                 return RecommendationResponse(
                     success=False,
-                    error="Empty response from Gemini"
+                    error="Empty response from LLM"
                 )
 
             # Parse response
-            parsed = self._parse_response(response.text)
+            parsed = self._parse_response(response_text)
 
             if not parsed:
                 return RecommendationResponse(
                     success=False,
-                    error="Failed to parse Gemini response"
+                    error="Failed to parse LLM response"
                 )
 
             # Convert to recommendation objects
@@ -225,22 +214,16 @@ Return ONLY the JSON array, no additional text.
                 success=True,
                 recommendations=recommendations,
                 total_evidence_reviewed=evidence_count,
-                model_used=self.model,
+                model_used=self.llm.model,
             )
 
         except Exception as e:
-            logger.error(f"Gemini recommendation error: {e}", exc_info=True)
+            logger.error(f"Recommendation error: {e}", exc_info=True)
             return RecommendationResponse(
                 success=False,
                 error=str(e)
             )
 
-    def check_api_key(self) -> bool:
-        """Check if API key is configured and valid"""
-        if not self.api_key:
-            return False
-        try:
-            self._get_client()
-            return True
-        except Exception:
-            return False
+
+# Backward-compatible alias
+GeminiClient = RecommendationService

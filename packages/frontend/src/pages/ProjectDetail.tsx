@@ -29,6 +29,8 @@ import {
   Alert,
   AlertIcon,
   Progress,
+  Checkbox,
+  Select,
 } from '@chakra-ui/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
@@ -44,6 +46,9 @@ function ProjectDetail() {
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(new Set());
+  const [targetZoneId, setTargetZoneId] = useState('');
+  const [batchAssigning, setBatchAssigning] = useState(false);
 
   // Fetch project data
   const { data: project, isLoading, error } = useQuery({
@@ -99,15 +104,47 @@ function ProjectDetail() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Assign image to zone (for future drag-drop zone assignment)
-  const _assignZoneMutation = useMutation({
-    mutationFn: ({ imageId, zoneId }: { imageId: string; zoneId: string | null }) =>
-      api.projects.assignImageZone(projectId!, imageId, zoneId),
-    onSuccess: () => {
+  // Batch assign images to a zone
+  const handleBatchAssign = async () => {
+    if (!targetZoneId || selectedImageIds.size === 0) return;
+    setBatchAssigning(true);
+    try {
+      const assignments = Array.from(selectedImageIds).map(imageId => ({
+        image_id: imageId,
+        zone_id: targetZoneId,
+      }));
+      await api.projects.batchAssignZones(projectId!, assignments);
+      const count = selectedImageIds.size;
+      setSelectedImageIds(new Set());
+      setTargetZoneId('');
       queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-    },
-  });
-  void _assignZoneMutation; // Suppress unused warning
+      toast({ title: `${count} image(s) assigned`, status: 'success' });
+    } catch {
+      toast({ title: 'Failed to assign images', status: 'error' });
+    } finally {
+      setBatchAssigning(false);
+    }
+  };
+
+  // Unassign a single image from its zone
+  const handleUnassign = async (imageId: string) => {
+    try {
+      await api.projects.assignImageZone(projectId!, imageId, null);
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      toast({ title: 'Image unassigned', status: 'success' });
+    } catch {
+      toast({ title: 'Failed to unassign image', status: 'error' });
+    }
+  };
+
+  const toggleImageSelection = (imageId: string) => {
+    setSelectedImageIds(prev => {
+      const next = new Set(prev);
+      if (next.has(imageId)) next.delete(imageId);
+      else next.add(imageId);
+      return next;
+    });
+  };
 
   // Delete image
   const deleteImageMutation = useMutation({
@@ -383,6 +420,45 @@ function ProjectDetail() {
                   <Heading size="sm">Ungrouped Images ({ungroupedImages.length})</Heading>
                 </CardHeader>
                 <CardBody>
+                  {project.spatial_zones.length > 0 && (
+                    <HStack mb={3} spacing={3}>
+                      <Checkbox
+                        isChecked={selectedImageIds.size === ungroupedImages.length && ungroupedImages.length > 0}
+                        isIndeterminate={selectedImageIds.size > 0 && selectedImageIds.size < ungroupedImages.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedImageIds(new Set(ungroupedImages.map(img => img.image_id)));
+                          } else {
+                            setSelectedImageIds(new Set());
+                          }
+                        }}
+                      >
+                        Select All
+                      </Checkbox>
+                      <Select
+                        placeholder="Select zone..."
+                        size="sm"
+                        maxW="200px"
+                        value={targetZoneId}
+                        onChange={(e) => setTargetZoneId(e.target.value)}
+                      >
+                        {project.spatial_zones.map(zone => (
+                          <option key={zone.zone_id} value={zone.zone_id}>
+                            {zone.zone_name}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        size="sm"
+                        colorScheme="blue"
+                        isDisabled={!targetZoneId || selectedImageIds.size === 0}
+                        isLoading={batchAssigning}
+                        onClick={handleBatchAssign}
+                      >
+                        Assign ({selectedImageIds.size})
+                      </Button>
+                    </HStack>
+                  )}
                   <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={2}>
                     {ungroupedImages.map(img => (
                       <Box key={img.image_id} position="relative">
@@ -393,12 +469,27 @@ function ProjectDetail() {
                           w="100%"
                           objectFit="cover"
                           borderRadius="md"
+                          cursor="pointer"
+                          border={selectedImageIds.has(img.image_id) ? '2px solid' : '2px solid transparent'}
+                          borderColor={selectedImageIds.has(img.image_id) ? 'blue.400' : 'transparent'}
+                          onClick={() => toggleImageSelection(img.image_id)}
                           fallback={
                             <Box h="80px" bg="gray.200" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
                               <Text fontSize="xs">{img.filename}</Text>
                             </Box>
                           }
                         />
+                        {project.spatial_zones.length > 0 && (
+                          <Checkbox
+                            position="absolute"
+                            top={1}
+                            left={1}
+                            bg="whiteAlpha.800"
+                            borderRadius="sm"
+                            isChecked={selectedImageIds.has(img.image_id)}
+                            onChange={() => toggleImageSelection(img.image_id)}
+                          />
+                        )}
                         <IconButton
                           aria-label="Delete"
                           icon={<Text>✕</Text>}
@@ -407,7 +498,7 @@ function ProjectDetail() {
                           top={1}
                           right={1}
                           colorScheme="red"
-                          onClick={() => deleteImageMutation.mutate(img.image_id)}
+                          onClick={(e) => { e.stopPropagation(); deleteImageMutation.mutate(img.image_id); }}
                         />
                       </Box>
                     ))}
@@ -444,6 +535,17 @@ function ProjectDetail() {
                                 <Text fontSize="xs">{img.filename}</Text>
                               </Box>
                             }
+                          />
+                          <IconButton
+                            aria-label="Unassign from zone"
+                            icon={<Text>↩</Text>}
+                            size="xs"
+                            position="absolute"
+                            top={1}
+                            left={1}
+                            colorScheme="yellow"
+                            title="Move back to ungrouped"
+                            onClick={() => handleUnassign(img.image_id)}
                           />
                           <IconButton
                             aria-label="Delete"

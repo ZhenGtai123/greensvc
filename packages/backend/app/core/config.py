@@ -18,12 +18,23 @@ class Settings(BaseSettings):
         extra="ignore",  # Ignore extra env vars from old .env files
     )
 
-    # API Keys
+    # LLM Provider
+    llm_provider: str = "gemini"  # gemini | openai | anthropic | deepseek
+
+    # API Keys (per provider)
     google_api_key: str = ""
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    deepseek_api_key: str = ""
+
+    # Model names (per provider)
+    gemini_model: str = "gemini-3-pro-preview"
+    openai_model: str = "gpt-4o"
+    anthropic_model: str = "claude-sonnet-4-20250514"
+    deepseek_model: str = "deepseek-chat"
 
     # External Services
     vision_api_url: str = "http://127.0.0.1:8000"
-    gemini_model: str = "gemini-3-pro-preview"
 
     # Server Configuration
     host: str = "0.0.0.0"

@@ -209,3 +209,42 @@ class FullAnalysisResult(BaseModel):
     """Combined result of Stage 2.5 + Stage 3."""
     zone_analysis: ZoneAnalysisResult
     design_strategies: DesignStrategyResult
+
+
+# ---------------------------------------------------------------------------
+# Project Pipeline (images → calculators → aggregation → analysis)
+# ---------------------------------------------------------------------------
+
+class ProjectPipelineRequest(BaseModel):
+    """Request for the project pipeline endpoint."""
+    project_id: str
+    indicator_ids: list[str]
+    run_stage3: bool = True
+    use_llm: bool = False
+    zscore_moderate: float = Field(default=0.5, ge=0)
+    zscore_significant: float = Field(default=1.0, ge=0)
+    zscore_critical: float = Field(default=1.5, ge=0)
+    max_ioms_per_query: int = Field(default=6, ge=1, le=20)
+    max_strategies_per_zone: int = Field(default=5, ge=1, le=10)
+
+
+class ProjectPipelineProgress(BaseModel):
+    """Progress step in the project pipeline."""
+    step: str
+    status: str  # completed | skipped | failed
+    detail: str = ""
+
+
+class ProjectPipelineResult(BaseModel):
+    """Complete result of the project pipeline."""
+    project_id: str
+    project_name: str
+    total_images: int = 0
+    zone_assigned_images: int = 0
+    calculations_run: int = 0
+    calculations_succeeded: int = 0
+    calculations_failed: int = 0
+    zone_statistics_count: int = 0
+    zone_analysis: Optional[ZoneAnalysisResult] = None
+    design_strategies: Optional[DesignStrategyResult] = None
+    steps: list[ProjectPipelineProgress] = Field(default_factory=list)

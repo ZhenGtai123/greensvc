@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_gemini_client, get_knowledge_base
-from app.services.gemini_client import GeminiClient
+from app.services.gemini_client import RecommendationService
 from app.services.knowledge_base import KnowledgeBase
 from app.models.indicator import (
     RecommendationRequest,
@@ -17,24 +17,23 @@ router = APIRouter()
 @router.post("/recommend", response_model=RecommendationResponse)
 async def recommend_indicators(
     request: RecommendationRequest,
-    gemini_client: GeminiClient = Depends(get_gemini_client),
+    recommendation_service: RecommendationService = Depends(get_gemini_client),
     knowledge_base: KnowledgeBase = Depends(get_knowledge_base),
 ):
     """
     Get AI-powered indicator recommendations based on project context.
 
-    Uses the knowledge base evidence and Gemini AI to recommend
+    Uses the knowledge base evidence and the active LLM provider to recommend
     the most relevant indicators for the project.
     """
-    # Check if Gemini is configured
-    if not gemini_client.check_api_key():
+    if not recommendation_service.check_api_key():
         raise HTTPException(
             status_code=503,
-            detail="Gemini API not configured. Please set GOOGLE_API_KEY."
+            detail="LLM provider not configured. Please set the appropriate API key."
         )
 
     # Get recommendations
-    response = await gemini_client.recommend_indicators(request, knowledge_base)
+    response = await recommendation_service.recommend_indicators(request, knowledge_base)
 
     if not response.success:
         raise HTTPException(
@@ -69,20 +68,6 @@ async def get_subdimensions(
     return knowledge_base.get_subdimensions()
 
 
-@router.get("/evidence/{indicator_id}")
-async def get_evidence_for_indicator(
-    indicator_id: str,
-    knowledge_base: KnowledgeBase = Depends(get_knowledge_base),
-):
-    """Get evidence records for a specific indicator"""
-    evidence = knowledge_base.get_evidence_for_indicator(indicator_id)
-    return {
-        "indicator_id": indicator_id,
-        "evidence_count": len(evidence),
-        "evidence": evidence,
-    }
-
-
 @router.get("/evidence/dimension/{dimension_id}")
 async def get_evidence_for_dimension(
     dimension_id: str,
@@ -92,6 +77,20 @@ async def get_evidence_for_dimension(
     evidence = knowledge_base.get_evidence_for_dimension(dimension_id)
     return {
         "dimension_id": dimension_id,
+        "evidence_count": len(evidence),
+        "evidence": evidence,
+    }
+
+
+@router.get("/evidence/{indicator_id}")
+async def get_evidence_for_indicator(
+    indicator_id: str,
+    knowledge_base: KnowledgeBase = Depends(get_knowledge_base),
+):
+    """Get evidence records for a specific indicator"""
+    evidence = knowledge_base.get_evidence_for_indicator(indicator_id)
+    return {
+        "indicator_id": indicator_id,
         "evidence_count": len(evidence),
         "evidence": evidence,
     }

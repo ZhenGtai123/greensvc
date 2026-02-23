@@ -13,7 +13,11 @@
       "Bash(tail:*)",
       "Bash(cd \"D:/green-svc/greensvc/packages/backend\" && PYTHONIOENCODING=utf-8 timeout 15 python -c \"\nimport sys, io\nsys.stdout = io.TextIOWrapper\\(sys.stdout.buffer, encoding='utf-8', errors='replace'\\)\nsys.stderr = io.TextIOWrapper\\(sys.stderr.buffer, encoding='utf-8', errors='replace'\\)\n\n# Start the app and test via TestClient\nfrom fastapi.testclient import TestClient\nfrom app.main import create_app\n\napp = create_app\\(\\)\nclient = TestClient\\(app\\)\n\n# Test GET /api/metrics\nresp = client.get\\('/api/metrics'\\)\nprint\\(f'GET /api/metrics: status={resp.status_code}'\\)\ndata = resp.json\\(\\)\nprint\\(f'Calculators returned: {len\\(data\\)}'\\)\n\n# Show all IDs\nids = sorted\\([c['id'] for c in data]\\)\nprint\\(f'IDs: {ids}'\\)\n\n# Test specific endpoints\nfor ind_id in ['IND_VPE', 'IND_WLK_IDX', 'IND_GVI']:\n    r = client.get\\(f'/api/metrics/{ind_id}'\\)\n    d = r.json\\(\\)\n    print\\(f'GET /api/metrics/{ind_id}: {d[\\\\\"name\\\\\"]} \\(calc_type={d[\\\\\"calc_type\\\\\"]}\\)'\\)\n\n# Test code endpoint\nr = client.get\\('/api/metrics/IND_VPE/code'\\)\nprint\\(f'GET /api/metrics/IND_VPE/code: status={r.status_code}, has_code={\\\\\"calculate_indicator\\\\\" in r.json\\(\\).get\\(\\\\\"code\\\\\", \\\\\"\\\\\"\\)}'\\)\n\nprint\\(\\)\nprint\\('API TESTS PASSED!'\\)\n\" 2>&1)",
       "Bash(head:*)",
-      "Bash(cd \"D:/green-svc/greensvc/packages/frontend\" && npx tsc --noEmit 2>&1)"
+      "Bash(cd \"D:/green-svc/greensvc/packages/frontend\" && npx tsc --noEmit 2>&1)",
+      "Bash(cd /d/green-svc/greensvc/packages/frontend && npm run build 2>&1)",
+      "Bash(cd:*)",
+      "Bash(cd /d/green-svc/greensvc/packages/frontend && npx tsc --noEmit 2>&1)",
+      "Bash(grep:*)"
     ]
   }
 }

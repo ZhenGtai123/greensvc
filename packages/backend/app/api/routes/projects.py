@@ -9,6 +9,8 @@ from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
 
+from pydantic import BaseModel
+
 from app.models.project import (
     ProjectCreate,
     ProjectUpdate,
@@ -18,12 +20,22 @@ from app.models.project import (
     SpatialRelation,
     UploadedImage,
 )
+
+
+class ZoneAssignment(BaseModel):
+    image_id: str
+    zone_id: Optional[str] = None
 from app.core.config import get_settings
 
 router = APIRouter()
 
 # In-memory storage for Phase 1 (will be replaced with database in later phases)
 _projects: dict[str, ProjectResponse] = {}
+
+
+def get_projects_store() -> dict[str, ProjectResponse]:
+    """Get the in-memory projects store (used by pipeline endpoint)."""
+    return _projects
 
 
 @router.post("", response_model=ProjectResponse)
@@ -236,6 +248,31 @@ async def upload_images(
         "uploaded_count": len(uploaded),
         "images": uploaded,
     }
+
+
+@router.put("/{project_id}/images/batch-zone")
+async def batch_assign_zones(
+    project_id: str,
+    assignments: List[ZoneAssignment],
+):
+    """Batch assign images to zones"""
+    if project_id not in _projects:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    project = _projects[project_id]
+    image_lookup = {img.image_id: img for img in project.uploaded_images}
+
+    updated = 0
+    for item in assignments:
+        img = image_lookup.get(item.image_id)
+        if img:
+            img.zone_id = item.zone_id
+            updated += 1
+
+    if updated > 0:
+        project.updated_at = datetime.now()
+
+    return {"success": True, "updated": updated}
 
 
 @router.put("/{project_id}/images/{image_id}/zone")

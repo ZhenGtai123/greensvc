@@ -18,20 +18,28 @@ import {
   Spinner,
   Divider,
   Code,
+  Select,
 } from '@chakra-ui/react';
-import { useConfig, useHealth, useKnowledgeBaseSummary } from '../hooks/useApi';
+import { useConfig, useHealth, useKnowledgeBaseSummary, useLLMProviders, queryKeys } from '../hooks/useApi';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../api';
+import type { LLMProviderInfo } from '../types';
 
 function Settings() {
   const { data: config, isLoading: configLoading } = useConfig();
   const { data: health } = useHealth();
   const { data: kbSummary } = useKnowledgeBaseSummary();
+  const { data: llmProviders, isLoading: providersLoading } = useLLMProviders();
+  const queryClient = useQueryClient();
   const toast = useToast();
 
   const [visionHealthy, setVisionHealthy] = useState<boolean | null>(null);
-  const [geminiConfigured, setGeminiConfigured] = useState<boolean | null>(null);
+  const [llmStatus, setLlmStatus] = useState<{ configured: boolean; provider: string; model: string | null } | null>(null);
   const [testingVision, setTestingVision] = useState(false);
-  const [testingGemini, setTestingGemini] = useState(false);
+  const [testingLLM, setTestingLLM] = useState(false);
+  const [switchingProvider, setSwitchingProvider] = useState(false);
+
+  const activeProvider = llmProviders?.find((p: LLMProviderInfo) => p.active);
 
   const testVisionConnection = async () => {
     setTestingVision(true);
@@ -49,20 +57,42 @@ function Settings() {
     setTestingVision(false);
   };
 
-  const testGeminiConnection = async () => {
-    setTestingGemini(true);
+  const testLLMConnection = async () => {
+    setTestingLLM(true);
     try {
-      const response = await api.testGemini();
-      setGeminiConfigured(response.data.configured);
+      const response = await api.testLLM();
+      setLlmStatus(response.data);
       toast({
-        title: response.data.configured ? 'Gemini API configured' : 'Gemini API not configured',
+        title: response.data.configured
+          ? `${response.data.provider} connected`
+          : 'LLM not configured',
         status: response.data.configured ? 'success' : 'warning',
       });
     } catch (error) {
-      setGeminiConfigured(false);
-      toast({ title: 'Failed to test Gemini API', status: 'error' });
+      setLlmStatus(null);
+      toast({ title: 'Failed to test LLM connection', status: 'error' });
     }
-    setTestingGemini(false);
+    setTestingLLM(false);
+  };
+
+  const handleSwitchProvider = async (providerId: string) => {
+    setSwitchingProvider(true);
+    try {
+      const response = await api.switchLLMProvider(providerId);
+      toast({
+        title: `Switched to ${response.data.provider}`,
+        description: `Model: ${response.data.model}`,
+        status: 'success',
+      });
+      // Refresh providers and config
+      queryClient.invalidateQueries({ queryKey: queryKeys.llmProviders });
+      queryClient.invalidateQueries({ queryKey: queryKeys.config });
+      setLlmStatus(null);
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail || 'Failed to switch provider';
+      toast({ title: detail, status: 'error' });
+    }
+    setSwitchingProvider(false);
   };
 
   if (configLoading) {
@@ -107,14 +137,14 @@ function Settings() {
               </HStack>
 
               <HStack justify="space-between">
-                <Text>Gemini API</Text>
+                <Text>LLM Provider</Text>
                 <HStack>
-                  {geminiConfigured !== null && (
-                    <Badge colorScheme={geminiConfigured ? 'green' : 'yellow'}>
-                      {geminiConfigured ? 'Configured' : 'Not Configured'}
+                  {llmStatus !== null && (
+                    <Badge colorScheme={llmStatus.configured ? 'green' : 'yellow'}>
+                      {llmStatus.configured ? 'Configured' : 'Not Configured'}
                     </Badge>
                   )}
-                  <Button size="xs" onClick={testGeminiConnection} isLoading={testingGemini}>
+                  <Button size="xs" onClick={testLLMConnection} isLoading={testingLLM}>
                     Test
                   </Button>
                 </HStack>
@@ -132,6 +162,57 @@ function Settings() {
           </CardBody>
         </Card>
 
+        {/* LLM Provider */}
+        <Card>
+          <CardHeader>
+            <Heading size="md">LLM Provider</Heading>
+          </CardHeader>
+          <CardBody>
+            <VStack align="stretch" spacing={4}>
+              <FormControl>
+                <FormLabel>Active Provider</FormLabel>
+                <Select
+                  value={activeProvider?.id || ''}
+                  onChange={(e) => handleSwitchProvider(e.target.value)}
+                  isDisabled={switchingProvider || providersLoading}
+                >
+                  {llmProviders?.map((p: LLMProviderInfo) => (
+                    <option key={p.id} value={p.id} disabled={!p.configured}>
+                      {p.name} {!p.configured ? '(no API key)' : ''}
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {activeProvider && (
+                <FormControl>
+                  <FormLabel>Model</FormLabel>
+                  <Code p={2} borderRadius="md" w="full">
+                    {activeProvider.current_model}
+                  </Code>
+                </FormControl>
+              )}
+
+              <Divider />
+
+              <Text fontSize="sm" fontWeight="semibold" color="gray.500">
+                Available Providers
+              </Text>
+              {llmProviders?.map((p: LLMProviderInfo) => (
+                <HStack key={p.id} justify="space-between">
+                  <HStack>
+                    <Text fontSize="sm">{p.name}</Text>
+                    {p.active && <Badge colorScheme="blue" fontSize="xs">Active</Badge>}
+                  </HStack>
+                  <Badge colorScheme={p.configured ? 'green' : 'gray'} fontSize="xs">
+                    {p.configured ? 'Configured' : 'Not configured'}
+                  </Badge>
+                </HStack>
+              ))}
+            </VStack>
+          </CardBody>
+        </Card>
+
         {/* Configuration */}
         <Card>
           <CardHeader>
@@ -143,13 +224,6 @@ function Settings() {
                 <FormLabel>Vision API URL</FormLabel>
                 <Code p={2} borderRadius="md" w="full">
                   {config?.vision_api_url}
-                </Code>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Gemini Model</FormLabel>
-                <Code p={2} borderRadius="md" w="full">
-                  {config?.gemini_model}
                 </Code>
               </FormControl>
 

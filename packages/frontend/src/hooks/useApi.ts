@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
-import type { ProjectCreate, ZoneAnalysisRequest, FullAnalysisRequest } from '../types';
+import type { ProjectCreate, ZoneAnalysisRequest, FullAnalysisRequest, ProjectPipelineRequest } from '../types';
 
 // Query keys
 export const queryKeys = {
   health: ['health'],
   config: ['config'],
+  llmProviders: ['llm-providers'],
   projects: ['projects'],
   project: (id: string) => ['project', id],
   calculators: ['calculators'],
@@ -28,6 +29,14 @@ export function useConfig() {
   return useQuery({
     queryKey: queryKeys.config,
     queryFn: () => api.getConfig().then((r) => r.data),
+  });
+}
+
+// LLM Provider hooks
+export function useLLMProviders() {
+  return useQuery({
+    queryKey: queryKeys.llmProviders,
+    queryFn: () => api.getLLMProviders().then((r) => r.data),
   });
 }
 
@@ -148,6 +157,17 @@ export function useRunFullAnalysis() {
   return useMutation({
     mutationFn: (data: FullAnalysisRequest) =>
       api.analysis.runFull(data).then(r => r.data),
+  });
+}
+
+export function useRunProjectPipeline() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ProjectPipelineRequest) =>
+      api.analysis.runProjectPipeline(data).then(r => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+    },
   });
 }
 

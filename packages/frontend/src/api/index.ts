@@ -9,6 +9,7 @@ import type {
   TaskStatus,
   SemanticClass,
   AppConfig,
+  LLMProviderInfo,
   KnowledgeBaseSummary,
   User,
   UserCreate,
@@ -18,6 +19,8 @@ import type {
   DesignStrategyResult,
   FullAnalysisRequest,
   FullAnalysisResult,
+  ProjectPipelineRequest,
+  ProjectPipelineResult,
 } from '../types';
 
 // Health & Config
@@ -28,7 +31,11 @@ export const api = {
   // Config
   getConfig: () => apiClient.get<AppConfig>('/api/config'),
   testVision: () => apiClient.post<{ healthy: boolean; config: unknown }>('/api/config/test-vision'),
-  testGemini: () => apiClient.post<{ configured: boolean; model: string | null }>('/api/config/test-gemini'),
+  testGemini: () => apiClient.post<{ configured: boolean; provider: string; model: string | null }>('/api/config/test-gemini'),
+  testLLM: () => apiClient.post<{ configured: boolean; provider: string; model: string | null }>('/api/config/test-llm'),
+  getLLMProviders: () => apiClient.get<LLMProviderInfo[]>('/api/config/llm-providers'),
+  switchLLMProvider: (provider: string, model?: string) =>
+    apiClient.put('/api/config/llm-provider', null, { params: { provider, model } }),
 
   // Projects
   projects: {
@@ -57,8 +64,10 @@ export const api = {
     },
     assignImageZone: (projectId: string, imageId: string, zoneId: string | null) =>
       apiClient.put(`/api/projects/${projectId}/images/${imageId}/zone`, null, {
-        params: { zone_id: zoneId },
+        params: zoneId != null ? { zone_id: zoneId } : {},
       }),
+    batchAssignZones: (projectId: string, assignments: Array<{ image_id: string; zone_id: string | null }>) =>
+      apiClient.put(`/api/projects/${projectId}/images/batch-zone`, assignments),
     deleteImage: (projectId: string, imageId: string) =>
       apiClient.delete(`/api/projects/${projectId}/images/${imageId}`),
     listImages: (projectId: string) =>
@@ -155,6 +164,8 @@ export const api = {
       apiClient.post<FullAnalysisResult>('/api/analysis/run-full', data),
     runFullAsync: (data: FullAnalysisRequest) =>
       apiClient.post<{ task_id: string; status: string; message: string }>('/api/analysis/run-full/async', data),
+    runProjectPipeline: (data: ProjectPipelineRequest) =>
+      apiClient.post<ProjectPipelineResult>('/api/analysis/project-pipeline', data),
   },
 
   // Auth

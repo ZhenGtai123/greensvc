@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
 from app.core.database import init_db_async
@@ -116,6 +117,11 @@ def create_app() -> FastAPI:
         prefix="/api/analysis",
         tags=["Analysis Pipeline"],
     )
+
+    # Serve uploaded images as static files
+    uploads_path = settings.temp_full_path / "uploads"
+    uploads_path.mkdir(parents=True, exist_ok=True)
+    app.mount("/api/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
     return app
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Container,
@@ -56,6 +56,20 @@ function Reports() {
 
   const [selectedCalculator, setSelectedCalculator] = useState('');
   const [imagePaths, setImagePaths] = useState('');
+
+  // Auto-select first recommended calculator from store (once)
+  const recommendedIds = selectedIndicators.map(i => i.indicator_id);
+  const calcSynced = useRef(false);
+  useEffect(() => {
+    if (calcSynced.current) return;
+    if (recommendedIds.length > 0 && calculators) {
+      const match = calculators.find(c => recommendedIds.includes(c.id));
+      if (match) {
+        setSelectedCalculator(match.id);
+        calcSynced.current = true;
+      }
+    }
+  }, [calculators, recommendedIds.length]);
   const [calculating, setCalculating] = useState(false);
   const [results, setResults] = useState<CalculationSummary | null>(null);
   const [rawResults, setRawResults] = useState<unknown[]>([]);
@@ -152,11 +166,18 @@ function Reports() {
                   value={selectedCalculator}
                   onChange={(e) => setSelectedCalculator(e.target.value)}
                 >
-                  {calculators?.map((calc) => (
-                    <option key={calc.id} value={calc.id}>
-                      {calc.id} - {calc.name}
-                    </option>
-                  ))}
+                  {calculators
+                    ?.slice()
+                    .sort((a, b) => {
+                      const aRec = recommendedIds.includes(a.id) ? 0 : 1;
+                      const bRec = recommendedIds.includes(b.id) ? 0 : 1;
+                      return aRec - bRec;
+                    })
+                    .map((calc) => (
+                      <option key={calc.id} value={calc.id}>
+                        {recommendedIds.includes(calc.id) ? '\u2605 ' : ''}{calc.id} - {calc.name}
+                      </option>
+                    ))}
                 </Select>
 
                 <Box w="full">

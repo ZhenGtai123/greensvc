@@ -42,6 +42,7 @@ class UploadedImage(BaseModel):
     has_gps: bool = False
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    metrics_results: dict[str, Optional[float]] = Field(default_factory=dict)
 
 
 class ProjectCreate(BaseModel):

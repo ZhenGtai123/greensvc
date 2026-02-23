@@ -37,7 +37,7 @@ def run_full_analysis_task(self, request_data: dict, output_path: Optional[str] 
     from app.services.zone_analyzer import ZoneAnalyzer
     from app.services.design_engine import DesignEngine
     from app.services.knowledge_base import KnowledgeBase
-    from app.services.gemini_client import GeminiClient
+    from app.services.llm_client import create_llm_client
 
     settings = get_settings()
 
@@ -45,9 +45,23 @@ def run_full_analysis_task(self, request_data: dict, output_path: Optional[str] 
     kb = KnowledgeBase(knowledge_base_dir=str(settings.knowledge_base_full_path))
     kb.load()
 
-    gemini = GeminiClient(api_key=settings.google_api_key, model=settings.gemini_model)
+    # Build LLM client from settings
+    provider = settings.llm_provider
+    key_map = {
+        "gemini": settings.google_api_key,
+        "openai": settings.openai_api_key,
+        "anthropic": settings.anthropic_api_key,
+        "deepseek": settings.deepseek_api_key,
+    }
+    model_map = {
+        "gemini": settings.gemini_model,
+        "openai": settings.openai_model,
+        "anthropic": settings.anthropic_model,
+        "deepseek": settings.deepseek_model,
+    }
+    llm = create_llm_client(provider, key_map.get(provider, ""), model_map.get(provider, ""))
     analyzer = ZoneAnalyzer()
-    engine = DesignEngine(knowledge_base=kb, gemini_client=gemini)
+    engine = DesignEngine(knowledge_base=kb, llm_client=llm)
 
     request = FullAnalysisRequest(**request_data)
 

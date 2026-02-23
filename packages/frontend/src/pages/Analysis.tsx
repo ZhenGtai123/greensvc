@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Box,
   Container,
@@ -44,8 +44,18 @@ import {
   Wrap,
   WrapItem,
   Tooltip,
+  Select,
+  Checkbox,
+  CheckboxGroup,
 } from '@chakra-ui/react';
-import { useRunZoneAnalysis, useRunDesignStrategies, useRunFullAnalysis } from '../hooks/useApi';
+import {
+  useRunZoneAnalysis,
+  useRunDesignStrategies,
+  useRunFullAnalysis,
+  useRunProjectPipeline,
+  useProjects,
+  useCalculators,
+} from '../hooks/useApi';
 import type {
   ZoneAnalysisRequest,
   FullAnalysisRequest,
@@ -56,7 +66,11 @@ import type {
   EnrichedZoneStat,
   ZoneDiagnostic,
   ZoneDesignOutput,
+  ProjectPipelineResult,
+  ProjectPipelineProgress,
 } from '../types';
+import { generateReport } from '../utils/generateReport';
+import useAppStore from '../store/useAppStore';
 
 const LAYERS = ['full', 'foreground', 'middleground', 'background'];
 const LAYER_LABELS: Record<string, string> = {
@@ -80,6 +94,12 @@ const PRIORITY_COLORS: Record<number, string> = {
   3: 'yellow.300',
   4: 'orange.200',
   5: 'red.200',
+};
+
+const STEP_STATUS_COLORS: Record<string, string> = {
+  completed: 'green',
+  skipped: 'gray',
+  failed: 'red',
 };
 
 function statusBgColor(status: string): string {
@@ -113,11 +133,20 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 
 function Analysis() {
   const toast = useToast();
+  const { selectedIndicators } = useAppStore();
 
-  // Input state
+  // Input mode tab
+  const [inputMode, setInputMode] = useState(0);
+
+  // Manual JSON input state
   const [inputJson, setInputJson] = useState('');
   const [parsedData, setParsedData] = useState<ZoneAnalysisRequest | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+
+  // Pipeline state
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedIndicatorIds, setSelectedIndicatorIds] = useState<string[]>([]);
+  const [pipelineResult, setPipelineResult] = useState<ProjectPipelineResult | null>(null);
 
   // Config state
   const [zscoreModerate, setZscoreModerate] = useState(0.5);
@@ -130,12 +159,46 @@ function Analysis() {
   const [designResult, setDesignResult] = useState<DesignStrategyResult | null>(null);
 
   // Selected layer for filtering
-  const [selectedLayer, setSelectedLayer] = useState(0); // index into LAYERS
+  const [selectedLayer, setSelectedLayer] = useState(0);
+
+  // Queries
+  const { data: projects } = useProjects();
+  const { data: calculators } = useCalculators();
+
+  // Initialize indicator selection from store once (set by Indicators page)
+  const indicatorsSynced = useRef(false);
+  useEffect(() => {
+    if (indicatorsSynced.current) return;
+    if (selectedIndicators.length > 0 && calculators && calculators.length > 0) {
+      const validIds = selectedIndicators
+        .map(i => i.indicator_id)
+        .filter(id => calculators.some(c => c.id === id));
+      if (validIds.length > 0) {
+        setSelectedIndicatorIds(validIds);
+        indicatorsSynced.current = true;
+      }
+    }
+  }, [selectedIndicators, calculators]);
 
   // Mutations
   const zoneAnalysis = useRunZoneAnalysis();
   const designStrategies = useRunDesignStrategies();
   const fullAnalysis = useRunFullAnalysis();
+  const projectPipeline = useRunProjectPipeline();
+
+  // Selected project info
+  const selectedProject = useMemo(() => {
+    if (!selectedProjectId || !projects) return null;
+    return projects.find(p => p.id === selectedProjectId) ?? null;
+  }, [selectedProjectId, projects]);
+
+  const projectSummary = useMemo(() => {
+    if (!selectedProject) return null;
+    const totalImages = selectedProject.uploaded_images.length;
+    const assignedImages = selectedProject.uploaded_images.filter(img => img.zone_id).length;
+    const zones = selectedProject.spatial_zones.length;
+    return { totalImages, assignedImages, zones };
+  }, [selectedProject]);
 
   // Parse summary
   const parsedSummary = useMemo(() => {
@@ -146,7 +209,7 @@ function Analysis() {
     return { zones: zones.size, indicators: indicators.size, layers: layers.size };
   }, [parsedData]);
 
-  // Parse JSON input (called explicitly via button, not on every keystroke)
+  // Parse JSON input
   const handleParseJson = useCallback(() => {
     setParseError(null);
     setParsedData(null);
@@ -156,7 +219,6 @@ function Analysis() {
     try {
       const json = JSON.parse(inputJson);
 
-      // Format 1: Already has indicator_definitions + zone_statistics
       if (json.indicator_definitions && json.zone_statistics) {
         const zoneStats = Array.isArray(json.zone_statistics)
           ? json.zone_statistics
@@ -168,7 +230,6 @@ function Analysis() {
         return;
       }
 
-      // Format 2: Flat array with Indicator, Zone, Layer, Mean fields
       if (Array.isArray(json) || (json.zone_statistics && Array.isArray(json.zone_statistics))) {
         const arr: Record<string, unknown>[] = Array.isArray(json) ? json : json.zone_statistics;
 
@@ -210,6 +271,29 @@ function Analysis() {
       setParseError(`Invalid JSON: ${(e as Error).message}`);
     }
   }, [inputJson]);
+
+  // Run project pipeline
+  const handleRunPipeline = useCallback(async () => {
+    if (!selectedProjectId || selectedIndicatorIds.length === 0) return;
+    try {
+      const result = await projectPipeline.mutateAsync({
+        project_id: selectedProjectId,
+        indicator_ids: selectedIndicatorIds,
+        run_stage3: true,
+        use_llm: useLlm,
+        zscore_moderate: zscoreModerate,
+        zscore_significant: zscoreSignificant,
+        zscore_critical: zscoreCritical,
+      });
+      setPipelineResult(result);
+      if (result.zone_analysis) setZoneResult(result.zone_analysis);
+      if (result.design_strategies) setDesignResult(result.design_strategies);
+      toast({ title: 'Project pipeline complete', status: 'success', duration: 3000 });
+    } catch (err: unknown) {
+      const msg = extractErrorMessage(err, 'Project pipeline failed');
+      toast({ title: msg, status: 'error' });
+    }
+  }, [selectedProjectId, selectedIndicatorIds, useLlm, zscoreModerate, zscoreSignificant, zscoreCritical, projectPipeline, toast]);
 
   // Run Stage 2.5 only
   const handleRunStage25 = useCallback(async () => {
@@ -267,6 +351,24 @@ function Analysis() {
     }
   }, [zoneResult, useLlm, designStrategies, toast]);
 
+  // Download Markdown report
+  const handleDownloadReport = useCallback(() => {
+    if (!zoneResult) return;
+    const md = generateReport({
+      projectName: pipelineResult?.project_name,
+      pipelineResult,
+      zoneResult,
+      designResult,
+    });
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analysis_report_${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [zoneResult, designResult, pipelineResult]);
+
   // Export JSON
   const handleExport = useCallback(() => {
     const exportData = {
@@ -307,101 +409,250 @@ function Analysis() {
     return { indicators, corr, pval };
   }, [zoneResult, selectedLayer]);
 
-  const isRunning = zoneAnalysis.isPending || fullAnalysis.isPending || designStrategies.isPending;
+  const isRunning = zoneAnalysis.isPending || fullAnalysis.isPending || designStrategies.isPending || projectPipeline.isPending;
+
+  // Indicator selection helpers
+  const handleSelectAllIndicators = useCallback(() => {
+    if (calculators) {
+      setSelectedIndicatorIds(calculators.map(c => c.id));
+    }
+  }, [calculators]);
+
+  const handleClearIndicators = useCallback(() => {
+    setSelectedIndicatorIds([]);
+  }, []);
 
   return (
     <Container maxW="container.xl" py={8}>
       <HStack justify="space-between" mb={6}>
         <Heading>Analysis Dashboard</Heading>
         {(zoneResult || designResult) && (
-          <Button size="sm" onClick={handleExport}>
-            Export JSON
-          </Button>
+          <HStack spacing={2}>
+            <Button size="sm" onClick={handleDownloadReport}>
+              Download Report
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleExport}>
+              Export JSON
+            </Button>
+          </HStack>
         )}
       </HStack>
 
-      {/* Input Section */}
+      {/* Input Section with Tabs */}
       <Card mb={6}>
         <CardHeader>
           <Heading size="md">Input Data</Heading>
         </CardHeader>
         <CardBody>
-          <VStack spacing={4} align="stretch">
-            <Textarea
-              placeholder="Paste zone statistics JSON here..."
-              value={inputJson}
-              onChange={(e) => setInputJson(e.target.value)}
-              fontFamily="mono"
-              fontSize="sm"
-              rows={10}
-              resize="vertical"
-            />
+          <Tabs variant="enclosed" index={inputMode} onChange={setInputMode} colorScheme="green" mb={4}>
+            <TabList>
+              <Tab>Project Pipeline</Tab>
+              <Tab>Manual JSON</Tab>
+            </TabList>
 
-            <Button size="sm" onClick={handleParseJson} isDisabled={!inputJson.trim()}>
-              Parse JSON
-            </Button>
+            <TabPanels>
+              {/* Tab 1: Project Pipeline */}
+              <TabPanel px={0}>
+                <VStack spacing={4} align="stretch">
+                  {/* Project selector */}
+                  <FormControl>
+                    <FormLabel fontSize="sm">Project</FormLabel>
+                    <Select
+                      placeholder="Select a project..."
+                      value={selectedProjectId}
+                      onChange={e => setSelectedProjectId(e.target.value)}
+                    >
+                      {projects?.map(p => {
+                        const zones = p.spatial_zones.length;
+                        const imgs = p.uploaded_images.length;
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.project_name} ({zones} zones, {imgs} images)
+                          </option>
+                        );
+                      })}
+                    </Select>
+                  </FormControl>
 
-            {parseError && (
-              <Alert status="error">
-                <AlertIcon />
-                {parseError}
-              </Alert>
-            )}
+                  {/* Project summary */}
+                  {projectSummary && (
+                    <Alert status={projectSummary.assignedImages > 0 ? 'info' : 'warning'}>
+                      <AlertIcon />
+                      {projectSummary.assignedImages} of {projectSummary.totalImages} images assigned to {projectSummary.zones} zones
+                      {projectSummary.assignedImages === 0 && ' — assign images to zones before running the pipeline'}
+                    </Alert>
+                  )}
 
-            {parsedSummary && (
-              <Alert status="success">
-                <AlertIcon />
-                Loaded: {parsedSummary.zones} zones x {parsedSummary.indicators} indicators x {parsedSummary.layers} layers
-              </Alert>
-            )}
+                  {/* Calculator selection */}
+                  <FormControl>
+                    <HStack justify="space-between" mb={2}>
+                      <FormLabel fontSize="sm" mb={0}>Indicators</FormLabel>
+                      <HStack spacing={2}>
+                        <Button size="xs" variant="ghost" onClick={handleSelectAllIndicators}>
+                          Select All
+                        </Button>
+                        <Button size="xs" variant="ghost" onClick={handleClearIndicators}>
+                          Clear All
+                        </Button>
+                      </HStack>
+                    </HStack>
+                    <CheckboxGroup value={selectedIndicatorIds} onChange={vals => setSelectedIndicatorIds(vals as string[])}>
+                      <VStack align="stretch" maxH="200px" overflowY="auto" spacing={1} p={2} borderWidth="1px" borderRadius="md">
+                        {calculators?.map(c => (
+                          <Checkbox key={c.id} value={c.id} size="sm">
+                            <Text fontSize="sm">
+                              {c.name} <Text as="span" color="gray.500">({c.id})</Text>
+                            </Text>
+                          </Checkbox>
+                        ))}
+                        {(!calculators || calculators.length === 0) && (
+                          <Text fontSize="sm" color="gray.500">No calculators available</Text>
+                        )}
+                      </VStack>
+                    </CheckboxGroup>
+                  </FormControl>
 
-            <Divider />
+                  {/* Run button */}
+                  <Button
+                    colorScheme="green"
+                    onClick={handleRunPipeline}
+                    isLoading={projectPipeline.isPending}
+                    isDisabled={!selectedProjectId || selectedIndicatorIds.length === 0 || isRunning}
+                  >
+                    Run Project Pipeline
+                  </Button>
 
-            {/* Configuration Row */}
-            <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4} alignItems="end">
-              <FormControl>
-                <FormLabel fontSize="sm">Z-score Moderate</FormLabel>
-                <NumberInput
-                  value={zscoreModerate}
-                  onChange={(_, val) => setZscoreModerate(isNaN(val) ? 0.5 : val)}
-                  step={0.1}
-                  min={0}
-                  size="sm"
-                >
-                  <NumberInputField />
-                </NumberInput>
-              </FormControl>
-              <FormControl>
-                <FormLabel fontSize="sm">Z-score Significant</FormLabel>
-                <NumberInput
-                  value={zscoreSignificant}
-                  onChange={(_, val) => setZscoreSignificant(isNaN(val) ? 1.0 : val)}
-                  step={0.1}
-                  min={0}
-                  size="sm"
-                >
-                  <NumberInputField />
-                </NumberInput>
-              </FormControl>
-              <FormControl>
-                <FormLabel fontSize="sm">Z-score Critical</FormLabel>
-                <NumberInput
-                  value={zscoreCritical}
-                  onChange={(_, val) => setZscoreCritical(isNaN(val) ? 1.5 : val)}
-                  step={0.1}
-                  min={0}
-                  size="sm"
-                >
-                  <NumberInputField />
-                </NumberInput>
-              </FormControl>
-              <FormControl display="flex" alignItems="center">
-                <FormLabel fontSize="sm" mb={0}>Use LLM (Stage 3)</FormLabel>
-                <Switch isChecked={useLlm} onChange={(e) => setUseLlm(e.target.checked)} colorScheme="green" />
-              </FormControl>
-            </SimpleGrid>
+                  {/* Pipeline result summary */}
+                  {pipelineResult && (
+                    <Card variant="outline">
+                      <CardBody>
+                        <VStack spacing={3} align="stretch">
+                          <Heading size="sm">Pipeline Result: {pipelineResult.project_name}</Heading>
+                          <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                            <Box>
+                              <Text fontSize="xs" color="gray.500">Images Processed</Text>
+                              <Text fontWeight="bold">{pipelineResult.zone_assigned_images} / {pipelineResult.total_images}</Text>
+                            </Box>
+                            <Box>
+                              <Text fontSize="xs" color="gray.500">Calculations OK</Text>
+                              <Text fontWeight="bold" color="green.600">{pipelineResult.calculations_succeeded}</Text>
+                            </Box>
+                            <Box>
+                              <Text fontSize="xs" color="gray.500">Calculations Failed</Text>
+                              <Text fontWeight="bold" color={pipelineResult.calculations_failed > 0 ? 'red.600' : undefined}>
+                                {pipelineResult.calculations_failed}
+                              </Text>
+                            </Box>
+                            <Box>
+                              <Text fontSize="xs" color="gray.500">Zone Statistics</Text>
+                              <Text fontWeight="bold">{pipelineResult.zone_statistics_count}</Text>
+                            </Box>
+                          </SimpleGrid>
 
-            {/* Action Buttons */}
+                          <Divider />
+
+                          {/* Step progress */}
+                          <Wrap spacing={2}>
+                            {pipelineResult.steps.map((step: ProjectPipelineProgress, idx: number) => (
+                              <WrapItem key={idx}>
+                                <Tooltip label={step.detail}>
+                                  <Badge colorScheme={STEP_STATUS_COLORS[step.status] || 'gray'} variant="subtle" px={2} py={1}>
+                                    {step.step}: {step.status}
+                                  </Badge>
+                                </Tooltip>
+                              </WrapItem>
+                            ))}
+                          </Wrap>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  )}
+                </VStack>
+              </TabPanel>
+
+              {/* Tab 2: Manual JSON */}
+              <TabPanel px={0}>
+                <VStack spacing={4} align="stretch">
+                  <Textarea
+                    placeholder="Paste zone statistics JSON here..."
+                    value={inputJson}
+                    onChange={(e) => setInputJson(e.target.value)}
+                    fontFamily="mono"
+                    fontSize="sm"
+                    rows={10}
+                    resize="vertical"
+                  />
+
+                  <Button size="sm" onClick={handleParseJson} isDisabled={!inputJson.trim()}>
+                    Parse JSON
+                  </Button>
+
+                  {parseError && (
+                    <Alert status="error">
+                      <AlertIcon />
+                      {parseError}
+                    </Alert>
+                  )}
+
+                  {parsedSummary && (
+                    <Alert status="success">
+                      <AlertIcon />
+                      Loaded: {parsedSummary.zones} zones x {parsedSummary.indicators} indicators x {parsedSummary.layers} layers
+                    </Alert>
+                  )}
+                </VStack>
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+
+          <Divider mb={4} />
+
+          {/* Shared configuration row */}
+          <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4} alignItems="end" mb={4}>
+            <FormControl>
+              <FormLabel fontSize="sm">Z-score Moderate</FormLabel>
+              <NumberInput
+                value={zscoreModerate}
+                onChange={(_, val) => setZscoreModerate(isNaN(val) ? 0.5 : val)}
+                step={0.1}
+                min={0}
+                size="sm"
+              >
+                <NumberInputField />
+              </NumberInput>
+            </FormControl>
+            <FormControl>
+              <FormLabel fontSize="sm">Z-score Significant</FormLabel>
+              <NumberInput
+                value={zscoreSignificant}
+                onChange={(_, val) => setZscoreSignificant(isNaN(val) ? 1.0 : val)}
+                step={0.1}
+                min={0}
+                size="sm"
+              >
+                <NumberInputField />
+              </NumberInput>
+            </FormControl>
+            <FormControl>
+              <FormLabel fontSize="sm">Z-score Critical</FormLabel>
+              <NumberInput
+                value={zscoreCritical}
+                onChange={(_, val) => setZscoreCritical(isNaN(val) ? 1.5 : val)}
+                step={0.1}
+                min={0}
+                size="sm"
+              >
+                <NumberInputField />
+              </NumberInput>
+            </FormControl>
+            <FormControl display="flex" alignItems="center">
+              <FormLabel fontSize="sm" mb={0}>Use LLM (Stage 3)</FormLabel>
+              <Switch isChecked={useLlm} onChange={(e) => setUseLlm(e.target.checked)} colorScheme="green" />
+            </FormControl>
+          </SimpleGrid>
+
+          {/* Manual mode action buttons */}
+          {inputMode === 1 && (
             <HStack spacing={4}>
               <Button
                 colorScheme="green"
@@ -421,7 +672,7 @@ function Analysis() {
                 Run Full Pipeline
               </Button>
             </HStack>
-          </VStack>
+          )}
         </CardBody>
       </Card>
 
@@ -767,7 +1018,7 @@ function Analysis() {
         <Card>
           <CardBody textAlign="center" py={10}>
             <Text color="gray.500">
-              Paste zone statistics JSON above and run the analysis pipeline.
+              Select a project and run the pipeline, or paste zone statistics JSON to start the analysis.
             </Text>
           </CardBody>
         </Card>

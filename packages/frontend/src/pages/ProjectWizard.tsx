@@ -219,6 +219,7 @@ function ProjectWizard() {
   }>>([]);
   const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
   const [draggedExistingImageId, setDraggedExistingImageId] = useState<string | null>(null);
+  const originalZoneMap = useRef<Record<string, string | null>>({});
 
   // Saving
   const [saving, setSaving] = useState(false);
@@ -264,8 +265,14 @@ function ProjectWizard() {
           }));
           setRelations(loadedRelations);
 
-          // Load existing images
-          setExistingImages(project.uploaded_images || []);
+          // Load existing images and remember original zone assignments
+          const imgs = project.uploaded_images || [];
+          setExistingImages(imgs);
+          const zoneMap: Record<string, string | null> = {};
+          for (const img of imgs) {
+            zoneMap[img.image_id] = img.zone_id ?? null;
+          }
+          originalZoneMap.current = zoneMap;
         })
         .catch((error) => {
           console.error('Failed to load project:', error);
@@ -295,11 +302,11 @@ function ProjectWizard() {
   };
 
   const removeZone = (id: string) => {
-    setZones(zones.filter(z => z.id !== id));
+    setZones(prev => prev.filter(z => z.id !== id));
     // Also remove any relations involving this zone
-    setRelations(relations.filter(r => r.fromZone !== id && r.toZone !== id));
+    setRelations(prev => prev.filter(r => r.fromZone !== id && r.toZone !== id));
     // Move images back to ungrouped
-    setImages(images.map(img => img.zoneId === id ? { ...img, zoneId: null } : img));
+    setImages(prev => prev.map(img => img.zoneId === id ? { ...img, zoneId: null } : img));
   };
 
   const toggleZoneType = (zoneId: string, typeId: string) => {
@@ -362,11 +369,11 @@ function ProjectWizard() {
     e.preventDefault();
     if (!draggedImageId) return;
 
-    setImages(images.map(img =>
+    setImages(prev => prev.map(img =>
       img.id === draggedImageId ? { ...img, zoneId: targetZoneId } : img
     ));
     setDraggedImageId(null);
-  }, [draggedImageId, images]);
+  }, [draggedImageId]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -423,9 +430,12 @@ function ProjectWizard() {
         await api.projects.update(projectId, projectData);
         savedProjectId = projectId;
 
-        // Update zone assignments for existing images that were moved
-        for (const img of existingImages) {
-          await api.projects.assignImageZone(projectId, img.image_id, img.zone_id);
+        // Batch update zone assignments for images that actually changed
+        const changedAssignments = existingImages
+          .filter(img => (img.zone_id ?? null) !== (originalZoneMap.current[img.image_id] ?? null))
+          .map(img => ({ image_id: img.image_id, zone_id: img.zone_id }));
+        if (changedAssignments.length > 0) {
+          await api.projects.batchAssignZones(projectId, changedAssignments);
         }
       } else {
         // Create new project
@@ -486,18 +496,18 @@ function ProjectWizard() {
     e.preventDefault();
     if (!draggedExistingImageId) return;
 
-    setExistingImages(existingImages.map(img =>
+    setExistingImages(prev => prev.map(img =>
       img.image_id === draggedExistingImageId ? { ...img, zone_id: targetZoneId } : img
     ));
     setDraggedExistingImageId(null);
-  }, [draggedExistingImageId, existingImages]);
+  }, [draggedExistingImageId]);
 
   // Handle delete existing image
   const handleDeleteExistingImage = async (imageId: string) => {
     if (!projectId) return;
     try {
       await api.projects.deleteImage(projectId, imageId);
-      setExistingImages(existingImages.filter(img => img.image_id !== imageId));
+      setExistingImages(prev => prev.filter(img => img.image_id !== imageId));
       toast({ title: 'Image deleted', status: 'success' });
     } catch {
       toast({ title: 'Failed to delete image', status: 'error' });

@@ -2,7 +2,7 @@
 Design Engine Service  (Stage 3)
 LLM-powered diagnosis, deterministic IOM matching, strategy generation.
 
-Depends on KnowledgeBase (IOM + evidence + appendix) and GeminiClient.
+Depends on KnowledgeBase (IOM + evidence + appendix) and LLMClient.
 """
 
 import asyncio
@@ -24,7 +24,7 @@ from app.models.analysis import (
     ProjectContext,
 )
 from app.services.knowledge_base import KnowledgeBase
-from app.services.gemini_client import GeminiClient
+from app.services.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +83,9 @@ def _parse_json_from_text(text: str) -> dict:
 class DesignEngine:
     """Stage 3: diagnosis → IOM matching → strategy generation."""
 
-    def __init__(self, knowledge_base: KnowledgeBase, gemini_client: GeminiClient):
+    def __init__(self, knowledge_base: KnowledgeBase, llm_client: LLMClient):
         self.kb = knowledge_base
-        self.gemini = gemini_client
+        self.llm = llm_client
 
         # Index IOM records by source indicator
         self._iom_by_indicator: dict[str, list[dict]] = defaultdict(list)
@@ -122,7 +122,7 @@ class DesignEngine:
     ) -> DesignStrategyResult:
         zone_analysis = request.zone_analysis
         allowed = set(request.allowed_indicator_ids) if request.allowed_indicator_ids else None
-        use_llm = request.use_llm and self.gemini.check_api_key()
+        use_llm = request.use_llm and self.llm.check_connection()
 
         zones_output: dict[str, ZoneDesignOutput] = {}
 
@@ -222,7 +222,7 @@ Return ONLY valid JSON:
   ]
 }}"""
 
-        raw_text = await asyncio.to_thread(self._call_gemini, prompt)
+        raw_text = await self._call_llm(prompt)
         data = _parse_json_from_text(raw_text)
 
         queries_raw = data.get("iom_queries", []) or []
@@ -413,7 +413,7 @@ Generate {min(max_strategies, 5)} concrete design strategies. Return ONLY valid 
   "synergies": "string"
 }}"""
 
-        raw_text = await asyncio.to_thread(self._call_gemini, prompt)
+        raw_text = await self._call_llm(prompt)
         result = _parse_json_from_text(raw_text)
 
         # Validate: strip indicator refs not in allowed list
@@ -548,14 +548,12 @@ Generate {min(max_strategies, 5)} concrete design strategies. Return ONLY valid 
         }
 
     # ------------------------------------------------------------------
-    # Gemini call helper
+    # LLM call helper
     # ------------------------------------------------------------------
 
-    def _call_gemini(self, prompt: str) -> str:
-        """Synchronous Gemini call (wrapped in asyncio.to_thread by callers)."""
-        client = self.gemini._get_client()
-        response = client.generate_content(prompt)
-        return response.text or ""
+    async def _call_llm(self, prompt: str) -> str:
+        """Call current LLM provider."""
+        return await self.llm.generate(prompt)
 
     @staticmethod
     def _normalize_direction(d: Optional[str]) -> str:

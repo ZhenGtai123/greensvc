@@ -23,6 +23,7 @@ export interface UploadedImage {
   has_gps: boolean;
   latitude: number | null;
   longitude: number | null;
+  metrics_results: Record<string, number | null>;
 }
 
 export interface Project {
@@ -168,10 +169,23 @@ export interface VisionAnalysisResponse {
 // Config types
 export interface AppConfig {
   vision_api_url: string;
+  llm_provider: string;
   gemini_model: string;
+  openai_model: string;
+  anthropic_model: string;
+  deepseek_model: string;
   data_dir: string;
   metrics_code_dir: string;
   knowledge_base_dir: string;
+}
+
+export interface LLMProviderInfo {
+  id: string;
+  name: string;
+  default_model: string;
+  configured: boolean;
+  active: boolean;
+  current_model: string;
 }
 
 // Knowledge base types
@@ -347,4 +361,35 @@ export interface FullAnalysisRequest extends ZoneAnalysisRequest {
   use_llm?: boolean;
   max_ioms_per_query?: number;
   max_strategies_per_zone?: number;
+}
+
+// Project Pipeline types
+export interface ProjectPipelineRequest {
+  project_id: string;
+  indicator_ids: string[];
+  run_stage3?: boolean;
+  use_llm?: boolean;
+  zscore_moderate?: number;
+  zscore_significant?: number;
+  zscore_critical?: number;
+}
+
+export interface ProjectPipelineProgress {
+  step: string;
+  status: string;
+  detail: string;
+}
+
+export interface ProjectPipelineResult {
+  project_id: string;
+  project_name: string;
+  total_images: number;
+  zone_assigned_images: number;
+  calculations_run: number;
+  calculations_succeeded: number;
+  calculations_failed: number;
+  zone_statistics_count: number;
+  zone_analysis: ZoneAnalysisResult | null;
+  design_strategies: DesignStrategyResult | null;
+  steps: ProjectPipelineProgress[];
 }
