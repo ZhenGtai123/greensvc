@@ -13,6 +13,11 @@ import type {
   User,
   UserCreate,
   AuthToken,
+  ZoneAnalysisRequest,
+  ZoneAnalysisResult,
+  DesignStrategyResult,
+  FullAnalysisRequest,
+  FullAnalysisResult,
 } from '../types';
 
 // Health & Config
@@ -138,6 +143,18 @@ export const api = {
       image_paths: string[];
       output_dir?: string;
     }) => apiClient.post('/api/tasks/metrics/multi', data),
+  },
+
+  // Analysis (Stage 2.5 + Stage 3)
+  analysis: {
+    runZoneStatistics: (data: ZoneAnalysisRequest) =>
+      apiClient.post<ZoneAnalysisResult>('/api/analysis/zone-statistics', data),
+    runDesignStrategies: (data: unknown) =>
+      apiClient.post<DesignStrategyResult>('/api/analysis/design-strategies', data),
+    runFull: (data: FullAnalysisRequest) =>
+      apiClient.post<FullAnalysisResult>('/api/analysis/run-full', data),
+    runFullAsync: (data: FullAnalysisRequest) =>
+      apiClient.post<{ task_id: string; status: string; message: string }>('/api/analysis/run-full/async', data),
   },
 
   // Auth

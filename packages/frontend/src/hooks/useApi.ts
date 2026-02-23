@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
-import type { ProjectCreate } from '../types';
+import type { ProjectCreate, ZoneAnalysisRequest, FullAnalysisRequest } from '../types';
 
 // Query keys
 export const queryKeys = {
@@ -126,6 +126,28 @@ export function useTaskStatus(taskId: string | null, enabled = true) {
       }
       return 2000;
     },
+  });
+}
+
+// Analysis mutations
+export function useRunZoneAnalysis() {
+  return useMutation({
+    mutationFn: (data: ZoneAnalysisRequest) =>
+      api.analysis.runZoneStatistics(data).then(r => r.data),
+  });
+}
+
+export function useRunDesignStrategies() {
+  return useMutation({
+    mutationFn: (data: unknown) =>
+      api.analysis.runDesignStrategies(data).then(r => r.data),
+  });
+}
+
+export function useRunFullAnalysis() {
+  return useMutation({
+    mutationFn: (data: FullAnalysisRequest) =>
+      api.analysis.runFull(data).then(r => r.data),
   });
 }
 

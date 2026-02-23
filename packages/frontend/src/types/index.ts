@@ -212,3 +212,139 @@ export interface AuthToken {
   token_type: string;
   expires_in: number;
 }
+
+// Analysis types (Stage 2.5 + Stage 3)
+export interface IndicatorDefinitionInput {
+  id: string;
+  name: string;
+  unit?: string;
+  target_direction?: string;
+  definition?: string;
+  category?: string;
+}
+
+export interface IndicatorLayerValue {
+  zone_id: string;
+  zone_name: string;
+  indicator_id: string;
+  layer: string;
+  n_images?: number;
+  mean?: number | null;
+  std?: number | null;
+  min?: number | null;
+  max?: number | null;
+  unit?: string;
+  area_sqm?: number;
+}
+
+export interface EnrichedZoneStat extends IndicatorLayerValue {
+  z_score?: number | null;
+  percentile?: number | null;
+  priority: number;
+  classification: string;
+}
+
+export interface ZoneProblem {
+  indicator_id: string;
+  indicator_name: string;
+  layer: string;
+  value?: number | null;
+  unit?: string;
+  z_score: number;
+  priority: number;
+  classification: string;
+  target_direction: string;
+}
+
+export interface ZoneDiagnostic {
+  zone_id: string;
+  zone_name: string;
+  area_sqm: number;
+  status: string;
+  total_priority: number;
+  priority_by_layer: Record<string, number>;
+  problems_by_layer: Record<string, ZoneProblem[]>;
+  indicator_status: Record<string, Record<string, unknown>>;
+}
+
+export interface ComputationMetadata {
+  version: string;
+  generated_at: string;
+  n_indicators: number;
+  n_zones: number;
+  layers: string[];
+}
+
+export interface ZoneAnalysisResult {
+  zone_statistics: EnrichedZoneStat[];
+  zone_diagnostics: ZoneDiagnostic[];
+  correlation_by_layer: Record<string, Record<string, Record<string, number>>>;
+  pvalue_by_layer: Record<string, Record<string, Record<string, number>>>;
+  indicator_definitions: Record<string, IndicatorDefinitionInput>;
+  layer_statistics: Record<string, Record<string, { N: number; Mean: number | null; Std: number | null; Min: number | null; Max: number | null }>>;
+  computation_metadata: ComputationMetadata;
+}
+
+export interface DesignStrategy {
+  priority: number;
+  strategy_name: string;
+  target_indicators: string[];
+  spatial_location: string;
+  intervention: {
+    object: string;
+    action: string;
+    variable: string;
+    specific_guidance: string;
+  };
+  expected_effects: { indicator: string; direction: string; magnitude: string }[];
+  confidence: string;
+  potential_tradeoffs: string;
+  supporting_ioms: string[];
+}
+
+export interface MatchedIOM {
+  iom_id: string | null;
+  indicator_id: string;
+  indicator_name: string;
+  direction: string;
+  score: number;
+  operation: Record<string, unknown>;
+  confidence_expanded: Record<string, unknown>;
+}
+
+export interface ZoneDesignOutput {
+  zone_id: string;
+  zone_name: string;
+  status: string;
+  overall_assessment: string;
+  matched_ioms: MatchedIOM[];
+  design_strategies: DesignStrategy[];
+  implementation_sequence: string;
+  synergies: string;
+}
+
+export interface DesignStrategyResult {
+  zones: Record<string, ZoneDesignOutput>;
+  metadata: { diagnosis_mode: string; total_zones: number; total_strategies: number };
+}
+
+export interface FullAnalysisResult {
+  zone_analysis: ZoneAnalysisResult;
+  design_strategies: DesignStrategyResult;
+}
+
+export interface ZoneAnalysisRequest {
+  indicator_definitions: Record<string, IndicatorDefinitionInput>;
+  zone_statistics: IndicatorLayerValue[];
+  zscore_moderate?: number;
+  zscore_significant?: number;
+  zscore_critical?: number;
+}
+
+export interface FullAnalysisRequest extends ZoneAnalysisRequest {
+  project_context?: { project?: Record<string, unknown>; context?: Record<string, unknown>; performance_query?: Record<string, unknown> };
+  allowed_indicator_ids?: string[];
+  use_llm?: boolean;
+  max_ioms_per_query?: number;
+  max_strategies_per_zone?: number;
+}

@@ -11,6 +11,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import ProjectWizard from './pages/ProjectWizard';
 import ProjectDetail from './pages/ProjectDetail';
+import Analysis from './pages/Analysis';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -61,6 +62,9 @@ function Navigation() {
             <Button as={Link} to="/reports" variant="ghost" size="sm">
               Reports
             </Button>
+            <Button as={Link} to="/analysis" variant="ghost" size="sm">
+              Analysis
+            </Button>
             <Button as={Link} to="/settings" variant="ghost" size="sm">
               Settings
             </Button>
@@ -89,6 +93,7 @@ function App() {
                 <Route path="/indicators" element={<Indicators />} />
                 <Route path="/calculators" element={<Calculators />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/analysis" element={<Analysis />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </Box>
