@@ -17,7 +17,7 @@ def create_celery_app() -> Celery:
         "greensvc",
         broker=f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
         backend=f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
-        include=["app.tasks.vision_tasks", "app.tasks.metrics_tasks"],
+        include=["app.tasks.vision_tasks", "app.tasks.metrics_tasks", "app.tasks.analysis_tasks"],
     )
 
     celery_app.conf.update(

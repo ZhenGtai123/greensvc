@@ -1,0 +1,3139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GreenSVC-AI · Design Goal Definition v2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #2563eb;
+  --primary-light: #dbeafe;
+  --primary-dark: #1d4ed8;
+  --accent: #10b981;
+  --accent-light: #d1fae5;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --surface: #ffffff;
+  --surface-alt: #f8fafc;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 32px;
+  padding: 24px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.header .subtitle {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.header .description {
+  margin-top: 12px;
+  font-size: 15px;
+  color: var(--text-muted);
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.version-badge {
+  display: inline-block;
+  background: var(--accent);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Section Cards */
+.section {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+}
+
+.section-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.section-icon.blue { background: var(--primary-light); }
+.section-icon.green { background: var(--accent-light); }
+.section-icon.orange { background: var(--warning-light); }
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.section-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Form Elements */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-row.single {
+  grid-template-columns: 1fr;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.form-group .hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.required { color: #ef4444; }
+
+/* Checkbox Grid */
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.checkbox-item:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.checkbox-item.selected {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.checkbox-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.checkbox-item .checkbox-content {
+  flex: 1;
+}
+
+.checkbox-item .checkbox-label {
+  font-weight: 600;
+  font-size: 14px;
+  display: block;
+}
+
+.checkbox-item .checkbox-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Subdimension chips */
+.subdim-container {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+  display: none;
+}
+
+.subdim-container.visible {
+  display: block;
+}
+
+.subdim-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.subdim-chip {
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.subdim-chip:hover {
+  border-color: var(--primary);
+}
+
+.subdim-chip.selected {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* Area Definition Table */
+.area-table-container {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+.area-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.area-table th {
+  background: var(--surface-alt);
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+}
+
+.area-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.area-table input, .area-table select, .area-table textarea {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.area-table textarea {
+  min-height: 60px;
+}
+
+.area-types-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.area-type-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.area-type-chip:hover {
+  border-color: var(--primary);
+}
+
+.area-type-chip.selected {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.area-type-chip input {
+  display: none;
+}
+
+.btn-remove {
+  padding: 6px 10px;
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.btn-remove:hover {
+  background: #fecaca;
+}
+
+.btn-add-area {
+  margin-top: 12px;
+  padding: 10px 20px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border: 1px dashed var(--primary);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-add-area:hover {
+  background: var(--primary);
+  color: white;
+  border-style: solid;
+}
+
+/* Spatial Relations */
+.relation-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.relation-item select {
+  flex: 1;
+  min-width: 120px;
+}
+
+.relation-arrow {
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-secondary {
+  background: var(--surface-alt);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+/* Output Panel */
+.output-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-top: 24px;
+  box-shadow: var(--shadow-lg);
+  display: none;
+}
+
+.output-panel.visible {
+  display: block;
+}
+
+.output-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.output-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.output-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.output-actions button {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.json-output {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 20px;
+  border-radius: 8px;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.json-key { color: #93c5fd; }
+.json-string { color: #86efac; }
+.json-number { color: #fcd34d; }
+.json-boolean { color: #f472b6; }
+
+/* Info boxes */
+.info-box {
+  padding: 12px 16px;
+  background: #eff6ff;
+  border-left: 4px solid var(--primary);
+  border-radius: 0 8px 8px 0;
+  margin: 12px 0;
+  font-size: 13px;
+  color: #1e40af;
+}
+
+.warning-box {
+  padding: 12px 16px;
+  background: #fef3c7;
+  border-left: 4px solid var(--warning);
+  border-radius: 0 8px 8px 0;
+  margin: 12px 0;
+  font-size: 13px;
+  color: #92400e;
+}
+
+/* Collapsible */
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 12px 0;
+}
+
+.collapsible-header:hover {
+  color: var(--primary);
+}
+
+.collapsible-icon {
+  transition: transform 0.2s;
+}
+
+.collapsible-content {
+  display: none;
+  padding-top: 12px;
+}
+
+.collapsible-content.expanded {
+  display: block;
+}
+
+.collapsible-header.expanded .collapsible-icon {
+  transform: rotate(180deg);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  .checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ===== Enhanced Spatial Zones & Relations (borrowed + adapted from GreenSVC-AI_EN.html) ===== */
+.manager-card{
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+.manager-title{
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.manager-grid{
+  display: grid;
+  grid-template-columns: 1fr 140px 180px;
+  gap: 10px;
+  align-items: center;
+}
+.manager-grid-3{
+  display:grid;
+  grid-template-columns: 1fr 120px 80px;
+  gap: 10px;
+  align-items:center;
+}
+.manager-card textarea{
+  width:100%;
+  margin-top:10px;
+  min-height:58px;
+  padding:10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  resize: vertical;
+}
+.manager-actions{
+  display:flex;
+  gap:10px;
+  margin-top:10px;
+  flex-wrap: wrap;
+}
+
+/* Multi-select zone type selector */
+.zone-types-selector{
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#fff;
+  max-height:170px;
+  overflow:auto;
+  padding:6px;
+}
+.zone-type-option{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  padding:8px 10px;
+  border-radius:8px;
+  cursor:pointer;
+  transition:all .15s;
+  border:1px solid transparent;
+  margin-bottom:6px;
+  background:#fafafa;
+}
+.zone-type-option:hover{
+  background: #f3f4f6;
+}
+.zone-type-option.selected{
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.zone-type-option input{
+  margin-top:2px;
+}
+.zone-type-name{
+  font-weight:600;
+  font-size:13px;
+  color:var(--text);
+}
+.zone-type-def{
+  font-size:12px;
+  color:var(--text-muted);
+  margin-top:2px;
+}
+.selected-types-display{
+  margin-top:6px;
+  font-size:12px;
+  color:var(--primary-dark);
+  font-weight:600;
+}
+
+/* Spatial map */
+.spatial-map{
+  background:#ffffff;
+  border:1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+.relation-flex{
+  display:grid;
+  grid-template-columns: 2.1fr 1.1fr;
+  gap: 14px;
+  align-items:start;
+}
+.side-panels{display:block}
+
+.operation-mode-switcher{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  padding: 12px;
+  background: var(--surface-alt);
+  border:1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+.mode-switch-btn{
+  padding: 10px 14px;
+  border:1px solid var(--border);
+  border-radius: 10px;
+  background:#fff;
+  cursor:pointer;
+  transition:all .15s;
+  font-weight:700;
+  font-size: 13px;
+}
+.mode-switch-btn:hover{transform: translateY(-1px);}
+.mode-switch-btn.active{
+  background: var(--primary);
+  color:#fff;
+  border-color: var(--primary);
+}
+.mode-indicator{
+  margin-left:auto;
+  padding:8px 12px;
+  border-radius: 999px;
+  background:#fff;
+  border:1px solid var(--border);
+  color: var(--primary-dark);
+  font-weight:700;
+  font-size: 12px;
+}
+
+.relation-setup-panel{
+  border:1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background:#fff;
+  margin-bottom: 12px;
+}
+.panel-title{font-weight:800;margin-bottom:10px}
+.relation-options-grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+}
+.relation-option-card{
+  border:1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fafafa;
+  transition:all .15s;
+}
+.relation-option-card:hover{background:#f3f4f6}
+.relation-option-card.selected{
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.relation-option-card label{cursor:pointer;display:block}
+.direction-panel{
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+}
+.direction-title{font-weight:700;margin-bottom:8px}
+.direction-selector{display:flex;gap:10px}
+.direction-btn{
+  flex:1;
+  border:1px solid var(--border);
+  border-radius: 10px;
+  background:#fff;
+  padding: 10px;
+  cursor:pointer;
+  font-weight:700;
+  transition:all .15s;
+}
+.direction-btn.selected{
+  background: var(--primary);
+  color:#fff;
+  border-color: var(--primary);
+}
+
+.map-canvas{
+  position:relative;
+  background: #f8fafc;
+  border: 2px solid #dbeafe;
+  border-radius: 14px;
+  min-height: 520px;
+  overflow:hidden;
+}
+.map-canvas.dragging{cursor:move}
+.map-canvas.connecting{cursor:pointer}
+.canvas-hint{
+  position:absolute;
+  left:12px;
+  bottom:12px;
+  padding:8px 10px;
+  border-radius:10px;
+  background: rgba(255,255,255,.92);
+  border:1px solid var(--border);
+  font-size:12px;
+  color: var(--text-muted);
+}
+
+.area-node{
+  position:absolute;
+  width: 160px;
+  min-height: 86px;
+  background:#fff;
+  border: 2px solid #c7d2fe;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 10px 10px 8px 10px;
+  cursor:pointer;
+  user-select:none;
+  transition: transform .12s, box-shadow .12s, border-color .12s;
+  z-index: 10;
+}
+.area-node:hover{transform: scale(1.03)}
+.area-node .node-title{
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.25;
+}
+.area-node .node-tags{
+  margin-top:6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+.area-node.selected{
+  border-color: var(--warning);
+  box-shadow: 0 0 0 4px rgba(245,158,11,.18);
+}
+.area-node.source{
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(16,185,129,.18);
+}
+.area-node.draggable{cursor:move}
+
+.connection-line{
+  position:absolute;
+  transform-origin:left center;
+  z-index: 2;
+  pointer-events:none;
+}
+.connection-line.clickable{pointer-events:all; cursor:pointer}
+.connection-line-inner{
+  height:2px;
+  position:relative;
+}
+.connection-label{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform: translate(-50%, -50%);
+  background:#fff;
+  border:1px solid #cbd5e1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space:nowrap;
+  box-shadow: 0 4px 10px rgba(0,0,0,.08);
+}
+.arrow-marker{
+  position:absolute;
+  width:0;height:0;
+  border-left:10px solid;
+  border-top:6px solid transparent;
+  border-bottom:6px solid transparent;
+  top:50%;
+  transform: translateY(-50%);
+}
+.arrow-end{right:-10px;}
+.arrow-start{left:-10px; transform: translateY(-50%) rotate(180deg);}
+
+.map-legend{
+  position:absolute;
+  top:10px;
+  right:10px;
+  background: rgba(255,255,255,.95);
+  border:1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 11px;
+  box-shadow: var(--shadow);
+  max-width: 240px;
+}
+.legend-title{font-weight:900;margin-bottom:8px}
+.legend-item{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+.legend-line{width:34px;height:2px;position:relative}
+.legend-line.arrow::after{
+  content:'';
+  position:absolute;
+  right:-6px;
+  top:-4px;
+  width:0;height:0;
+  border-left:8px solid;
+  border-top:5px solid transparent;
+  border-bottom:5px solid transparent;
+  border-left-color: inherit;
+}
+
+.records{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+.records-title{font-weight:800;margin-bottom:8px}
+.records-list{list-style:none;padding:0;margin:10px 0 0 0}
+.record-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+  padding:10px;
+  border-radius: 10px;
+  background: #fafafa;
+  border:1px solid transparent;
+  margin-bottom:8px;
+}
+.record-item:hover{background:#f3f4f6;border-color:var(--border)}
+.record-left{display:flex;align-items:center;gap:8px;flex:1}
+.record-arrow{font-weight:900;color:var(--primary)}
+.record-meta{font-size:12px;color:var(--text-muted)}
+.record-del{
+  padding:6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background:#fff;
+  cursor:pointer;
+  font-weight:700;
+}
+.record-del:hover{background:#fee2e2;border-color:#fecaca;color:#b91c1c}
+
+@media (max-width: 980px){
+  .manager-grid{grid-template-columns:1fr; }
+  .manager-grid-3{grid-template-columns:1fr; }
+  .relation-flex{grid-template-columns: 1fr; }
+  .relation-options-grid{grid-template-columns: 1fr; }
+}
+
+
+/* === Dropdown (for Zone Types & Relationship Types) === */
+.dropdown { position: relative; width: 100%; }
+.dropdown-btn{
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  cursor:pointer;
+}
+.dropdown-btn.open{
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+.dropdown-caret{ color: var(--text-muted); font-size: 12px; }
+.dropdown-menu{
+  position:absolute;
+  top: calc(100% + 6px);
+  left:0;
+  right:0;
+  max-height: 260px;
+  overflow:auto;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  display:none;
+  z-index: 50;
+}
+.dropdown-menu.open{ display:block; }
+.dropdown-option{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  padding:10px;
+  border-radius: 10px;
+  cursor:pointer;
+  border: 1px solid transparent;
+}
+.dropdown-option:hover{ background: var(--surface-alt); }
+.dropdown-option input{ margin-top: 3px; }
+.opt-title{ font-weight: 800; font-size: 13px; line-height:1.2; }
+.opt-desc{ display:block; font-size: 11px; color: var(--text-muted); margin-top:4px; line-height:1.2; }
+
+/* Manager divider */
+.manager-divider{ height:1px; background: var(--border); margin: 12px 0; }
+
+/* === Image Upload & Grouping === */
+.upload-area{
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  text-align:center;
+  background: var(--surface-alt);
+  cursor:pointer;
+  transition: all .15s;
+}
+.upload-area.dragover{
+  border-color: var(--primary);
+  background: #eff6ff;
+}
+.stats-bar{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+.stat-item{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  text-align:center;
+}
+.stat-value{ font-weight: 900; font-size: 18px; }
+.stat-label{ font-size: 12px; color: var(--text-muted); margin-top:2px; }
+
+.image-pool{ margin-top: 14px; }
+.image-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+}
+.image-item{
+  position:relative;
+  border-radius: 12px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  background:#fff;
+  cursor: grab;
+}
+.image-item.dragging{ opacity: .6; }
+.image-item img{ width:100%; height:80px; object-fit:cover; display:block; }
+.image-number{
+  position:absolute;
+  top:6px;
+  left:6px;
+  background: rgba(0,0,0,.6);
+  color:#fff;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+.image-actions{
+  position:absolute;
+  top:6px;
+  right:6px;
+  display:flex;
+  gap:6px;
+}
+.image-action-btn{
+  width:22px; height:22px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.92);
+  border:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: 12px;
+  cursor:pointer;
+  user-select:none;
+}
+.groups-container{
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+.group-box{
+  border: 2px dashed #cbd5e1;
+  border-radius: 14px;
+  background:#fff;
+  padding: 12px;
+  min-height: 160px;
+}
+.group-box.dragover{
+  border-color: var(--accent);
+  background: #ecfdf5;
+}
+.group-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom: 8px;
+}
+.group-title{ font-weight: 900; font-size: 13px; }
+.group-count{
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border:1px solid var(--border);
+}
+.group-images{ min-height: 110px; }
+.empty-drop{
+  color:#94a3b8;
+  text-align:center;
+  font-size: 12px;
+  padding: 22px 10px;
+}
+
+/* Temp connection line */
+.temp-connection{ position:absolute; width:100%; height:100%; pointer-events:none; display:none; z-index: 1; }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>GreenSVC-AI <span class="version-badge">v2.0</span></h1>
+    <div class="subtitle">Evidence-Based Landscape Design Support System</div>
+    <div class="description">
+      Define project context, performance goals, and spatial zones to generate evidence-based SVC indicator recommendations and spatial operation guidelines.
+    </div>
+  </div>
+
+  <!-- Section 1: Project Information -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon blue">📋</div>
+      <div>
+        <div class="section-title">Project Information</div>
+        <div class="section-subtitle">Basic project details</div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Project Name <span class="required">*</span></label>
+        <input type="text" id="project-name" placeholder="e.g., Shenzhen Longhua Community Park Renovation">
+      </div>
+      <div class="form-group">
+        <label>Project Location</label>
+        <input type="text" id="project-location" placeholder="e.g., Minzhi Street, Longhua District, Shenzhen">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Site Scale</label>
+        <select id="site-scale">
+          <option value="">Please select</option>
+          <option value="XS">Extra Small (&lt;0.5 hectare)</option>
+          <option value="S">Small (0.5-2 hectares)</option>
+          <option value="M">Medium (2-10 hectares)</option>
+          <option value="L">Large (10-50 hectares)</option>
+          <option value="XL">Extra Large (&gt;50 hectares)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Project Phase</label>
+        <select id="project-phase">
+          <option value="">Please select</option>
+          <option value="conceptual">Conceptual Design</option>
+          <option value="schematic">Schematic Design</option>
+          <option value="detailed">Detailed Design</option>
+          <option value="renovation">Renovation/Improvement</option>
+          <option value="evaluation">Post-occupancy Evaluation</option>
+        </select>
+      </div>
+    </div>
+
+    
+  </div>
+
+  <!-- Section 2: Site Context (Appendix-aligned) -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon green">🌍</div>
+      <div>
+        <div class="section-title">Site Context</div>
+        <div class="section-subtitle">Appendix-aligned context coding (climate, setting, LCZ, country, users)</div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Köppen Climate Zone (koppen_zone_id) <span class="required">*</span></label>
+        <select id="koppen-zone">
+          <option value="">Please select</option>
+          <option value="KPN_AF">KPN_AF — Köppen Climate: Tropical Rainforest (Af)</option>
+          <option value="KPN_CFA">KPN_CFA — Humid Subtropical (Cfa)</option>
+          <option value="KPN_CFB">KPN_CFB — Oceanic (Cfb)</option>
+          <option value="KPN_CSB">KPN_CSB — Warm-Summer Mediterranean Climate</option>
+          <option value="KPN_CWA">KPN_CWA — Monsoon-Influenced Humid Subtropical Climate</option>
+          <option value="KPN_DFA">KPN_DFA — Hot-summer Humid Continental (Dfa)</option>
+          <option value="KPN_DFB">KPN_DFB — Warm-Summer Humid Continental Climate</option>
+          <option value="KPN_DWA">KPN_DWA — Monsoon Humid Continental (Dwa)</option>
+          <option value="KPN_XX">KPN_XX — Unknown or Undefined Climate</option>
+          <option value="KPN_NA">KPN_NA — Not Applicable</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Country/Region (country_id)</label>
+        <select id="country">
+          <option value="">Please select (optional)</option>
+          <option value="CNT_CHN">CNT_CHN — Cnt Chn</option>
+          <option value="CNT_DNK">CNT_DNK — Denmark</option>
+          <option value="CNT_FIN">CNT_FIN — Finland</option>
+          <option value="CNT_GBR">CNT_GBR — United Kingdom (Great Britain)</option>
+          <option value="CNT_GLO">CNT_GLO — Global</option>
+          <option value="CNT_HKG">CNT_HKG — Hong Kong</option>
+          <option value="CNT_IND">CNT_IND — India</option>
+          <option value="CNT_IRL">CNT_IRL — Ireland</option>
+          <option value="CNT_ITA">CNT_ITA — Italy</option>
+          <option value="CNT_JPN">CNT_JPN — Japan</option>
+          <option value="CNT_KOR">CNT_KOR — South Korea</option>
+          <option value="CNT_LKA">CNT_LKA — Sri Lanka</option>
+          <option value="CNT_MAC">CNT_MAC — Macau</option>
+          <option value="CNT_NLD">CNT_NLD — Netherlands</option>
+          <option value="CNT_SGP">CNT_SGP — Singapore</option>
+          <option value="CNT_TWN">CNT_TWN — Taiwan</option>
+          <option value="CNT_USA">CNT_USA — Cnt Usa</option>
+          <option value="CNT_NA">CNT_NA — Country Not Applicable</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Space Type (space_type_id) <span class="required">*</span></label>
+        <select id="space-type">
+          <option value="">Please select</option>
+          <option value="SET_CAM">SET_CAM — Campus</option>
+          <option value="SET_CBD">SET_CBD — Central Business District</option>
+          <option value="SET_CMD">SET_CMD — Commercial District</option>
+          <option value="SET_CMP">SET_CMP — Campus</option>
+          <option value="SET_COM">SET_COM — Commercial</option>
+          <option value="SET_COU">SET_COU — Courtyard</option>
+          <option value="SET_CST">SET_CST — Coastal Street</option>
+          <option value="SET_FOR">SET_FOR — Forest</option>
+          <option value="SET_GWY">SET_GWY — Greenway</option>
+          <option value="SET_HIS">SET_HIS — Historical Street/Area</option>
+          <option value="SET_HWY">SET_HWY — Highway</option>
+          <option value="SET_IND">SET_IND — Industrial Area</option>
+          <option value="SET_LIL">SET_LIL — Lilong</option>
+          <option value="SET_MET">SET_MET — Metro Station Area</option>
+          <option value="SET_NEW_CTY">SET_NEW_CTY — New City</option>
+          <option value="SET_NUA">SET_NUA — New Urban Area</option>
+          <option value="SET_OLD_CTY">SET_OLD_CTY — Old City</option>
+          <option value="SET_OLD_DST">SET_OLD_DST — Old Urban District</option>
+          <option value="SET_POS">SET_POS — Public Open Space</option>
+          <option value="SET_PRK">SET_PRK — Park</option>
+          <option value="SET_PUB_HOU">SET_PUB_HOU — Public Housing</option>
+          <option value="SET_PUB_HSG">SET_PUB_HSG — Public Housing</option>
+          <option value="SET_RES">SET_RES — Residential</option>
+          <option value="SET_RIV">SET_RIV — River</option>
+          <option value="SET_STR">SET_STR — Street</option>
+          <option value="SET_URB">SET_URB — Urban</option>
+          <option value="SET_URB_AGG">SET_URB_AGG — Urban Agglomeration</option>
+          <option value="SET_NA">SET_NA — Not available</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Local Climate Zone (lcz_type_id)</label>
+        <select id="lcz-type">
+          <option value="">Please select (optional)</option>
+          <option value="LCZ_1">LCZ_1 — LCZ 1 - Compact High-rise</option>
+          <option value="LCZ_2">LCZ_2 — LCZ 2 - Compact Mid-rise</option>
+          <option value="LCZ_3">LCZ_3 — LCZ 3 - Compact Low-rise</option>
+          <option value="LCZ_4">LCZ_4 — LCZ 4 - Open High-rise</option>
+          <option value="LCZ_6">LCZ_6 — LCZ 6 - Open Low-rise</option>
+          <option value="LCZ_A">LCZ_A — LCZ A - Dense Trees</option>
+          <option value="LCZ_B">LCZ_B — LCZ B - Scattered Trees</option>
+          <option value="LCZ_URB">LCZ_URB — Urban / Built-up Area</option>
+          <option value="LCZ_UNSPECIFIED">LCZ_UNSPECIFIED — Unspecified Local Climate Zone</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Target User Group (age_group_id)</label>
+        <select id="age-group">
+          <option value="">Please select (optional)</option>
+          <option value="AGE_ADL">AGE_ADL — Adult Population</option>
+          <option value="AGE_ALL">AGE_ALL — All Age Groups</option>
+          <option value="AGE_ELD">AGE_ELD — Elderly Population</option>
+          <option value="AGE_UNSPECIFIED">AGE_UNSPECIFIED — Unspecified Age Group</option>
+          <option value="AGE_NA">AGE_NA — Age Not Available</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Section 3: Performance Goals (Appendix-aligned) -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon green">🎯</div>
+      <div>
+        <div class="section-title">Performance Goals</div>
+        <div class="section-subtitle">Define target requirements and select Appendix-aligned performance dimensions</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Design Brief (for performance target requirements)</label>
+      <textarea id="design-brief" placeholder="Describe the performance objectives, constraints, priorities, and expected outcomes..."></textarea>
+    </div>
+
+    <div class="checkbox-grid" id="performance-grid">
+      <div class="checkbox-item" onclick="togglePerformance(this)">
+        <input type="checkbox" name="performance" value="PRF_AES">
+        <div class="checkbox-content">
+          <span class="checkbox-label">👁️ Visual–Spatial Quality</span>
+          <span class="checkbox-desc">Visual–spatial quality outcomes including aesthetic quality and spatial legibility (clari…</span>
+        </div>
+      </div>
+      <div class="checkbox-item" onclick="togglePerformance(this)">
+        <input type="checkbox" name="performance" value="PRF_BEH">
+        <div class="checkbox-content">
+          <span class="checkbox-label">🚶 Use, Accessibility &amp; Safety</span>
+          <span class="checkbox-desc">Outcomes related to use patterns and behaviors, including functional convenience/accessib…</span>
+        </div>
+      </div>
+      <div class="checkbox-item" onclick="togglePerformance(this)">
+        <input type="checkbox" name="performance" value="PRF_COM">
+        <div class="checkbox-content">
+          <span class="checkbox-label">😌 Comfort</span>
+          <span class="checkbox-desc">Comfort outcomes integrating thermal comfort and composite comfort (thermal, visual, and…</span>
+        </div>
+      </div>
+      <div class="checkbox-item" onclick="togglePerformance(this)">
+        <input type="checkbox" name="performance" value="PRF_ECO">
+        <div class="checkbox-content">
+          <span class="checkbox-label">💶 Economic Value</span>
+          <span class="checkbox-desc">Performance related to financial value, cost, or economic return of a space.</span>
+        </div>
+      </div>
+      <div class="checkbox-item" onclick="togglePerformance(this)">
+        <input type="checkbox" name="performance" value="PRF_ENV">
+        <div class="checkbox-content">
+          <span class="checkbox-label">🌿 Environmental Quality</span>
+          <span class="checkbox-desc">Air quality and environmental measures</span>
+        </div>
+      </div>
+      <div class="checkbox-item" onclick="togglePerformance(this)">
+        <input type="checkbox" name="performance" value="PRF_HLT">
+        <div class="checkbox-content">
+          <span class="checkbox-label">🧠 Health &amp; Wellbeing</span>
+          <span class="checkbox-desc">Health and wellbeing outcomes including physical health indicators, psychological health,…</span>
+        </div>
+      </div>
+      <div class="checkbox-item" onclick="togglePerformance(this)">
+        <input type="checkbox" name="performance" value="PRF_SOC">
+        <div class="checkbox-content">
+          <span class="checkbox-label">🤝 Social Outcomes &amp; Equity</span>
+          <span class="checkbox-desc">Social outcomes including interaction/cohesion and social equity in access to and benefit…</span>
+        </div>
+      </div>
+      <div class="checkbox-item" onclick="togglePerformance(this)">
+        <input type="checkbox" name="performance" value="PRF_NA">
+        <div class="checkbox-content">
+          <span class="checkbox-label">⛔ Performance - Not Applicable</span>
+          <span class="checkbox-desc">A designation used in data sets when a specific performance metric cannot be calculated,…</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="subdim-container" id="subdimensions-container">
+      <label style="font-weight: 600; margin-bottom: 8px; display: block;">Subdimensions (Optional)</label>
+      <div class="subdim-chips" id="subdim-chips"></div>
+    </div>
+  </div>
+
+
+  <!-- Section 4: Spatial Zones Definition -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon orange">🗺️</div>
+      <div>
+        <div class="section-title">Spatial Zones Definition</div>
+        <div class="section-subtitle">Define analysis zones and their characteristics</div>
+      </div>
+    </div>
+
+    <div class="info-box">
+      Define distinct spatial zones within your project site. Each zone will be evaluated separately for SVC indicator measurement and operation recommendations.
+      <div class="small" style="margin-top:6px;color:var(--text-muted);">
+        Tip: Use concise, unique zone names (e.g., “Entrance Plaza”, “Waterfront Promenade”). You can assign multiple zone types to a single zone.
+      </div>
+    </div>
+
+    <div class="manager-card">
+      <div class="manager-title">🏷️ Zone Type Management</div>
+      <div class="small" style="margin-bottom:8px;color:var(--text-muted);">
+        Add new zone types and manage existing ones. Newly added types will appear in all Zone Type dropdown menus.
+      </div>
+
+      <div class="manager-grid">
+        <input id="newZoneTypeName" placeholder="New type name (e.g., Waterfront)" />
+        <button class="btn btn-secondary" onclick="addZoneType()">+ Add Type</button>
+      </div>
+      <textarea id="newZoneTypeDef" placeholder="New type definition/description (optional)"></textarea>
+
+      <div class="manager-divider"></div>
+
+      <div class="form-row" style="margin-top:12px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label style="font-size:13px;">Existing Types</label>
+          <select id="zoneTypeManagerSelect" onchange="onZoneTypeManagerSelectChange()"></select>
+          <div class="hint">Select a type to view details. Only custom types can be deleted.</div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label style="font-size:13px;">Definition</label>
+          <textarea id="zoneTypeManagerDef" readonly placeholder="Select a type to view definition"></textarea>
+          <div class="manager-actions" style="margin-top:8px;">
+            <button class="btn btn-secondary" id="zoneTypeDeleteBtn" onclick="deleteSelectedZoneType()" style="display:none;">Delete Selected Type</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="area-table-container" style="margin-top:14px;">
+      <table class="area-table" id="area-table">
+        <thead>
+          <tr>
+            <th style="width: 18%;">Zone Name</th>
+            <th style="width: 24%;">Zone Types (Multi-select)</th>
+            <th style="width: 12%;">Area (㎡)</th>
+            <th style="width: 12%;">Status</th>
+            <th style="width: 26%;">Current Issues/Features</th>
+            <th style="width: 8%;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="area-table-body">
+          <!-- Dynamic rows will be added here -->
+        </tbody>
+      </table>
+    </div>
+
+    <button class="btn-add-area" onclick="addAreaRow()">+ Add Zone</button>
+  </div>
+
+
+<!-- Section 5: Spatial Relations (Collapsible) -->
+  <div class="section">
+    <div class="collapsible-header" onclick="toggleCollapsible(this)">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="section-icon blue">🔗</div>
+        <div>
+          <div class="section-title">Spatial Relations (Optional)</div>
+          <div class="section-subtitle">Define connections between zones (drag & connect)</div>
+        </div>
+      </div>
+      <span class="collapsible-icon">▼</span>
+    </div>
+
+    <div class="collapsible-content" id="relations-content">
+      <div class="info-box">
+        Use the spatial map to define relationships between zones (e.g., adjacency, path connection, visual connection). This helps the system understand spatial structure, circulation, and experiential sequences.
+        <div class="small" style="margin-top:6px;color:var(--text-muted);">
+          Workflow: (1) Define zones above → (2) Open this panel → (3) Drag nodes to layout → (4) Switch to Connect Mode and click two nodes to create relations.
+        </div>
+      </div>
+
+      <div class="spatial-map">
+        <div class="operation-mode-switcher">
+          <button class="mode-switch-btn active" id="drag-mode-btn" onclick="switchOperationMode('drag')">✋ Drag Mode</button>
+          <button class="mode-switch-btn" id="connect-mode-btn" onclick="switchOperationMode('connect')">🔗 Connect Mode</button>
+          <div class="mode-indicator" id="mode-indicator">Current: Drag Mode</div>
+        </div>
+
+        <div class="relation-setup-panel">
+          <div class="panel-title">Connection Relationship Setup</div>
+
+          <div class="form-group" style="margin-top:10px; margin-bottom: 0;">
+            <label style="font-size:13px;">Relationship Types (multi-select)</label>
+            <div class="dropdown">
+              <button type="button" class="dropdown-btn" id="relationTypeBtn" onclick="toggleDropdown('relationTypeMenu','relationTypeBtn')">
+                <span id="relationTypeBtnLabel">Select relationship type(s)</span>
+                <span class="dropdown-caret">▾</span>
+              </button>
+              <div class="dropdown-menu" id="relationTypeMenu"></div>
+            </div>
+            <div class="hint" id="relationTypeSelectedHint" style="margin-top:6px;">Selected: —</div>
+          </div>
+
+
+          <div class="direction-panel">
+            <div class="direction-title">Connection Direction</div>
+            <div class="direction-selector">
+              <button class="direction-btn selected" id="dir-single" onclick="setConnectionDirection('single')">→ One-way</button>
+              <button class="direction-btn" id="dir-double" onclick="setConnectionDirection('double')">↔ Two-way</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="relation-flex">
+          <div class="map-canvas" id="spatial-diagram">
+            <div class="map-legend" id="legendBox">
+              <div class="legend-title">Legend</div>
+            </div>
+                        <svg class="temp-connection" id="temp-line">
+              <line id="temp-line-seg" x1="0" y1="0" x2="0" y2="0" stroke="#22c55e" stroke-width="2" stroke-dasharray="5,5"></line>
+            </svg>
+            <div class="canvas-hint" id="canvasHint">Define at least 2 zones to start building relations.</div>
+          </div>
+
+          <div class="side-panels">
+            <div class="manager-card">
+              <div class="manager-title">🧩 Relationship Type Management</div>
+
+              <div class="small" style="margin-bottom:8px;color:var(--text-muted);">
+                Add new relationship types and select existing ones from the dropdown. Newly added types will appear in the setup dropdown immediately.
+              </div>
+
+              <div class="manager-grid-3">
+                <input id="relName" placeholder="Relationship name (e.g., Visual Connection)">
+                <select id="relStyle">
+                  <option value="solid">Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="dotted">Dotted</option>
+                </select>
+                <input id="relColor" type="color" value="#2563eb" title="Color">
+              </div>
+              <textarea id="relDef" placeholder="Relationship definition/description (optional)"></textarea>
+
+              <div class="manager-actions">
+                <button class="btn btn-secondary" onclick="addRelationType()">+ Add Relationship Type</button>
+              </div>
+
+              <div class="manager-divider"></div>
+
+              <div class="form-group" style="margin-bottom:0;">
+                <label style="font-size:13px;">Existing Relationship Types</label>
+                <select id="relTypeManagerSelect" onchange="onRelTypeManagerSelectChange()"></select>
+                <div class="hint">Select a type to view details. Only custom types can be deleted.</div>
+              </div>
+              <div id="relTypeManagerInfo" class="small" style="margin-top:10px;"></div>
+
+              <div class="manager-actions" style="margin-top:8px;">
+                <button class="btn btn-secondary" id="relTypeDeleteBtn" onclick="deleteSelectedRelationType()" style="display:none;">Delete Selected Type</button>
+              </div>
+            </div>
+
+            <div class="records" style="margin-top:12px;">
+              <div class="records-title">📜 Spatial Relationship Records</div>
+              <div id="connCount" class="small">Current: 0 records</div>
+              <ul id="connList" class="records-list"></ul>
+              <div class="manager-actions">
+                <button class="btn btn-secondary" onclick="clearConnections()">Clear All Records</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="warning-box small" style="margin-top:12px;">
+          Tip: You can create multiple relationships between the same two zones (e.g., Adjacent + Path + Visual).
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Section 6: Image Upload & Grouping -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon green">📸</div>
+      <div>
+        <div class="section-title">Image Upload &amp; Grouping</div>
+        <div class="section-subtitle">Upload site photos and group them by zones</div>
+      </div>
+    </div>
+
+    <div class="info-box">
+      Upload site photos (JPG/PNG). Drag images into the corresponding zone group. Groups will sync automatically with your <strong>Spatial Zones</strong>.
+      <div class="small" style="margin-top:6px;color:var(--text-muted);">
+        Tip: Recommend 3–5 photos per zone from different angles for robust visual feature analysis.
+      </div>
+    </div>
+
+    <div class="upload-area" id="upload-area">
+      <div style="font-size:42px;opacity:.75">📸</div>
+      <div style="font-weight:900;margin-top:4px">Drag images here or click to select</div>
+      <div class="small" style="margin-top:6px;color:var(--text-muted);">Supports batch upload · JPG/PNG</div>
+      <input type="file" id="file-input" multiple accept="image/*" style="display:none">
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-item"><div class="stat-value" id="total-images">0</div><div class="stat-label">Total Images</div></div>
+      <div class="stat-item"><div class="stat-value" id="grouped-images">0</div><div class="stat-label">Grouped Images</div></div>
+      <div class="stat-item"><div class="stat-value" id="group-count">0</div><div class="stat-label">Zone Groups</div></div>
+    </div>
+
+    <div id="image-pool-container" class="image-pool" style="display:none">
+      <div style="font-weight:800;margin:10px 0 8px">Ungrouped Images (Drag into zone groups below)</div>
+      <div id="ungrouped-pool" class="image-grid"></div>
+    </div>
+
+    <div class="manager-card" style="margin-top:14px;">
+      <div class="manager-title">🗂️ Zone Groups</div>
+      <div class="small" style="color:var(--text-muted);margin-top:6px;">
+        Drag images into each zone. You can move images between zones or drag them back to the Ungrouped pool.
+      </div>
+      <div id="groups-container" class="groups-container"></div>
+    </div>
+  </div>
+
+
+<!-- Action Buttons -->
+  <div class="action-buttons">
+    <button class="btn btn-secondary" onclick="resetForm()">Reset</button>
+    <button class="btn btn-primary" onclick="generateQuery()">Generate Query JSON</button>
+  </div>
+
+  <!-- Output Panel -->
+  <div class="output-panel" id="output-panel">
+    <div class="output-header">
+      <div class="output-title">📄 Generated Query (Stage 0 Output)</div>
+      <div class="output-actions">
+        <button class="btn btn-secondary" onclick="copyToClipboard()">Copy</button>
+        <button class="btn btn-secondary" onclick="downloadJSON()">Download</button>
+      </div>
+    </div>
+    <pre class="json-output" id="output-json"></pre>
+  </div>
+</div>
+
+<script>
+/* ===================== Global State ===================== */
+let areaRowCount = 0;
+
+/** Zone Types (customizable) */
+const DEFAULT_ZONE_TYPES = [
+  {
+    "id": "entrance",
+    "name": "Entrance/Gateway",
+    "def": "Main entry points, gateways, arrival forecourts",
+    "custom": false
+  },
+  {
+    "id": "plaza",
+    "name": "Plaza/Square",
+    "def": "Gathering plazas, open paved spaces, event squares",
+    "custom": false
+  },
+  {
+    "id": "lawn",
+    "name": "Lawn/Open Space",
+    "def": "Open lawns, flexible activity fields, multi-use clearings",
+    "custom": false
+  },
+  {
+    "id": "playground",
+    "name": "Playground/Children",
+    "def": "Children play zones, family play areas",
+    "custom": false
+  },
+  {
+    "id": "elderly",
+    "name": "Elderly Activity",
+    "def": "Elderly-friendly activity, gentle exercise, chess/meeting corners",
+    "custom": false
+  },
+  {
+    "id": "fitness",
+    "name": "Fitness/Sports",
+    "def": "Sports courts, fitness routes, exercise facilities",
+    "custom": false
+  },
+  {
+    "id": "waterfront",
+    "name": "Waterfront",
+    "def": "Water-edge promenades, decks, waterside terraces",
+    "custom": false
+  },
+  {
+    "id": "woodland",
+    "name": "Woodland/Forest",
+    "def": "Wooded areas, forest understorey, naturalized groves",
+    "custom": false
+  },
+  {
+    "id": "garden",
+    "name": "Garden/Planting",
+    "def": "Gardens, planting beds, ornamental horticulture zones",
+    "custom": false
+  },
+  {
+    "id": "path",
+    "name": "Path/Corridor",
+    "def": "Main circulation corridors, greenways, linear connectors",
+    "custom": false
+  },
+  {
+    "id": "rest",
+    "name": "Rest/Seating",
+    "def": "Rest nodes, seating pockets, shaded pause points",
+    "custom": false
+  },
+  {
+    "id": "service",
+    "name": "Service/Facility",
+    "def": "Service buildings, toilets, kiosks, management areas",
+    "custom": false
+  }
+];
+let zoneTypes = JSON.parse(JSON.stringify(DEFAULT_ZONE_TYPES));
+
+/** Relation Types (customizable) */
+const DEFAULT_RELATION_TYPES = {
+  "adjacent": {
+    "id": "adjacent",
+    "name": "Spatially Adjacent",
+    "style": "solid",
+    "color": "#2563eb",
+    "def": "Directly connected or sharing boundaries; unobstructed adjacency.",
+    "custom": false
+  },
+  "path": {
+    "id": "path",
+    "name": "Path Connection",
+    "style": "solid",
+    "color": "#10b981",
+    "def": "Clear walkable path or circulation link between zones.",
+    "custom": false
+  },
+  "visual": {
+    "id": "visual",
+    "name": "Visual Connection",
+    "style": "dashed",
+    "color": "#f59e0b",
+    "def": "Mutually visible or facing relationship; line-of-sight connection.",
+    "custom": false
+  },
+  "functional": {
+    "id": "functional",
+    "name": "Functional Link",
+    "style": "dotted",
+    "color": "#ef4444",
+    "def": "Functional sequence or complementarity between uses (program logic).",
+    "custom": false
+  }
+};
+let relationTypes = JSON.parse(JSON.stringify(DEFAULT_RELATION_TYPES));
+
+/** Spatial Map State */
+let spatialNodes = [];        // [{zoneId, x, y}]
+let spatialConnections = [];  // [{id, from_zone, to_zone, relation_type, direction}]
+let operationMode = 'drag';   // 'drag' | 'connect'
+let connectionDirection = 'single'; // 'single' | 'double'
+let selectedRelationTypes = []; // [relation_type_id]
+let connectingFrom = null;
+let draggedNodeId = null;
+let dragOffset = {x:0, y:0};
+let connectionIdCounter = 0;
+
+
+/** Image Upload State */
+let uploadedImages = []; // [{id, name, url, zone_id}]
+let draggedImageId = null;
+
+const SUBDIMENSIONS = {
+  PRF_AES: [
+    {id: 'PRS_ACC', name: 'Performance - Accessibility'},
+    {id: 'PRS_AES', name: 'Aesthetic Appreciation'},
+    {id: 'PRS_APP', name: 'Attractiveness'},
+    {id: 'PRS_BEA_VIS', name: 'Visual Beauty Score'},
+    {id: 'PRS_DIV', name: 'Diversity/Richness'},
+    {id: 'PRS_EAP', name: 'Economic Activity and Performance'},
+    {id: 'PRS_GRN', name: 'Green Infrastructure'},
+    {id: 'PRS_LGT', name: 'Light and Nighttime Economy'},
+    {id: 'PRS_LIV', name: 'Livability'},
+    {id: 'PRS_NAV', name: 'Navigation and Accessibility'},
+    {id: 'PRS_PSY', name: 'Psychological Dimension'},
+    {id: 'PRS_UNSPECIFIED', name: 'Presentation Unspecified'},
+    {id: 'PRS_URB_QUA', name: 'Urban Quality Index'},
+    {id: 'PRS_VIS', name: 'Visual Attributes'},
+    {id: 'PRS_VIS_DOM', name: 'Presentation Visual Dominance'},
+    {id: 'PRS_VIS_EFF', name: 'Visual Efficiency'},
+    {id: 'PRS_VIS_EXP', name: 'Presentation Visual Experimental'},
+    {id: 'PRS_WEA_VIS', name: 'Performance - Perceived Wealth Visual'}
+  ],
+  PRF_BEH: [
+    {id: 'PRS_BEH', name: 'Behavioral Outcomes'},
+    {id: 'PRS_CYC', name: 'Cyclability Score'},
+    {id: 'PRS_EXE_PRE', name: 'Executive Presence'},
+    {id: 'PRS_MOB', name: 'Mobility Behavior'},
+    {id: 'PRS_RUN', name: 'Performance - Runnability'},
+    {id: 'PRS_SAF_VIS', name: 'Performance - Visual Safety'},
+    {id: 'PRS_STY', name: 'Presentation Style'},
+    {id: 'PRS_WLK', name: 'Walkability Score'}
+  ],
+  PRF_COM: [
+    {id: 'PRS_COL', name: 'Cooling Effect'},
+    {id: 'PRS_HDF', name: 'Performance - Hardscape Features'},
+    {id: 'PRS_REG', name: 'Regional and Regulatory Factors'},
+    {id: 'PRS_RST', name: 'Presentation Restriction'}
+  ],
+  PRF_ECO: [
+    {id: 'PRS_HPR', name: 'Performance - Health Promotion Resources'},
+    {id: 'PRS_VAL', name: 'Presentation Value'}
+  ],
+  PRF_ENV: [
+    {id: 'PRS_PM2', name: 'PM2.5 Pollution Level'},
+    {id: 'PRS_PM_CON', name: 'Presentation Participatory Media Connectivity'},
+    {id: 'PRS_QUA', name: 'Quality of Presence'},
+    {id: 'PRS_WLK_VIS', name: 'Performance - Visual Walkability'}
+  ],
+  PRF_HLT: [
+    {id: 'PRS_AFF_NEG', name: 'Performance - Affective Negative Perception'},
+    {id: 'PRS_AFF_POS', name: 'Performance - Affective Positive Perception'},
+    {id: 'PRS_ATT', name: 'Visual Attention / Saliency'},
+    {id: 'PRS_DIS', name: 'District Distribution'},
+    {id: 'PRS_DPS', name: 'Presentation Depression / Despair'},
+    {id: 'PRS_HEA', name: 'Health Dimension'},
+    {id: 'PRS_SAD', name: 'Performance - Sadness Perception'},
+    {id: 'PRS_SAT', name: 'Performance - Satisfaction'},
+    {id: 'PRS_SCL', name: 'Scale of Presence'},
+    {id: 'PRS_STR', name: 'Stress Reduction'}
+  ],
+  PRF_SOC: [
+    {id: 'PRS_CRI', name: 'Presentation Crisis'},
+    {id: 'PRS_ECO', name: 'Presentation Economic'},
+    {id: 'PRS_POP', name: 'Population Dimensions'},
+    {id: 'PRS_POV', name: 'Poverty Dimension'},
+    {id: 'PRS_SOC', name: 'Social Interaction'},
+    {id: 'PRS_SOC_ECO', name: 'Socio-Economic Factors'}
+  ],
+  PRF_NA: [
+    {id: 'PRS_NA', name: 'Not Applicable'},
+    {id: 'PRS_PSY_FEE', name: 'Performance - Psychological Feeling'}
+  ],
+};
+
+/* ===================== Initialization ===================== */
+document.addEventListener('DOMContentLoaded', () => {
+  // Render managers
+  renderZoneTypeManagerUI();
+  renderRelationTypeManager();
+
+  // Add initial zone rows
+  addAreaRow();
+  addAreaRow();
+
+  // Default: select a sensible relation type
+  selectedRelationTypes = ['adjacent'];
+  renderRelationOptions();
+  renderLegend();
+  switchOperationMode('drag');
+
+  // Image upload handlers + initial groups
+  setupImageHandlers();
+  syncImageGroupsWithZones();
+
+  updateSpatialDiagramIfNeeded();
+});
+/* ===================== Checkbox Handling ===================== */
+function toggleCheckbox(item) {
+  const checkbox = item.querySelector('input[type="checkbox"]');
+  checkbox.checked = !checkbox.checked;
+  item.classList.toggle('selected', checkbox.checked);
+}
+
+function togglePerformance(item) {
+  const checkbox = item.querySelector('input[type="checkbox"]');
+  checkbox.checked = !checkbox.checked;
+  item.classList.toggle('selected', checkbox.checked);
+  updateSubdimensions();
+}
+
+function updateSubdimensions() {
+  const selected = [...document.querySelectorAll('input[name="performance"]:checked')].map(cb => cb.value);
+  const container = document.getElementById('subdimensions-container');
+  const chips = document.getElementById('subdim-chips');
+  
+  if (selected.length === 0) {
+    container.classList.remove('visible');
+    return;
+  }
+  
+  container.classList.add('visible');
+  chips.innerHTML = '';
+  
+  selected.forEach(perfId => {
+    const subdims = SUBDIMENSIONS[perfId] || [];
+    subdims.forEach(sub => {
+      const chip = document.createElement('div');
+      chip.className = 'subdim-chip';
+      chip.textContent = sub.name;
+      chip.dataset.value = sub.id;
+      chip.onclick = () => {
+        chip.classList.toggle('selected');
+      };
+      chips.appendChild(chip);
+    });
+  });
+}
+
+/* ===================== Area Table Management ===================== */
+
+/** Generic dropdown open/close */
+function toggleDropdown(menuId, btnId){
+  const menu = document.getElementById(menuId);
+  const btn = document.getElementById(btnId);
+  if(!menu || !btn) return;
+
+  const isOpen = menu.classList.contains('open');
+  closeAllDropdowns();
+  if(!isOpen){
+    menu.classList.add('open');
+    btn.classList.add('open');
+  }
+}
+function closeAllDropdowns(){
+  document.querySelectorAll('.dropdown-menu.open').forEach(el => el.classList.remove('open'));
+  document.querySelectorAll('.dropdown-btn.open').forEach(el => el.classList.remove('open'));
+}
+document.addEventListener('click', (e) => {
+  if(!e.target.closest('.dropdown')) closeAllDropdowns();
+});
+
+/** Zone Types: Manager dropdown */
+function renderZoneTypeManagerUI(){
+  const select = document.getElementById('zoneTypeManagerSelect');
+  const defBox = document.getElementById('zoneTypeManagerDef');
+  if(!select || !defBox) return;
+
+  const current = select.value;
+  select.innerHTML = zoneTypes.map(t => `<option value="${t.id}">${escapeHtml(t.name)} (${t.id})</option>`).join('');
+  if(current && zoneTypes.some(t => t.id === current)) select.value = current;
+  else select.selectedIndex = 0;
+
+  onZoneTypeManagerSelectChange();
+}
+
+function onZoneTypeManagerSelectChange(){
+  const select = document.getElementById('zoneTypeManagerSelect');
+  const defBox = document.getElementById('zoneTypeManagerDef');
+  const delBtn = document.getElementById('zoneTypeDeleteBtn');
+  if(!select || !defBox || !delBtn) return;
+
+  const t = zoneTypes.find(x => x.id === select.value);
+  if(!t){
+    defBox.value = '';
+    delBtn.style.display = 'none';
+    return;
+  }
+  defBox.value = t.def || '';
+  delBtn.style.display = t.custom ? 'inline-block' : 'none';
+}
+
+function deleteSelectedZoneType(){
+  const select = document.getElementById('zoneTypeManagerSelect');
+  if(!select) return;
+  const t = zoneTypes.find(x => x.id === select.value);
+  if(!t) return;
+  if(!t.custom){
+    alert('Only custom types can be deleted.');
+    return;
+  }
+  removeZoneType(t.id);
+}
+
+/** Add a custom zone type */
+function addZoneType(){
+  const nameEl = document.getElementById('newZoneTypeName');
+  const defEl = document.getElementById('newZoneTypeDef');
+  const name = (nameEl?.value || '').trim();
+  const def = (defEl?.value || '').trim();
+
+  if(!name){ alert('Please enter a zone type name.'); return; }
+
+  const id = 'zt_' + Date.now();
+  zoneTypes.push({id, name, def, custom:true});
+
+  if(nameEl) nameEl.value = '';
+  if(defEl) defEl.value = '';
+
+  updateAllZoneTypeSelectors();
+  renderZoneTypeManagerUI();
+  updateSpatialDiagramIfNeeded();
+}
+
+function removeZoneType(id){
+  zoneTypes = zoneTypes.filter(t => t.id !== id);
+  // Update dropdown menus
+  updateAllZoneTypeSelectors();
+  renderZoneTypeManagerUI();
+  updateSpatialDiagramIfNeeded();
+}
+
+/** Dropdown selector for each zone row (multi-select) */
+function buildZoneTypeSelectorHTML(rowId, selectedIds){
+  const btnId = `zoneTypeBtn-${rowId}`;
+  const menuId = `zoneTypeMenu-${rowId}`;
+
+  const optionsHtml = zoneTypes.map(t => {
+    const checked = selectedIds.includes(t.id);
+    return `
+      <label class="dropdown-option" onclick="event.stopPropagation()">
+        <input type="checkbox" value="${t.id}" ${checked ? 'checked' : ''} onchange="onZoneTypeSelectionChange('${rowId}')">
+        <div>
+          <span class="opt-title">${escapeHtml(t.name)}</span>
+          ${t.def ? `<span class="opt-desc">${escapeHtml(t.def)}</span>` : ''}
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  const selectedNames = zoneTypes.filter(t => selectedIds.includes(t.id)).map(t => t.name);
+  const label = selectedNames.length ? selectedNames.join(', ') : 'Select type(s)';
+
+  return `
+    <div class="dropdown">
+      <button type="button" class="dropdown-btn" id="${btnId}" onclick="toggleDropdown('${menuId}','${btnId}')">
+        <span id="zoneTypeBtnLabel-${rowId}">${escapeHtml(label)}</span>
+        <span class="dropdown-caret">▾</span>
+      </button>
+      <div class="dropdown-menu zone-type-menu" id="${menuId}">
+        ${optionsHtml || '<div class="small" style="padding:10px;color:var(--text-muted);">No types available.</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function getSelectedZoneTypeIds(rowId){
+  const menu = document.getElementById(`zoneTypeMenu-${rowId}`);
+  if(!menu) return [];
+  return [...menu.querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
+}
+
+function onZoneTypeSelectionChange(rowId){
+  const ids = getSelectedZoneTypeIds(rowId);
+  const names = zoneTypes.filter(t => ids.includes(t.id)).map(t => t.name);
+  const label = names.length ? names.join(', ') : 'Select type(s)';
+  const labelEl = document.getElementById(`zoneTypeBtnLabel-${rowId}`);
+  if(labelEl) labelEl.textContent = label;
+
+  updateSpatialDiagramIfNeeded();
+}
+
+/** When zoneTypes library changes, rebuild selectors but keep selections */
+function updateAllZoneTypeSelectors(){
+  document.querySelectorAll('#area-table-body tr').forEach(row => {
+    const rowId = row.id.replace('area-row-','');
+    const selectedIds = getSelectedZoneTypeIds(rowId);
+    const cell = document.getElementById(`zone-types-cell-${rowId}`);
+    if(cell) cell.innerHTML = buildZoneTypeSelectorHTML(rowId, selectedIds);
+  });
+}
+
+/** Add a new zone row */
+function addAreaRow() {
+  const tbody = document.getElementById('area-table-body');
+  const rowId = areaRowCount++;
+  const zoneId = `zone_${rowId}`;
+
+  const row = document.createElement('tr');
+  row.id = `area-row-${rowId}`;
+  row.dataset.zoneId = zoneId;
+
+  row.innerHTML = `
+    <td>
+      <input type="text" id="zone-name-${rowId}" placeholder="e.g., Entrance Plaza" oninput="updateSpatialDiagramIfNeeded()">
+      <div class="small" style="margin-top:6px;color:var(--text-muted);">ID: ${zoneId}</div>
+    </td>
+    <td id="zone-types-cell-${rowId}">
+      ${buildZoneTypeSelectorHTML(rowId, [])}
+    </td>
+    <td>
+      <input type="number" id="zone-area-${rowId}" placeholder="optional" min="0" oninput="updateSpatialDiagramIfNeeded()">
+    </td>
+    <td>
+      <select id="zone-status-${rowId}" onchange="updateSpatialDiagramIfNeeded()">
+        <option value="">Select</option>
+        <option value="good">Good</option>
+        <option value="moderate">Moderate</option>
+        <option value="poor" selected>Needs Improvement</option>
+        <option value="critical">Critical</option>
+      </select>
+    </td>
+    <td>
+      <textarea id="zone-issues-${rowId}" placeholder="Describe main issues or features..." oninput="updateSpatialDiagramIfNeeded()"></textarea>
+    </td>
+    <td>
+      <button class="btn-remove" onclick="removeAreaRow(${rowId})">Remove</button>
+    </td>
+  `;
+
+  tbody.appendChild(row);
+  renderZoneTypeManagerUI();
+  updateSpatialDiagramIfNeeded();
+}
+
+function removeAreaRow(rowId) {
+  const row = document.getElementById(`area-row-${rowId}`);
+  if (!row) return;
+  const zoneId = row.dataset.zoneId;
+  row.remove();
+
+  spatialConnections = spatialConnections.filter(c => c.from_zone !== zoneId && c.to_zone !== zoneId);
+
+  // Ungroup images assigned to this zone (if any)
+  if(typeof ungroupImagesByZone === 'function'){
+    ungroupImagesByZone(zoneId);
+  }
+
+  updateSpatialDiagramIfNeeded();
+  renderConnectionRecords();
+}
+
+/** Collect zone data for output */
+function collectAreaData() {
+  const zones = [];
+  const rows = document.querySelectorAll('#area-table-body tr');
+
+  rows.forEach((row) => {
+    const rowId = row.id.replace('area-row-', '');
+    const zoneId = row.dataset.zoneId;
+    const name = document.getElementById(`zone-name-${rowId}`)?.value?.trim();
+
+    if (!name) return;
+
+    const selectedTypeIds = getSelectedZoneTypeIds(rowId);
+    const selectedTypeNames = zoneTypes.filter(t => selectedTypeIds.includes(t.id)).map(t => t.name);
+
+    const area = document.getElementById(`zone-area-${rowId}`)?.value;
+    const status = document.getElementById(`zone-status-${rowId}`)?.value || null;
+    const issues = document.getElementById(`zone-issues-${rowId}`)?.value?.trim() || null;
+
+    zones.push({
+      zone_id: zoneId,
+      zone_name: name,
+      zone_types: selectedTypeIds,
+      zone_type_labels: selectedTypeNames,
+      area_sqm: area ? parseInt(area) : null,
+      status: status,
+      current_issues: issues
+    });
+  });
+
+  return zones;
+}
+
+
+/* ===================== Relations Management (Spatial Map) ===================== */
+
+function renderRelationTypeManager(){
+  const select = document.getElementById('relTypeManagerSelect');
+  if(select){
+    const current = select.value;
+    select.innerHTML = Object.values(relationTypes).map(rt => `<option value="${rt.id}">${escapeHtml(rt.name)} (${rt.id})</option>`).join('');
+    if(current && relationTypes[current]) select.value = current;
+    else select.selectedIndex = 0;
+  }
+
+  onRelTypeManagerSelectChange();
+  renderRelationOptions();
+  renderLegend();
+}
+
+function onRelTypeManagerSelectChange(){
+  const select = document.getElementById('relTypeManagerSelect');
+  const info = document.getElementById('relTypeManagerInfo');
+  const delBtn = document.getElementById('relTypeDeleteBtn');
+  if(!select || !info || !delBtn) return;
+
+  const rt = relationTypes[select.value];
+  if(!rt){
+    info.textContent = '';
+    delBtn.style.display = 'none';
+    return;
+  }
+
+  const symbol = rt.style === 'solid'
+    ? `<span style="display:inline-block;width:30px;height:2px;background:${rt.color};vertical-align:middle;margin:0 6px;"></span>`
+    : `<span style="display:inline-block;width:30px;height:0;border-top:2px ${rt.style} ${rt.color};vertical-align:middle;margin:0 6px;"></span>`;
+
+  info.innerHTML = `
+    <div><strong>${escapeHtml(rt.name)}</strong> ${symbol} <span class="small" style="color:var(--text-muted);">(${escapeHtml(rt.style)})</span></div>
+    <div class="small" style="color:var(--text-muted); margin-top:6px;">${escapeHtml(rt.def || '(No definition)')}</div>
+  `;
+
+  delBtn.style.display = rt.custom ? 'inline-block' : 'none';
+}
+
+function deleteSelectedRelationType(){
+  const select = document.getElementById('relTypeManagerSelect');
+  if(!select) return;
+  const rt = relationTypes[select.value];
+  if(!rt) return;
+  if(!rt.custom){
+    alert('Only custom types can be deleted.');
+    return;
+  }
+  removeRelationType(rt.id);
+}
+
+function addRelationType(){
+  const name = (document.getElementById('relName')?.value || '').trim();
+  const style = (document.getElementById('relStyle')?.value || 'solid');
+  const color = (document.getElementById('relColor')?.value || '#2563eb');
+  const def = (document.getElementById('relDef')?.value || '').trim();
+
+  if(!name){ alert('Please enter a relationship type name.'); return; }
+
+  const id = 'rel_' + Date.now();
+  relationTypes[id] = {id, name, style, color, def, custom:true};
+
+  document.getElementById('relName').value = '';
+  document.getElementById('relDef').value = '';
+
+  renderRelationTypeManager();
+}
+
+function removeRelationType(id){
+  delete relationTypes[id];
+  selectedRelationTypes = selectedRelationTypes.filter(t => t !== id);
+  spatialConnections = spatialConnections.filter(c => c.relation_type !== id);
+  renderRelationTypeManager();
+  updateSpatialDiagramIfNeeded();
+  renderConnectionRecords();
+}
+
+
+function clearConnections(){
+  if(!confirm('Clear all spatial relationship records?')) return;
+  spatialConnections = [];
+  connectingFrom = null;
+  renderConnectionRecords();
+  updateSpatialDiagramIfNeeded();
+}
+
+function renderRelationOptions(){
+  const menu = document.getElementById('relationTypeMenu');
+  if(!menu) return;
+
+  menu.innerHTML = Object.values(relationTypes).map(rt => {
+    const checked = selectedRelationTypes.includes(rt.id);
+    return `
+      <label class="dropdown-option" onclick="event.stopPropagation()">
+        <input type="checkbox" value="${rt.id}" ${checked?'checked':''} onchange="onRelationTypeCheckboxChange(this)">
+        <div>
+          <span class="opt-title">${escapeHtml(rt.name)}</span>
+          ${rt.def ? `<span class="opt-desc">${escapeHtml(rt.def)}</span>` : ''}
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  updateRelationTypeSelectedUI();
+  updateTempLineStyle();
+}
+
+function onRelationTypeCheckboxChange(checkbox){
+  const id = checkbox.value;
+  if(checkbox.checked){
+    if(!selectedRelationTypes.includes(id)) selectedRelationTypes.push(id);
+  }else{
+    selectedRelationTypes = selectedRelationTypes.filter(v => v !== id);
+  }
+  updateRelationTypeSelectedUI();
+  updateTempLineStyle();
+}
+
+function updateRelationTypeSelectedUI(){
+  const names = selectedRelationTypes.map(id => relationTypes[id]?.name).filter(Boolean);
+  const label = names.length ? names.join(', ') : 'Select relationship type(s)';
+  const labelEl = document.getElementById('relationTypeBtnLabel');
+  if(labelEl) labelEl.textContent = label;
+
+  const hint = document.getElementById('relationTypeSelectedHint');
+  if(hint) hint.textContent = names.length ? `Selected: ${names.join(', ')}` : 'Selected: —';
+}
+
+function setConnectionDirection(dir){
+  connectionDirection = dir;
+  document.querySelectorAll('.direction-btn').forEach(btn => btn.classList.remove('selected'));
+  document.getElementById(`dir-${dir}`)?.classList.add('selected');
+  renderLegend();
+  updateSpatialDiagramIfNeeded();
+}
+
+function switchOperationMode(mode){
+  operationMode = mode;
+
+  document.querySelectorAll('.mode-switch-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById(`${mode}-mode-btn`)?.classList.add('active');
+
+  const indicator = document.getElementById('mode-indicator');
+  if(indicator) indicator.textContent = mode === 'drag' ? 'Current: Drag Mode' : 'Current: Connect Mode';
+
+  const canvas = document.getElementById('spatial-diagram');
+  if(canvas){
+    canvas.classList.toggle('dragging', mode === 'drag');
+    canvas.classList.toggle('connecting', mode === 'connect');
+  }
+
+  if(mode !== 'connect'){
+    connectingFrom = null;
+    document.querySelectorAll('.area-node').forEach(n => n.classList.remove('source'));
+    hideTempLine();
+  }
+}
+
+function renderLegend(){
+  const legend = document.getElementById('legendBox');
+  if(!legend) return;
+
+  const isArrow = connectionDirection === 'single';
+  const items = Object.values(relationTypes).map(rt => {
+    const css = rt.style === 'solid'
+      ? `background:${rt.color};`
+      : `background:none;border-top:2px ${rt.style} ${rt.color};height:0;`;
+    return `
+      <div class="legend-item">
+        <div class="legend-line ${isArrow?'arrow':''}" style="${css}; border-left-color:${rt.color}"></div>
+        <span title="${escapeHtml(rt.def||'')}">${escapeHtml(rt.name)}</span>
+      </div>
+    `;
+  }).join('');
+
+  legend.innerHTML = `<div class="legend-title">Legend</div>${items}`;
+}
+
+function clamp(val, min, max){
+  return Math.max(min, Math.min(max, val));
+}
+
+function computeAutoLayoutPositions(count, width, height){
+  const nodeW = 160;
+  const nodeH = 86;
+  const margin = 18;
+  const pad = 22;
+
+  const w = Math.max(320, width);
+  const h = Math.max(260, height);
+
+  const positions = [];
+
+  if(count <= 8){
+    const cx = w / 2;
+    const cy = h / 2;
+    const r = Math.min(w, h) / 2 - Math.max(nodeW, nodeH) / 2 - pad;
+    const radius = Math.max(90, r);
+
+    for(let i=0;i<count;i++){
+      const ang = (2*Math.PI*i)/count - Math.PI/2;
+      const x = cx + radius*Math.cos(ang) - nodeW/2;
+      const y = cy + radius*Math.sin(ang) - nodeH/2;
+      positions.push({
+        x: clamp(x, margin, w - nodeW - margin),
+        y: clamp(y, margin, h - nodeH - margin)
+      });
+    }
+  }else{
+    const cols = Math.ceil(Math.sqrt(count));
+    const rows = Math.ceil(count / cols);
+    const cellW = w / cols;
+    const cellH = h / rows;
+
+    for(let i=0;i<count;i++){
+      const c = i % cols;
+      const r0 = Math.floor(i / cols);
+      const x = c*cellW + (cellW - nodeW)/2;
+      const y = r0*cellH + (cellH - nodeH)/2;
+      positions.push({
+        x: clamp(x, margin, w - nodeW - margin),
+        y: clamp(y, margin, h - nodeH - margin)
+      });
+    }
+  }
+  return positions;
+}
+
+function hideTempLine(){
+  const svg = document.getElementById('temp-line');
+  if(svg) svg.style.display = 'none';
+}
+function updateTempLineStyle(){
+  const seg = document.getElementById('temp-line-seg');
+  if(!seg) return;
+  const primaryId = selectedRelationTypes[0];
+  const color = primaryId ? (relationTypes[primaryId]?.color || '#22c55e') : '#22c55e';
+  seg.setAttribute('stroke', color);
+}
+function showTempLine(x1, y1, x2, y2){
+  const svg = document.getElementById('temp-line');
+  const seg = document.getElementById('temp-line-seg');
+  if(!svg || !seg) return;
+  svg.style.display = 'block';
+  seg.setAttribute('x1', x1);
+  seg.setAttribute('y1', y1);
+  seg.setAttribute('x2', x2);
+  seg.setAttribute('y2', y2);
+  updateTempLineStyle();
+}
+
+function updateSpatialDiagramIfNeeded(){
+  const canvas = document.getElementById('spatial-diagram');
+  if(!canvas) return;
+
+  const zones = collectAreaData();
+  const hint = document.getElementById('canvasHint');
+
+  // Sync image grouping UI with latest zone list
+  if(typeof syncImageGroupsWithZones === 'function'){
+    syncImageGroupsWithZones();
+  }
+
+  const zoneIds = new Set(zones.map(z => z.zone_id));
+  spatialConnections = spatialConnections.filter(c => zoneIds.has(c.from_zone) && zoneIds.has(c.to_zone));
+
+  if(hint){
+    hint.style.display = zones.length < 2 ? 'block' : 'none';
+  }
+
+  const prevPos = new Map(spatialNodes.map(n => [n.zone_id, {x:n.x, y:n.y}]));
+
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width || canvas.clientWidth || 760;
+  const h = rect.height || canvas.clientHeight || 520;
+
+  const layout = computeAutoLayoutPositions(zones.length, w, h);
+
+  spatialNodes = zones.map((z, idx) => {
+    const saved = prevPos.get(z.zone_id);
+    if(saved) return {zone_id:z.zone_id, x:saved.x, y:saved.y};
+    const pos = layout[idx] || {x:30, y:30};
+    return {zone_id:z.zone_id, x:pos.x, y:pos.y};
+  });
+
+  renderSpatialDiagram(zones);
+  renderConnectionRecords();
+}
+
+function renderSpatialDiagram(zones){
+  const canvas = document.getElementById('spatial-diagram');
+  if(!canvas) return;
+
+  [...canvas.querySelectorAll('.area-node, .connection-line')].forEach(el => el.remove());
+
+  zones.forEach(z => {
+    const pos = spatialNodes.find(n => n.zone_id === z.zone_id) || {x:30,y:30};
+    const node = document.createElement('div');
+    node.className = 'area-node ' + (operationMode==='drag' ? 'draggable' : '');
+    node.style.left = `${pos.x}px`;
+    node.style.top = `${pos.y}px`;
+    node.dataset.zoneId = z.zone_id;
+
+    const tags = (z.zone_type_labels && z.zone_type_labels.length) ? z.zone_type_labels.join(', ') : 'No type';
+    node.innerHTML = `
+      <div class="node-title">${escapeHtml(z.zone_name)}</div>
+      <div class="node-tags">${escapeHtml(tags)}</div>
+    `;
+
+    node.addEventListener('mousedown', (e) => {
+      if(operationMode !== 'drag') return;
+      draggedNodeId = z.zone_id;
+      const rect = node.getBoundingClientRect();
+      dragOffset.x = e.clientX - rect.left;
+      dragOffset.y = e.clientY - rect.top;
+      node.classList.add('selected');
+      e.preventDefault();
+    });
+
+    node.addEventListener('click', (e) => {
+      if(operationMode !== 'connect') return;
+      const clickedId = z.zone_id;
+
+      if(!connectingFrom){
+        connectingFrom = clickedId;
+        document.querySelectorAll('.area-node').forEach(n => n.classList.remove('source'));
+        node.classList.add('source');
+        const cx = node.offsetLeft + node.offsetWidth/2;
+        const cy = node.offsetTop + node.offsetHeight/2;
+        showTempLine(cx, cy, cx, cy);
+        showCanvasHint('Select a target node to create connection(s).');
+      }else{
+        if(clickedId === connectingFrom){
+          connectingFrom = null;
+          node.classList.remove('source');
+          hideTempLine();
+          showCanvasHint('Connection cancelled.');
+          return;
+        }
+        addConnections(connectingFrom, clickedId);
+        connectingFrom = null;
+        document.querySelectorAll('.area-node').forEach(n => n.classList.remove('source'));
+        hideTempLine();
+      }
+      e.stopPropagation();
+    });
+
+    canvas.appendChild(node);
+  });
+
+  canvas.onmousemove = (e) => {
+    const canvasRect = canvas.getBoundingClientRect();
+
+    if(operationMode === 'drag'){
+      if(!draggedNodeId) return;
+
+      const x = e.clientX - canvasRect.left - dragOffset.x;
+      const y = e.clientY - canvasRect.top - dragOffset.y;
+
+      const node = spatialNodes.find(n => n.zone_id === draggedNodeId);
+      if(node){
+        node.x = clamp(x, 8, (canvasRect.width || 760) - 160 - 8);
+        node.y = clamp(y, 8, (canvasRect.height || 520) - 86 - 8);
+
+        const el = canvas.querySelector(`.area-node[data-zone-id="${draggedNodeId}"]`);
+        if(el){
+          el.style.left = node.x + 'px';
+          el.style.top = node.y + 'px';
+        }
+        renderConnections();
+      }
+      return;
+    }
+
+    if(operationMode === 'connect' && connectingFrom){
+      const src = canvas.querySelector(`.area-node[data-zone-id="${connectingFrom}"]`);
+      if(!src) return;
+      const x1 = src.offsetLeft + src.offsetWidth/2;
+      const y1 = src.offsetTop + src.offsetHeight/2;
+      const x2 = e.clientX - canvasRect.left;
+      const y2 = e.clientY - canvasRect.top;
+      showTempLine(x1, y1, x2, y2);
+    }
+  };
+
+  canvas.onmouseup = () => {
+    draggedNodeId = null;
+    canvas.querySelectorAll('.area-node.selected').forEach(n => n.classList.remove('selected'));
+  };
+  canvas.onmouseleave = () => {
+    draggedNodeId = null;
+    canvas.querySelectorAll('.area-node.selected').forEach(n => n.classList.remove('selected'));
+  };
+
+  canvas.onclick = (e) => {
+    if(operationMode !== 'connect') return;
+    if(e.target === canvas){
+      connectingFrom = null;
+      document.querySelectorAll('.area-node').forEach(n => n.classList.remove('source'));
+      hideTempLine();
+      showCanvasHint('Connection cancelled.');
+    }
+  };
+
+  renderConnections();
+}
+
+function showCanvasHint(text){
+  const hint = document.getElementById('canvasHint');
+  if(!hint) return;
+  hint.textContent = text;
+  hint.style.display = 'block';
+  clearTimeout(showCanvasHint._t);
+  showCanvasHint._t = setTimeout(() => {
+    if(collectAreaData().length >= 2) hint.style.display = 'none';
+  }, 1500);
+}
+
+function addConnections(fromZone, toZone){
+  if(!selectedRelationTypes.length){
+    alert('Please select at least one relationship type in the setup panel.');
+    return;
+  }
+
+  selectedRelationTypes.forEach(typeId => {
+    spatialConnections.push({
+      id: `c_${connectionIdCounter++}`,
+      from_zone: fromZone,
+      to_zone: toZone,
+      relation_type: typeId,
+      direction: connectionDirection
+    });
+  });
+
+  if(connectionDirection === 'double'){
+    selectedRelationTypes.forEach(typeId => {
+      spatialConnections.push({
+        id: `c_${connectionIdCounter++}`,
+        from_zone: toZone,
+        to_zone: fromZone,
+        relation_type: typeId,
+        direction: connectionDirection
+      });
+    });
+  }
+
+  renderConnectionRecords();
+  renderConnections();
+}
+
+function renderConnections(){
+  const canvas = document.getElementById('spatial-diagram');
+  if(!canvas) return;
+
+  [...canvas.querySelectorAll('.connection-line')].forEach(el => el.remove());
+
+  const getCenter = (zoneId) => {
+    const el = canvas.querySelector(`.area-node[data-zone-id="${zoneId}"]`);
+    if(!el) return null;
+    const left = parseFloat(el.style.left || '0');
+    const top = parseFloat(el.style.top || '0');
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    return {x: left + w/2, y: top + h/2};
+  };
+
+  spatialConnections.forEach((conn) => {
+    const from = getCenter(conn.from_zone);
+    const to = getCenter(conn.to_zone);
+    if(!from || !to) return;
+
+    const rt = relationTypes[conn.relation_type];
+    if(!rt) return;
+
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.sqrt(dx*dx + dy*dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+    const line = document.createElement('div');
+    line.className = 'connection-line clickable';
+    line.style.left = `${from.x}px`;
+    line.style.top = `${from.y}px`;
+    line.style.width = `${length}px`;
+    line.style.transform = `rotate(${angle}deg)`;
+
+    const inner = document.createElement('div');
+    inner.className = 'connection-line-inner';
+    inner.style.background = rt.style === 'solid' ? rt.color : 'transparent';
+    inner.style.borderTop = rt.style === 'solid' ? 'none' : `2px ${rt.style} ${rt.color}`;
+    inner.style.height = '2px';
+
+    const arrowEnd = document.createElement('div');
+    arrowEnd.className = 'arrow-marker arrow-end';
+    arrowEnd.style.borderLeftColor = rt.color;
+    inner.appendChild(arrowEnd);
+
+    if(conn.direction === 'double'){
+      const arrowStart = document.createElement('div');
+      arrowStart.className = 'arrow-marker arrow-start';
+      arrowStart.style.borderLeftColor = rt.color;
+      inner.appendChild(arrowStart);
+    }
+
+    const label = document.createElement('div');
+    label.className = 'connection-label';
+    label.textContent = rt.name;
+
+    line.appendChild(inner);
+    line.appendChild(label);
+
+    line.onclick = () => {
+      removeConnectionById(conn.id);
+    };
+
+    canvas.appendChild(line);
+  });
+}
+
+function removeConnectionById(id){
+  spatialConnections = spatialConnections.filter(c => c.id !== id);
+  renderConnectionRecords();
+  renderConnections();
+}
+
+function renderConnectionRecords(){
+  const ul = document.getElementById('connList');
+  const count = document.getElementById('connCount');
+  if(!ul || !count) return;
+
+  const zones = collectAreaData();
+  const zoneNameById = new Map(zones.map(z => [z.zone_id, z.zone_name]));
+
+  count.textContent = `Current: ${spatialConnections.length} records`;
+  ul.innerHTML = spatialConnections.map(conn => {
+    const fromName = zoneNameById.get(conn.from_zone) || conn.from_zone;
+    const toName = zoneNameById.get(conn.to_zone) || conn.to_zone;
+    const rt = relationTypes[conn.relation_type];
+    const rtName = rt ? rt.name : conn.relation_type;
+    const dir = conn.direction === 'double' ? '↔' : '→';
+    return `
+      <li class="record-item">
+        <div class="record-left">
+          <div>
+            <div><strong>${escapeHtml(fromName)}</strong> <span class="record-arrow">${dir}</span> <strong>${escapeHtml(toName)}</strong></div>
+            <div class="record-meta">${escapeHtml(rtName)} · ${escapeHtml(conn.direction)}</div>
+          </div>
+        </div>
+        <button class="record-del" onclick="removeConnectionById('${conn.id}')">Delete</button>
+      </li>
+    `;
+  }).join('');
+}
+
+function collectRelations() {
+  return spatialConnections.map(c => ({
+    from_zone: c.from_zone,
+    to_zone: c.to_zone,
+    relation_type: c.relation_type,
+    relation_type_label: relationTypes[c.relation_type]?.name || null,
+    direction: c.direction
+  }));
+}
+
+
+/* ===================== Image Upload & Grouping ===================== */
+
+function setupImageHandlers(){
+  const uploadArea = document.getElementById('upload-area');
+  const fileInput = document.getElementById('file-input');
+  if(!uploadArea || !fileInput) return;
+
+  uploadArea.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', (e) => {
+    handleImageFiles(e.target.files);
+    fileInput.value = '';
+  });
+
+  uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+  });
+
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    handleImageFiles(e.dataTransfer.files);
+  });
+
+  // Make ungrouped pool droppable (drop here to ungroup)
+  const pool = document.getElementById('ungrouped-pool');
+  if(pool){
+    pool.addEventListener('dragover', (e) => e.preventDefault());
+    pool.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if(draggedImageId) assignImageToZone(draggedImageId, null);
+    });
+  }
+}
+
+function handleImageFiles(fileList){
+  if(!fileList || !fileList.length) return;
+
+  [...fileList].forEach(file => {
+    if(!file.type || !file.type.startsWith('image/')) return;
+    const id = 'img_' + Date.now() + '_' + Math.floor(Math.random()*100000);
+    const url = URL.createObjectURL(file);
+    uploadedImages.push({id, name: file.name, url, zone_id: null});
+  });
+
+  renderImageUI();
+}
+
+function renderImageUI(){
+  const poolContainer = document.getElementById('image-pool-container');
+  if(poolContainer) poolContainer.style.display = uploadedImages.length ? 'block' : 'none';
+
+  renderUngroupedPool();
+  syncImageGroupsWithZones();
+  updateImageStats();
+}
+
+function imageThumbHtml(img, number, grouped){
+  const ungroupBtn = grouped ? `<div class="image-action-btn" data-action="ungroup-image" title="Ungroup">↩</div>` : '';
+  return `
+    <div class="image-item" draggable="true" data-image-id="${img.id}">
+      <img src="${img.url}" alt="${escapeHtml(img.name)}">
+      <div class="image-number">#${number}</div>
+      <div class="image-actions">
+        ${ungroupBtn}
+        <div class="image-action-btn" data-action="delete-image" title="Delete">✕</div>
+      </div>
+    </div>
+  `;
+}
+
+function attachImageThumbHandlers(scopeEl){
+  if(!scopeEl) return;
+
+  scopeEl.querySelectorAll('.image-item').forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      draggedImageId = item.dataset.imageId;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      draggedImageId = null;
+    });
+  });
+
+  scopeEl.querySelectorAll('[data-action="delete-image"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.closest('.image-item')?.dataset.imageId;
+      if(id) deleteImage(id);
+    });
+  });
+
+  scopeEl.querySelectorAll('[data-action="ungroup-image"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.closest('.image-item')?.dataset.imageId;
+      if(id) assignImageToZone(id, null);
+    });
+  });
+}
+
+function renderUngroupedPool(){
+  const pool = document.getElementById('ungrouped-pool');
+  if(!pool) return;
+
+  const ungrouped = uploadedImages.filter(img => !img.zone_id);
+  pool.innerHTML = ungrouped.length
+    ? ungrouped.map((img, idx) => imageThumbHtml(img, idx+1, false)).join('')
+    : `<div class="empty-drop">No ungrouped images. Drag images back here to ungroup.</div>`;
+
+  attachImageThumbHandlers(pool);
+}
+
+function syncImageGroupsWithZones(){
+  const container = document.getElementById('groups-container');
+  if(!container) return;
+
+  const zones = collectAreaData();
+  const zoneIds = new Set(zones.map(z => z.zone_id));
+
+  // Ungroup images whose zone no longer exists
+  uploadedImages.forEach(img => {
+    if(img.zone_id && !zoneIds.has(img.zone_id)) img.zone_id = null;
+  });
+
+  const gc = document.getElementById('group-count');
+  if(gc) gc.textContent = String(zones.length);
+
+  if(!zones.length){
+    container.innerHTML = `<div class="small" style="color:var(--text-muted);padding:10px;">No zones defined yet. Please name at least one zone above to create groups.</div>`;
+    updateImageStats();
+    return;
+  }
+
+  container.innerHTML = zones.map(z => {
+    const imgs = uploadedImages.filter(i => i.zone_id === z.zone_id);
+    const inner = imgs.length
+      ? imgs.map((img, idx) => imageThumbHtml(img, idx+1, true)).join('')
+      : `<div class="empty-drop">Drop images here</div>`;
+
+    return `
+      <div class="group-box" data-zone-id="${z.zone_id}">
+        <div class="group-header">
+          <div class="group-title">${escapeHtml(z.zone_name)}</div>
+          <div class="group-count">${imgs.length} image(s)</div>
+        </div>
+        <div class="group-images image-grid" id="group-${z.zone_id}">
+          ${inner}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.group-box').forEach(box => {
+    box.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      box.classList.add('dragover');
+    });
+    box.addEventListener('dragleave', () => box.classList.remove('dragover'));
+    box.addEventListener('drop', (e) => {
+      e.preventDefault();
+      box.classList.remove('dragover');
+      if(!draggedImageId) return;
+      const zid = box.dataset.zoneId;
+      assignImageToZone(draggedImageId, zid);
+    });
+  });
+
+  // Attach thumb handlers inside groups
+  container.querySelectorAll('.group-images').forEach(el => attachImageThumbHandlers(el));
+
+  updateImageStats();
+}
+
+function assignImageToZone(imageId, zoneIdOrNull){
+  const img = uploadedImages.find(i => i.id === imageId);
+  if(!img) return;
+  img.zone_id = zoneIdOrNull;
+
+  renderUngroupedPool();
+  syncImageGroupsWithZones();
+  updateImageStats();
+}
+
+function ungroupImagesByZone(zoneId){
+  uploadedImages.forEach(img => { if(img.zone_id === zoneId) img.zone_id = null; });
+  renderImageUI();
+}
+
+function deleteImage(imageId){
+  const idx = uploadedImages.findIndex(i => i.id === imageId);
+  if(idx < 0) return;
+  try{ URL.revokeObjectURL(uploadedImages[idx].url); }catch(e){}
+  uploadedImages.splice(idx, 1);
+  renderImageUI();
+}
+
+function clearAllImages(){
+  try{
+    uploadedImages.forEach(img => {
+      try{ URL.revokeObjectURL(img.url); }catch(e){}
+    });
+  }catch(e){}
+  uploadedImages = [];
+  draggedImageId = null;
+  renderImageUI();
+}
+
+function updateImageStats(){
+  const total = document.getElementById('total-images');
+  const grouped = document.getElementById('grouped-images');
+  if(total) total.textContent = String(uploadedImages.length);
+  if(grouped) grouped.textContent = String(uploadedImages.filter(i => i.zone_id).length);
+}
+
+function collectPhotoManifest(zones){
+  const zoneNameById = new Map((zones || []).map(z => [z.zone_id, z.zone_name]));
+  const images = uploadedImages.map(img => ({
+    image_id: img.id,
+    filename: img.name,
+    zone_id: img.zone_id || null,
+    zone_name: img.zone_id ? (zoneNameById.get(img.zone_id) || null) : null
+  }));
+
+  const groups = (zones || []).map(z => ({
+    zone_id: z.zone_id,
+    zone_name: z.zone_name,
+    images: uploadedImages.filter(i => i.zone_id === z.zone_id).map(i => i.name)
+  })).filter(g => g.images.length > 0);
+
+  return {
+    total_images: uploadedImages.length,
+    grouped_images: uploadedImages.filter(i => i.zone_id).length,
+    images,
+    groups
+  };
+}
+
+
+/* ===================== Collapsible ===================== */
+function toggleCollapsible(header) {
+  header.classList.toggle('expanded');
+  const content = header.nextElementSibling;
+  content.classList.toggle('expanded');
+}
+
+/* ===================== Generate Output ===================== */
+function generateQuery() {
+  // Validate required fields
+  const projectName = document.getElementById('project-name').value.trim();
+  const koppenZone = document.getElementById('koppen-zone').value;
+  const spaceType = document.getElementById('space-type').value;
+  const performanceDims = [...document.querySelectorAll('input[name="performance"]:checked')].map(cb => cb.value);
+  const ageGroup = document.getElementById('age-group').value || null;
+  const zones = collectAreaData();
+  
+  // Validation
+  if (!projectName) {
+    alert('Please enter a project name.');
+    return;
+  }
+  if (!koppenZone) {
+    alert('Please select a Köppen climate zone.');
+    return;
+  }
+  if (!spaceType) {
+    alert('Please select a space type.');
+    return;
+  }
+  if (performanceDims.length === 0) {
+    alert('Please select at least one performance dimension.');
+    return;
+  }
+  if (zones.length === 0) {
+    alert('Please define at least one spatial zone.');
+    return;
+  }
+  
+  // Build query object
+  const queryData = {
+    query_metadata: {
+      query_version: "2.0",
+      generated_at: new Date().toISOString(),
+      system: "GreenSVC-AI"
+    },
+    
+    project: {
+      name: projectName,
+      location: document.getElementById('project-location').value.trim() || null,
+      scale: document.getElementById('site-scale').value || null,
+      phase: document.getElementById('project-phase').value || null,    },
+    
+    context: {
+      climate: {
+        koppen_zone_id: koppenZone
+      },
+      urban_form: {
+        space_type_id: spaceType,
+        lcz_type_id: document.getElementById('lcz-type').value || null
+      },
+      user: {
+        age_group_id: ageGroup
+      },
+      country_id: document.getElementById('country').value || null
+    },
+
+    performance_query: {
+      design_brief: document.getElementById('design-brief').value.trim() || null,
+      dimensions: performanceDims,
+      subdimensions: [...document.querySelectorAll('.subdim-chip.selected')].map(chip => chip.dataset.value)
+    },
+    
+    spatial_zones: zones,
+    
+    spatial_relations: collectRelations(),
+
+    site_photos: collectPhotoManifest(zones)
+  };
+  
+  // Clean null values
+  const cleanedData = JSON.parse(JSON.stringify(queryData, (key, value) => {
+    if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+      return undefined;
+    }
+    return value;
+  }));
+  
+  // Display output
+  const outputPanel = document.getElementById('output-panel');
+  const outputJson = document.getElementById('output-json');
+  
+  outputJson.innerHTML = syntaxHighlight(JSON.stringify(cleanedData, null, 2));
+  outputPanel.classList.add('visible');
+  outputPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  
+  // Store for clipboard/download
+  window.generatedQueryData = cleanedData;
+}
+
+function syntaxHighlight(json) {
+  return json
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+      let cls = 'json-number';
+      if (/^"/.test(match)) {
+        if (/:$/.test(match)) {
+          cls = 'json-key';
+        } else {
+          cls = 'json-string';
+        }
+      } else if (/true|false/.test(match)) {
+        cls = 'json-boolean';
+      }
+      return `<span class="${cls}">${match}</span>`;
+    });
+}
+
+function resetForm() {
+  if (!confirm('Are you sure you want to reset all form data?')) return;
+
+  document.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.type === 'checkbox') {
+      el.checked = false;
+    } else if (el.tagName === 'SELECT') {
+      el.selectedIndex = 0;
+    } else {
+      el.value = '';
+    }
+  });
+
+  document.querySelectorAll('.checkbox-item, .subdim-chip, .relation-option-card, .zone-type-option').forEach(el => {
+    el.classList.remove('selected');
+  });
+
+  document.getElementById('subdimensions-container').classList.remove('visible');
+  document.getElementById('output-panel').classList.remove('visible');
+
+  zoneTypes = JSON.parse(JSON.stringify(DEFAULT_ZONE_TYPES));
+  relationTypes = JSON.parse(JSON.stringify(DEFAULT_RELATION_TYPES));
+  selectedRelationTypes = ['adjacent'];
+  operationMode = 'drag';
+  connectionDirection = 'single';
+  connectingFrom = null;
+  spatialNodes = [];
+  spatialConnections = [];
+  connectionIdCounter = 0;
+
+  clearAllImages();
+
+  renderZoneTypeManagerUI();
+  renderRelationTypeManager();
+  renderRelationOptions();
+  renderLegend();
+  switchOperationMode('drag');
+
+  document.getElementById('area-table-body').innerHTML = '';
+  areaRowCount = 0;
+  addAreaRow();
+  addAreaRow();
+
+  updateSpatialDiagramIfNeeded();
+}
+function copyToClipboard() {
+  if (!window.generatedQueryData) return;
+  navigator.clipboard.writeText(JSON.stringify(window.generatedQueryData, null, 2))
+    .then(() => alert('JSON copied to clipboard!'))
+    .catch(err => console.error('Copy failed:', err));
+}
+
+function downloadJSON() {
+  if (!window.generatedQueryData) return;
+  const blob = new Blob([JSON.stringify(window.generatedQueryData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `greensvc_query_${window.generatedQueryData.project.name.replace(/\s+/g, '_')}_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadObjectAsJson(obj, filename){
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(str){
+  if(str === null || str === undefined) return '';
+  return String(str)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'",'&#39;');
+}
+</script>
+</body>
+</html>

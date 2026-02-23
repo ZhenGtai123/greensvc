@@ -12,6 +12,8 @@ from app.services.metrics_manager import MetricsManager
 from app.services.metrics_calculator import MetricsCalculator
 from app.services.knowledge_base import KnowledgeBase
 from app.services.gemini_client import GeminiClient
+from app.services.zone_analyzer import ZoneAnalyzer
+from app.services.design_engine import DesignEngine
 
 
 # Settings dependency
@@ -26,6 +28,8 @@ _metrics_manager: MetricsManager = None
 _metrics_calculator: MetricsCalculator = None
 _knowledge_base: KnowledgeBase = None
 _gemini_client: GeminiClient = None
+_zone_analyzer: ZoneAnalyzer = None
+_design_engine: DesignEngine = None
 
 
 def get_vision_client() -> VisionModelClient:
@@ -88,13 +92,34 @@ def get_gemini_client() -> GeminiClient:
     return _gemini_client
 
 
+def get_zone_analyzer() -> ZoneAnalyzer:
+    """Get ZoneAnalyzer singleton"""
+    global _zone_analyzer
+    if _zone_analyzer is None:
+        _zone_analyzer = ZoneAnalyzer()
+    return _zone_analyzer
+
+
+def get_design_engine() -> DesignEngine:
+    """Get DesignEngine singleton"""
+    global _design_engine
+    if _design_engine is None:
+        kb = get_knowledge_base()
+        gemini = get_gemini_client()
+        _design_engine = DesignEngine(knowledge_base=kb, gemini_client=gemini)
+    return _design_engine
+
+
 def reset_services() -> None:
     """Reset all service singletons (useful for testing)"""
     global _vision_client, _metrics_manager, _metrics_calculator
     global _knowledge_base, _gemini_client
+    global _zone_analyzer, _design_engine
 
     _vision_client = None
     _metrics_manager = None
     _metrics_calculator = None
     _knowledge_base = None
     _gemini_client = None
+    _zone_analyzer = None
+    _design_engine = None

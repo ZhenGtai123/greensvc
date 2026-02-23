@@ -25,6 +25,14 @@ from .metrics import (
     CalculationResult,
     BatchCalculationResponse,
 )
+from .analysis import (
+    ZoneAnalysisRequest,
+    ZoneAnalysisResult,
+    DesignStrategyRequest,
+    DesignStrategyResult,
+    FullAnalysisRequest,
+    FullAnalysisResult,
+)
 from .user import (
     UserBase,
     UserCreate,
@@ -57,6 +65,13 @@ __all__ = [
     "CalculationRequest",
     "CalculationResult",
     "BatchCalculationResponse",
+    # Analysis
+    "ZoneAnalysisRequest",
+    "ZoneAnalysisResult",
+    "DesignStrategyRequest",
+    "DesignStrategyResult",
+    "FullAnalysisRequest",
+    "FullAnalysisResult",
     # User
     "UserBase",
     "UserCreate",

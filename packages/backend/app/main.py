@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import init_db_async
-from app.api.routes import health, config, metrics, projects, vision, indicators, tasks, auth
+from app.api.routes import health, config, metrics, projects, vision, indicators, tasks, auth, analysis
 
 # Configure logging
 logging.basicConfig(
@@ -110,6 +110,11 @@ def create_app() -> FastAPI:
         auth.router,
         prefix="/api/auth",
         tags=["Authentication"],
+    )
+    app.include_router(
+        analysis.router,
+        prefix="/api/analysis",
+        tags=["Analysis Pipeline"],
     )
 
     return app
