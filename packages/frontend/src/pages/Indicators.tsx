@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import {
   Container,
   Heading,
@@ -32,7 +33,7 @@ import {
   WrapItem,
   Progress,
 } from '@chakra-ui/react';
-import { useKnowledgeBaseSummary, useRecommendIndicators } from '../hooks/useApi';
+import { useKnowledgeBaseSummary, useRecommendIndicators, useProject } from '../hooks/useApi';
 import type { IndicatorRecommendation } from '../types';
 import useAppStore from '../store/useAppStore';
 
@@ -47,16 +48,30 @@ const DIMENSIONS = [
 ];
 
 function Indicators() {
+  const { projectId: routeProjectId } = useParams<{ projectId: string }>();
   const { data: kbSummary, isLoading: kbLoading } = useKnowledgeBaseSummary();
+  const { data: routeProject } = useProject(routeProjectId || '');
   const recommendMutation = useRecommendIndicators();
   const toast = useToast();
 
-  const { selectedIndicators, addSelectedIndicator, removeSelectedIndicator, clearSelectedIndicators } = useAppStore();
+  const { currentProject, selectedIndicators, addSelectedIndicator, removeSelectedIndicator, clearSelectedIndicators } = useAppStore();
+
+  // Use route project if available, otherwise fall back to store
+  const activeProject = routeProject || currentProject;
 
   // Form state
   const [projectName, setProjectName] = useState('');
   const [designBrief, setDesignBrief] = useState('');
   const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
+
+  // Pre-fill from active project
+  useEffect(() => {
+    if (activeProject) {
+      setProjectName(activeProject.project_name);
+      setDesignBrief(activeProject.design_brief || '');
+      setSelectedDimensions(activeProject.performance_dimensions || []);
+    }
+  }, [activeProject]);
 
   // Results
   const [recommendations, setRecommendations] = useState<IndicatorRecommendation[]>([]);
@@ -285,6 +300,18 @@ function Indicators() {
           )}
         </VStack>
       </SimpleGrid>
+
+      {/* Navigation buttons for pipeline mode */}
+      {routeProjectId && (
+        <HStack justify="space-between" mt={6}>
+          <Button as={Link} to={`/projects/${routeProjectId}/vision`} variant="outline">
+            Back: Vision
+          </Button>
+          <Button as={Link} to={`/projects/${routeProjectId}/analysis`} colorScheme="blue">
+            Next: Analysis
+          </Button>
+        </HStack>
+      )}
     </Container>
   );
 }

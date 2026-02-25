@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useParams, Link } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -39,8 +39,9 @@ import api from '../api';
 import type { SemanticClass, UploadedImage } from '../types';
 
 function VisionAnalysis() {
+  const { projectId: routeProjectId } = useParams<{ projectId: string }>();
   const [searchParams] = useSearchParams();
-  const projectId = searchParams.get('project');
+  const projectId = routeProjectId || searchParams.get('project');
 
   const { data: semanticConfig, isLoading: configLoading } = useSemanticConfig();
   const { data: project, isLoading: projectLoading } = useProject(projectId || '');
@@ -149,27 +150,33 @@ function VisionAnalysis() {
           toast({ title: response.data.error || 'Analysis failed', status: 'error' });
         }
       } else if (imageSource === 'project' && selectedProjectImages.length > 0) {
-        // Batch analysis using project image paths
-        const imagePaths = selectedProjectImages.map(imgId => {
-          const img = project?.uploaded_images.find(i => i.image_id === imgId);
-          return img?.filepath || '';
-        }).filter(Boolean);
-
+        // Batch analysis using project images
         let processed = 0;
         const allResults: Record<string, unknown>[] = [];
+        const requestPayload = {
+          semantic_classes: selectedClasses,
+          semantic_countability: countability,
+          openness_list: openness,
+          encoder,
+          detection_threshold: threshold,
+          enable_hole_filling: holeFilling,
+        };
 
-        for (const imagePath of imagePaths) {
-          const response = await api.vision.analyzeByPath(imagePath, {
-            semantic_classes: selectedClasses,
-            semantic_countability: countability,
-            openness_list: openness,
-            encoder,
-            detection_threshold: threshold,
-            enable_hole_filling: holeFilling,
-          });
+        for (const imageId of selectedProjectImages) {
+          const img = project?.uploaded_images.find(i => i.image_id === imageId);
+          if (!img) continue;
+
+          let response;
+          if (projectId) {
+            // Project-aware endpoint: persists masks to project
+            response = await api.vision.analyzeProjectImage(projectId, imageId, requestPayload);
+          } else {
+            // Fallback to path-based analysis
+            response = await api.vision.analyzeByPath(img.filepath, requestPayload);
+          }
 
           processed++;
-          setBatchProgress({ current: processed, total: imagePaths.length });
+          setBatchProgress({ current: processed, total: selectedProjectImages.length });
 
           if (response.data.status === 'success') {
             allResults.push(response.data.statistics);
@@ -180,11 +187,11 @@ function VisionAnalysis() {
         if (allResults.length > 0) {
           setStatistics({
             images_processed: allResults.length,
-            total_images: imagePaths.length,
+            total_images: selectedProjectImages.length,
             results: allResults,
           });
           toast({
-            title: `Analysis complete: ${allResults.length}/${imagePaths.length} images processed`,
+            title: `Analysis complete: ${allResults.length}/${selectedProjectImages.length} images processed`,
             status: 'success'
           });
         }
@@ -549,6 +556,18 @@ function VisionAnalysis() {
           )}
         </VStack>
       </SimpleGrid>
+
+      {/* Navigation buttons for pipeline mode */}
+      {routeProjectId && (
+        <HStack justify="space-between" mt={6}>
+          <Button as={Link} to={`/projects/${routeProjectId}`} variant="outline">
+            Back to Project
+          </Button>
+          <Button as={Link} to={`/projects/${routeProjectId}/indicators`} colorScheme="blue">
+            Next: Indicators
+          </Button>
+        </HStack>
+      )}
     </Container>
   );
 }

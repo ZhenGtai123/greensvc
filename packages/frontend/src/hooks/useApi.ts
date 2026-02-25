@@ -171,6 +171,18 @@ export function useRunProjectPipeline() {
   });
 }
 
+// Vision project image analysis mutation
+export function useAnalyzeProjectImage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, imageId, request }: { projectId: string; imageId: string; request: Record<string, unknown> }) =>
+      api.vision.analyzeProjectImage(projectId, imageId, request).then(r => r.data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.project(variables.projectId) });
+    },
+  });
+}
+
 // Indicator recommendation mutation
 export function useRecommendIndicators() {
   return useMutation({

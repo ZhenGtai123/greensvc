@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -132,6 +133,7 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 }
 
 function Analysis() {
+  const { projectId: routeProjectId } = useParams<{ projectId: string }>();
   const toast = useToast();
   const { selectedIndicators } = useAppStore();
 
@@ -164,6 +166,14 @@ function Analysis() {
   // Queries
   const { data: projects } = useProjects();
   const { data: calculators } = useCalculators();
+
+  // Auto-select project and switch to pipeline tab from route
+  useEffect(() => {
+    if (routeProjectId) {
+      setSelectedProjectId(routeProjectId);
+      setInputMode(0); // Switch to Project Pipeline tab
+    }
+  }, [routeProjectId]);
 
   // Initialize indicator selection from store once (set by Indicators page)
   const indicatorsSynced = useRef(false);
@@ -457,21 +467,27 @@ function Analysis() {
                   {/* Project selector */}
                   <FormControl>
                     <FormLabel fontSize="sm">Project</FormLabel>
-                    <Select
-                      placeholder="Select a project..."
-                      value={selectedProjectId}
-                      onChange={e => setSelectedProjectId(e.target.value)}
-                    >
-                      {projects?.map(p => {
-                        const zones = p.spatial_zones.length;
-                        const imgs = p.uploaded_images.length;
-                        return (
-                          <option key={p.id} value={p.id}>
-                            {p.project_name} ({zones} zones, {imgs} images)
-                          </option>
-                        );
-                      })}
-                    </Select>
+                    {routeProjectId ? (
+                      <Text fontWeight="bold" py={2}>
+                        {selectedProject?.project_name || routeProjectId}
+                      </Text>
+                    ) : (
+                      <Select
+                        placeholder="Select a project..."
+                        value={selectedProjectId}
+                        onChange={e => setSelectedProjectId(e.target.value)}
+                      >
+                        {projects?.map(p => {
+                          const zones = p.spatial_zones.length;
+                          const imgs = p.uploaded_images.length;
+                          return (
+                            <option key={p.id} value={p.id}>
+                              {p.project_name} ({zones} zones, {imgs} images)
+                            </option>
+                          );
+                        })}
+                      </Select>
+                    )}
                   </FormControl>
 
                   {/* Project summary */}
@@ -1022,6 +1038,18 @@ function Analysis() {
             </Text>
           </CardBody>
         </Card>
+      )}
+
+      {/* Navigation buttons for pipeline mode */}
+      {routeProjectId && (
+        <HStack justify="space-between" mt={6}>
+          <Button as={Link} to={`/projects/${routeProjectId}/indicators`} variant="outline">
+            Back: Indicators
+          </Button>
+          <Button as={Link} to={`/projects/${routeProjectId}/reports`} colorScheme="blue">
+            Next: Reports
+          </Button>
+        </HStack>
       )}
     </Container>
   );

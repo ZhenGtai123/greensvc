@@ -201,11 +201,17 @@ function ProjectDetail() {
           <Button variant="outline" as={Link} to={`/projects/${projectId}/edit`}>
             Edit Project
           </Button>
-          <Button colorScheme="green" as={Link} to={`/vision?project=${projectId}`}>
-            Analyze Images
+          <Button colorScheme="green" as={Link} to={`/projects/${projectId}/vision`}>
+            1. Vision
           </Button>
-          <Button colorScheme="blue" as={Link} to={`/indicators?project=${projectId}`}>
-            Get Recommendations
+          <Button colorScheme="blue" as={Link} to={`/projects/${projectId}/indicators`}>
+            2. Indicators
+          </Button>
+          <Button colorScheme="teal" as={Link} to={`/projects/${projectId}/analysis`}>
+            3. Analysis
+          </Button>
+          <Button colorScheme="purple" as={Link} to={`/projects/${projectId}/reports`}>
+            4. Reports
           </Button>
         </HStack>
       </HStack>

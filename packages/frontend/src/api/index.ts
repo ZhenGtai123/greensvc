@@ -110,6 +110,10 @@ export const api = {
     },
     analyzeByPath: (image_path: string, request: Record<string, unknown>) =>
       apiClient.post('/api/vision/analyze/path', request, { params: { image_path } }),
+    analyzeProjectImage: (projectId: string, imageId: string, request: Record<string, unknown>) =>
+      apiClient.post('/api/vision/analyze/project-image', request, {
+        params: { project_id: projectId, image_id: imageId },
+      }),
   },
 
   // Indicators

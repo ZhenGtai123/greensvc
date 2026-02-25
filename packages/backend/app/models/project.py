@@ -43,6 +43,10 @@ class UploadedImage(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     metrics_results: dict[str, Optional[float]] = Field(default_factory=dict)
+    mask_filepaths: dict[str, str] = Field(default_factory=dict)
+    # Keys from Vision API: "semantic_map", "depth_map", "fmb_map", "openness_map",
+    #        "foreground_map", "middleground_map", "background_map",
+    #        "sky_mask", "semantic_raw"
 
 
 class ProjectCreate(BaseModel):

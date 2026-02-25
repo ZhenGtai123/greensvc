@@ -24,6 +24,7 @@ export interface UploadedImage {
   latitude: number | null;
   longitude: number | null;
   metrics_results: Record<string, number | null>;
+  mask_filepaths: Record<string, string>;
 }
 
 export interface Project {

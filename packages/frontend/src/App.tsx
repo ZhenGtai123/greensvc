@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Outlet, useParams, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ChakraProvider, Box, Flex, VStack, HStack, Heading, Button, extendTheme } from '@chakra-ui/react';
+import StepIndicator from './components/StepIndicator';
 
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
@@ -75,6 +76,23 @@ function Navigation() {
   );
 }
 
+// Layout for nested project pipeline routes
+function ProjectPipelineLayout() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const location = useLocation();
+
+  const pathEnd = location.pathname.split('/').pop();
+  const stepMap: Record<string, number> = { vision: 1, indicators: 2, analysis: 3, reports: 4 };
+  const currentStep = stepMap[pathEnd || ''] || 1;
+
+  return (
+    <Box>
+      <StepIndicator currentStep={currentStep} projectId={projectId || ''} />
+      <Outlet />
+    </Box>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -89,6 +107,12 @@ function App() {
                 <Route path="/projects/new" element={<ProjectWizard />} />
                 <Route path="/projects/:projectId" element={<ProjectDetail />} />
                 <Route path="/projects/:projectId/edit" element={<ProjectWizard />} />
+                <Route path="/projects/:projectId" element={<ProjectPipelineLayout />}>
+                  <Route path="vision" element={<VisionAnalysis />} />
+                  <Route path="indicators" element={<Indicators />} />
+                  <Route path="analysis" element={<Analysis />} />
+                  <Route path="reports" element={<Reports />} />
+                </Route>
                 <Route path="/vision" element={<VisionAnalysis />} />
                 <Route path="/indicators" element={<Indicators />} />
                 <Route path="/calculators" element={<Calculators />} />

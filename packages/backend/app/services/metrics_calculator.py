@@ -133,6 +133,117 @@ class MetricsCalculator:
                 image_path=image_path,
             )
 
+    def calculate_for_layer(
+        self,
+        indicator_id: str,
+        semantic_map_path: str,
+        mask_path: str,
+    ) -> CalculationResult:
+        """
+        Calculate indicator within a masked spatial layer.
+
+        Loads the calculator module's TARGET_RGB, counts matching pixels
+        in the semantic map that fall within the mask region.
+        """
+        try:
+            module = self.load_calculator_module(indicator_id)
+            if not module:
+                return CalculationResult(
+                    success=False,
+                    indicator_id=indicator_id,
+                    error=f"Failed to load calculator: {indicator_id}",
+                )
+
+            from PIL import Image
+
+            # Load semantic map as RGB numpy array
+            sem_img = Image.open(semantic_map_path).convert("RGB")
+            sem_arr = np.array(sem_img)
+
+            # Load layer mask as grayscale
+            mask_img = Image.open(mask_path).convert("L")
+            mask_arr = np.array(mask_img) > 127  # boolean mask
+
+            if mask_arr.shape[:2] != sem_arr.shape[:2]:
+                # Resize mask to match semantic map
+                mask_img = mask_img.resize((sem_arr.shape[1], sem_arr.shape[0]), Image.NEAREST)
+                mask_arr = np.array(mask_img) > 127
+
+            mask_pixels = int(np.sum(mask_arr))
+            if mask_pixels == 0:
+                return CalculationResult(
+                    success=True,
+                    indicator_id=indicator_id,
+                    indicator_name=module.INDICATOR.get("name", ""),
+                    value=0.0,
+                    unit=module.INDICATOR.get("unit", ""),
+                    target_pixels=0,
+                    total_pixels=0,
+                    image_path=semantic_map_path,
+                )
+
+            # Get TARGET_RGB from module (set by each calculator)
+            target_rgb = getattr(module, "TARGET_RGB", None)
+            if target_rgb is None:
+                # Fallback: run full calculate_indicator on semantic map
+                # (won't be layer-restricted but better than nothing)
+                result = module.calculate_indicator(semantic_map_path)
+                return CalculationResult(
+                    success=result.get("success", False),
+                    indicator_id=indicator_id,
+                    indicator_name=module.INDICATOR.get("name", ""),
+                    value=result.get("value"),
+                    unit=module.INDICATOR.get("unit", ""),
+                    target_pixels=result.get("target_pixels"),
+                    total_pixels=result.get("total_pixels"),
+                    error=result.get("error"),
+                    image_path=semantic_map_path,
+                )
+
+            # Count target pixels within the masked region
+            if isinstance(target_rgb, (list, tuple)) and len(target_rgb) == 3 and isinstance(target_rgb[0], (int, float)):
+                # Single target color
+                target_colors = [tuple(int(c) for c in target_rgb)]
+            elif isinstance(target_rgb, (list, tuple)):
+                # Multiple target colors
+                target_colors = [tuple(int(c) for c in rgb) for rgb in target_rgb]
+            else:
+                target_colors = []
+
+            target_mask = np.zeros(sem_arr.shape[:2], dtype=bool)
+            for rgb in target_colors:
+                match = (
+                    (sem_arr[:, :, 0] == rgb[0])
+                    & (sem_arr[:, :, 1] == rgb[1])
+                    & (sem_arr[:, :, 2] == rgb[2])
+                )
+                target_mask |= match
+
+            # Combine: target pixels that are within the layer mask
+            combined = target_mask & mask_arr
+            target_pixels = int(np.sum(combined))
+            value = (target_pixels / mask_pixels) * 100.0
+
+            return CalculationResult(
+                success=True,
+                indicator_id=indicator_id,
+                indicator_name=module.INDICATOR.get("name", ""),
+                value=value,
+                unit=module.INDICATOR.get("unit", ""),
+                target_pixels=target_pixels,
+                total_pixels=mask_pixels,
+                image_path=semantic_map_path,
+            )
+
+        except Exception as e:
+            logger.error("calculate_for_layer error %s: %s", indicator_id, e)
+            return CalculationResult(
+                success=False,
+                indicator_id=indicator_id,
+                error=str(e),
+                image_path=semantic_map_path,
+            )
+
     def batch_calculate(
         self,
         indicator_id: str,

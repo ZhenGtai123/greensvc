@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -30,7 +31,7 @@ import {
   StatHelpText,
   Divider,
 } from '@chakra-ui/react';
-import { useCalculators } from '../hooks/useApi';
+import { useCalculators, useProjects, useProject } from '../hooks/useApi';
 import useAppStore from '../store/useAppStore';
 import api from '../api';
 
@@ -50,12 +51,39 @@ interface CalculationSummary {
 }
 
 function Reports() {
+  const { projectId: routeProjectId } = useParams<{ projectId: string }>();
   const { data: calculators } = useCalculators();
-  const { selectedIndicators } = useAppStore();
+  const { currentProject, selectedIndicators } = useAppStore();
   const toast = useToast();
 
   const [selectedCalculator, setSelectedCalculator] = useState('');
   const [imagePaths, setImagePaths] = useState('');
+
+  // Project image source — route project takes priority
+  const [selectedProjectId, setSelectedProjectId] = useState(routeProjectId || currentProject?.id || '');
+  const { data: projects } = useProjects();
+  const { data: selectedProject } = useProject(selectedProjectId);
+
+  // Sync route project ID
+  useEffect(() => {
+    if (routeProjectId) {
+      setSelectedProjectId(routeProjectId);
+    }
+  }, [routeProjectId]);
+
+  // Auto-fill image paths from selected project
+  useEffect(() => {
+    if (selectedProject) {
+      const paths = selectedProject.uploaded_images
+        .filter((img: { zone_id: string | null }) => img.zone_id)
+        .map((img: { mask_filepaths?: Record<string, string>; filepath: string }) =>
+          img.mask_filepaths?.semantic_map || img.filepath
+        );
+      if (paths.length > 0) {
+        setImagePaths(paths.join('\n'));
+      }
+    }
+  }, [selectedProject]);
 
   // Auto-select first recommended calculator from store (once)
   const recommendedIds = selectedIndicators.map(i => i.indicator_id);
@@ -161,6 +189,29 @@ function Reports() {
             </CardHeader>
             <CardBody>
               <VStack spacing={4}>
+                <Box w="full">
+                  <Text fontSize="sm" mb={1} fontWeight="medium">Project Image Source</Text>
+                  {routeProjectId ? (
+                    <Text fontWeight="bold" mb={3}>
+                      {selectedProject?.project_name || routeProjectId}
+                    </Text>
+                  ) : (
+                    <Select
+                      placeholder="Manual input (no project)"
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      mb={3}
+                      size="sm"
+                    >
+                      {projects?.map((p: { id: string; project_name: string }) => (
+                        <option key={p.id} value={p.id}>
+                          {p.project_name}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </Box>
+
                 <Select
                   placeholder="Select calculator"
                   value={selectedCalculator}
@@ -335,6 +386,18 @@ function Reports() {
           )}
         </VStack>
       </SimpleGrid>
+
+      {/* Navigation button for pipeline mode */}
+      {routeProjectId && (
+        <HStack justify="space-between" mt={6}>
+          <Button as={Link} to={`/projects/${routeProjectId}/analysis`} variant="outline">
+            Back: Analysis
+          </Button>
+          <Button as={Link} to={`/projects/${routeProjectId}`} colorScheme="green">
+            Back to Project
+          </Button>
+        </HStack>
+      )}
     </Container>
   );
 }

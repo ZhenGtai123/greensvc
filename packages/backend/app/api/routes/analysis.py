@@ -189,27 +189,53 @@ async def run_project_pipeline(
         detail=f"{len(assigned_images)} of {len(project.uploaded_images)} images assigned to zones",
     ))
 
-    # 4. Run calculations
+    # 4. Run calculations (use semantic_map when available, plus FMB layers)
     calc_run = 0
     calc_ok = 0
     calc_fail = 0
 
     for img in assigned_images:
+        # Prefer semantic_map mask over raw photo
+        image_path = img.mask_filepaths.get("semantic_map", img.filepath)
+
         for ind_id in valid_ids:
-            if ind_id in img.metrics_results:
-                continue  # already calculated (idempotent)
-            calc_run += 1
-            try:
-                result = calculator.calculate(ind_id, img.filepath)
-                if result.success and result.value is not None:
-                    img.metrics_results[ind_id] = result.value
-                    calc_ok += 1
-                else:
+            # Full layer
+            if ind_id not in img.metrics_results:
+                calc_run += 1
+                try:
+                    result = calculator.calculate(ind_id, image_path)
+                    if result.success and result.value is not None:
+                        img.metrics_results[ind_id] = result.value
+                        calc_ok += 1
+                    else:
+                        calc_fail += 1
+                        logger.warning("Calculation failed for %s on %s: %s", ind_id, img.image_id, result.error)
+                except Exception as e:
                     calc_fail += 1
-                    logger.warning("Calculation failed for %s on %s: %s", ind_id, img.image_id, result.error)
-            except Exception as e:
-                calc_fail += 1
-                logger.error("Calculator exception %s on %s: %s", ind_id, img.image_id, e)
+                    logger.error("Calculator exception %s on %s: %s", ind_id, img.image_id, e)
+
+            # FMB layers (only if layer masks exist)
+            for layer in ["foreground", "middleground", "background"]:
+                layer_key = f"{ind_id}__{layer}"
+                mask_name = f"{layer}_map"
+                mask_path = img.mask_filepaths.get(mask_name)
+                if mask_path and layer_key not in img.metrics_results:
+                    calc_run += 1
+                    try:
+                        result = calculator.calculate_for_layer(
+                            ind_id,
+                            image_path,
+                            mask_path,
+                        )
+                        if result.success and result.value is not None:
+                            img.metrics_results[layer_key] = result.value
+                            calc_ok += 1
+                        else:
+                            calc_fail += 1
+                            logger.warning("Layer calc failed for %s/%s on %s: %s", ind_id, layer, img.image_id, result.error)
+                    except Exception as e:
+                        calc_fail += 1
+                        logger.error("Layer calc exception %s/%s on %s: %s", ind_id, layer, img.image_id, e)
 
     steps.append(ProjectPipelineProgress(
         step="run_calculations",

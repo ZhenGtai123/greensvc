@@ -34,20 +34,28 @@ class MetricsAggregator:
         # Build zone lookup
         zone_lookup: dict[str, SpatialZone] = {z.zone_id: z for z in zones}
 
-        # Group values: (zone_id, indicator_id) -> list[float]
-        grouped: dict[tuple[str, str], list[float]] = defaultdict(list)
+        LAYERS = ["full", "foreground", "middleground", "background"]
+
+        # Group values: (zone_id, indicator_id, layer) -> list[float]
+        grouped: dict[tuple[str, str, str], list[float]] = defaultdict(list)
 
         for img in images:
             if not img.zone_id or img.zone_id not in zone_lookup:
                 continue
             for ind_id in indicator_ids:
+                # Full layer
                 val = img.metrics_results.get(ind_id)
                 if val is not None:
-                    grouped[(img.zone_id, ind_id)].append(val)
+                    grouped[(img.zone_id, ind_id, "full")].append(val)
+                # FMB layers
+                for layer in ["foreground", "middleground", "background"]:
+                    val = img.metrics_results.get(f"{ind_id}__{layer}")
+                    if val is not None:
+                        grouped[(img.zone_id, ind_id, layer)].append(val)
 
         # Build zone statistics
         zone_statistics: list[IndicatorLayerValue] = []
-        for (zone_id, ind_id), values in grouped.items():
+        for (zone_id, ind_id, layer), values in grouped.items():
             zone = zone_lookup[zone_id]
             arr = np.array(values, dtype=float)
             n = len(values)
@@ -56,7 +64,7 @@ class MetricsAggregator:
                 zone_id=zone_id,
                 zone_name=zone.zone_name,
                 indicator_id=ind_id,
-                layer="full",
+                layer=layer,
                 n_images=n,
                 mean=float(np.mean(arr)),
                 std=float(np.std(arr, ddof=1)) if n > 1 else 0.0,
