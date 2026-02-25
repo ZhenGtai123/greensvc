@@ -37,7 +37,7 @@ async def recommend_indicators(
 
     if not response.success:
         raise HTTPException(
-            status_code=500,
+            status_code=502,
             detail=response.error or "Failed to get recommendations"
         )
 

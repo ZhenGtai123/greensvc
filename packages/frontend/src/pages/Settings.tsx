@@ -13,7 +13,7 @@ import {
   CardBody,
   Text,
   Badge,
-  useToast,
+  /* useToast — replaced by useAppToast */
   Divider,
   Code,
   Select,
@@ -23,6 +23,7 @@ import { useConfig, useHealth, useKnowledgeBaseSummary, useLLMProviders, queryKe
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../api';
 import type { LLMProviderInfo } from '../types';
+import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 
@@ -32,7 +33,7 @@ function Settings() {
   const { data: kbSummary } = useKnowledgeBaseSummary();
   const { data: llmProviders, isLoading: providersLoading } = useLLMProviders();
   const queryClient = useQueryClient();
-  const toast = useToast();
+  const toast = useAppToast();
 
   const [visionHealthy, setVisionHealthy] = useState<boolean | null>(null);
   const [llmStatus, setLlmStatus] = useState<{ configured: boolean; provider: string; model: string | null } | null>(null);

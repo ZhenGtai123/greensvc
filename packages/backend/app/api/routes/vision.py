@@ -141,6 +141,7 @@ async def analyze_image_by_path(
     if project_id and image_id and result.status == "success" and result.images:
         saved = await _save_masks_to_project(result, project_id, image_id, settings)
         if saved:
+            result.mask_paths = saved
             projects_store = get_projects_store()
             project = projects_store.get(project_id)
             if project:
@@ -167,6 +168,8 @@ async def analyze_project_image(
     Looks up the image from the in-memory project store, runs vision analysis,
     saves masks to disk, and updates the image's mask_filepaths.
     """
+    logger.info("analyze_project_image called: project_id=%s image_id=%s filepath=%s",
+                project_id, image_id, getattr(request, 'image_id', ''))
     projects_store = get_projects_store()
     project = projects_store.get(project_id)
     if not project:
@@ -185,8 +188,9 @@ async def analyze_project_image(
         raise HTTPException(status_code=404, detail=f"Image file not found on disk: {img.filepath}")
 
     # Validate parameters
-    logger.debug(
-        "analyze_project_image: classes=%d, countability=%d, openness=%d",
+    logger.info(
+        "analyze_project_image: project=%s image=%s classes=%d countability=%d openness=%d",
+        project_id, image_id,
         len(request.semantic_classes), len(request.semantic_countability), len(request.openness_list),
     )
     valid, error = vision_client.validate_parameters(
@@ -195,6 +199,7 @@ async def analyze_project_image(
         request.openness_list,
     )
     if not valid:
+        logger.warning("validate_parameters failed: %s", error)
         raise HTTPException(status_code=400, detail=error)
 
     # Call Vision API
@@ -205,6 +210,7 @@ async def analyze_project_image(
         saved = await _save_masks_to_project(result, project_id, image_id, settings)
         img.mask_filepaths.update(saved)
         projects_store.save(project)
+        result.mask_paths = saved
         logger.info("Saved %d masks for project %s image %s", len(saved), project_id, image_id)
 
     return result

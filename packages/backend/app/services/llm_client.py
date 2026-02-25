@@ -59,15 +59,18 @@ class GeminiLLM(LLMClient):
 
     def _get_client(self):
         if self._client is None:
-            import google.generativeai as genai
-            genai.configure(api_key=self.api_key)
-            self._client = genai.GenerativeModel(self.model)
+            from google import genai
+            self._client = genai.Client(api_key=self.api_key)
         return self._client
 
     async def generate(self, prompt: str) -> str:
         import asyncio
         client = self._get_client()
-        response = await asyncio.to_thread(client.generate_content, prompt)
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model=self.model,
+            contents=prompt,
+        )
         return response.text or ""
 
     def check_connection(self) -> bool:

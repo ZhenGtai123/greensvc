@@ -21,7 +21,7 @@ import {
   Textarea,
   Alert,
   AlertIcon,
-  useToast,
+  /* useToast — replaced by useAppToast */
   Spinner,
   Divider,
   Switch,
@@ -71,6 +71,7 @@ import type {
 } from '../types';
 import { generateReport } from '../utils/generateReport';
 import useAppStore from '../store/useAppStore';
+import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 
@@ -135,8 +136,13 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 
 function Analysis() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
-  const toast = useToast();
-  const { selectedIndicators } = useAppStore();
+  const toast = useAppToast();
+  const {
+    selectedIndicators,
+    zoneAnalysisResult, setZoneAnalysisResult,
+    designStrategyResult, setDesignStrategyResult,
+    pipelineResult: storePipelineResult, setPipelineResult: setStorePipelineResult,
+  } = useAppStore();
 
   // Input mode tab
   const [inputMode, setInputMode] = useState(0);
@@ -149,17 +155,19 @@ function Analysis() {
   // Pipeline state
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedIndicatorIds, setSelectedIndicatorIds] = useState<string[]>([]);
-  const [pipelineResult, setPipelineResult] = useState<ProjectPipelineResult | null>(null);
+  // Pipeline results from store (persist across navigation)
+  const pipelineResult = storePipelineResult;
+  const setPipelineResult = (r: ProjectPipelineResult | null) => setStorePipelineResult(r);
+  const zoneResult = zoneAnalysisResult;
+  const setZoneResult = (r: ZoneAnalysisResult | null) => setZoneAnalysisResult(r);
+  const designResult = designStrategyResult;
+  const setDesignResult = (r: DesignStrategyResult | null) => setDesignStrategyResult(r);
 
   // Config state
   const [zscoreModerate, setZscoreModerate] = useState(0.5);
   const [zscoreSignificant, setZscoreSignificant] = useState(1.0);
   const [zscoreCritical, setZscoreCritical] = useState(1.5);
   const [useLlm, setUseLlm] = useState(false);
-
-  // Results state
-  const [zoneResult, setZoneResult] = useState<ZoneAnalysisResult | null>(null);
-  const [designResult, setDesignResult] = useState<DesignStrategyResult | null>(null);
 
   // Selected layer for filtering
   const [selectedLayer, setSelectedLayer] = useState(0);
@@ -624,9 +632,16 @@ function Analysis() {
           <Divider mb={4} />
 
           {/* Shared configuration row */}
+          <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide" mb={2}>
+            Analysis Parameters
+          </Text>
           <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4} alignItems="end" mb={4}>
             <FormControl>
-              <FormLabel fontSize="sm">Z-score Moderate</FormLabel>
+              <Tooltip label="Indicators deviating beyond this threshold are flagged as moderate concerns. Lower values flag more indicators." placement="top" hasArrow>
+                <FormLabel fontSize="sm" cursor="help" borderBottom="1px dashed" borderColor="gray.300" display="inline-block">
+                  Z-score Moderate
+                </FormLabel>
+              </Tooltip>
               <NumberInput
                 value={zscoreModerate}
                 onChange={(_, val) => setZscoreModerate(isNaN(val) ? 0.5 : val)}
@@ -638,7 +653,11 @@ function Analysis() {
               </NumberInput>
             </FormControl>
             <FormControl>
-              <FormLabel fontSize="sm">Z-score Significant</FormLabel>
+              <Tooltip label="Indicators beyond this threshold are flagged as significant problems requiring attention in design strategies." placement="top" hasArrow>
+                <FormLabel fontSize="sm" cursor="help" borderBottom="1px dashed" borderColor="gray.300" display="inline-block">
+                  Z-score Significant
+                </FormLabel>
+              </Tooltip>
               <NumberInput
                 value={zscoreSignificant}
                 onChange={(_, val) => setZscoreSignificant(isNaN(val) ? 1.0 : val)}
@@ -650,7 +669,11 @@ function Analysis() {
               </NumberInput>
             </FormControl>
             <FormControl>
-              <FormLabel fontSize="sm">Z-score Critical</FormLabel>
+              <Tooltip label="Indicators beyond this threshold are flagged as critical — top priority for intervention. Higher values mean only extreme deviations are flagged." placement="top" hasArrow>
+                <FormLabel fontSize="sm" cursor="help" borderBottom="1px dashed" borderColor="gray.300" display="inline-block">
+                  Z-score Critical
+                </FormLabel>
+              </Tooltip>
               <NumberInput
                 value={zscoreCritical}
                 onChange={(_, val) => setZscoreCritical(isNaN(val) ? 1.5 : val)}
@@ -662,7 +685,16 @@ function Analysis() {
               </NumberInput>
             </FormControl>
             <FormControl display="flex" alignItems="center">
-              <FormLabel fontSize="sm" mb={0}>Use LLM (Stage 3)</FormLabel>
+              <Tooltip
+                label="When enabled, Stage 3 uses an LLM (e.g. Gemini, GPT, Claude) to generate context-aware design strategies based on zone diagnostics. When disabled, strategies are generated using rule-based matching — faster but less tailored."
+                placement="top"
+                hasArrow
+                maxW="320px"
+              >
+                <FormLabel fontSize="sm" mb={0} cursor="help" borderBottom="1px dashed" borderColor="gray.300">
+                  Use LLM (Stage 3)
+                </FormLabel>
+              </Tooltip>
               <Switch isChecked={useLlm} onChange={(e) => setUseLlm(e.target.checked)} colorScheme="green" />
             </FormControl>
           </SimpleGrid>

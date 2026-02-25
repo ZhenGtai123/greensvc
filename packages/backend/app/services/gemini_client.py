@@ -78,8 +78,13 @@ class RecommendationService:
 
         # Build indicator definitions section
         indicator_text = "\n## Available Indicators\n"
-        for ind in indicator_defs[:30]:  # Limit
-            indicator_text += f"- {ind.get('code', '')}: {ind.get('name', '')}\n"
+        # indicator_defs may be a dict keyed by indicator_id or a list of dicts
+        if isinstance(indicator_defs, dict):
+            for ind_id, ind in list(indicator_defs.items())[:30]:
+                indicator_text += f"- {ind_id}: {ind.get('name', '')}\n"
+        else:
+            for ind in indicator_defs[:30]:
+                indicator_text += f"- {ind.get('code', '')}: {ind.get('name', '')}\n"
 
         # Build the full prompt
         prompt = f"""You are an expert in urban greenspace analysis and evidence-based design.

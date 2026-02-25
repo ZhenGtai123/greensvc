@@ -122,6 +122,11 @@ def create_app() -> FastAPI:
     uploads_path.mkdir(parents=True, exist_ok=True)
     app.mount("/api/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
+    # Serve vision analysis mask images as static files
+    masks_path = settings.temp_full_path / "masks"
+    masks_path.mkdir(parents=True, exist_ok=True)
+    app.mount("/api/masks", StaticFiles(directory=str(masks_path)), name="masks")
+
     return app
 
 

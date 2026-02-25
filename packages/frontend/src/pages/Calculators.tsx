@@ -16,7 +16,7 @@ import {
   ModalBody,
   ModalCloseButton,
   useDisclosure,
-  useToast,
+  /* useToast — replaced by useAppToast */
   Spinner,
   Input,
   VStack,
@@ -28,12 +28,13 @@ import api from '../api';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import AnimatedCard from '../components/AnimatedCard';
+import useAppToast from '../hooks/useAppToast';
 
 function Calculators() {
   const { data: calculators, isLoading, refetch } = useCalculators();
   const uploadCalculator = useUploadCalculator();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const toast = useToast();
+  const toast = useAppToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedCalc, setSelectedCalc] = useState<string | null>(null);

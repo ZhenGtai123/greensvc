@@ -164,6 +164,8 @@ export interface VisionAnalysisResponse {
   image_path: string;
   processing_time: number;
   statistics: Record<string, unknown>;
+  mask_paths: Record<string, string>;
+  instances: Record<string, unknown>[];
   error?: string;
 }
 

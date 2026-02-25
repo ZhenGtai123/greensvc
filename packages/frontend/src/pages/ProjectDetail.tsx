@@ -14,7 +14,7 @@ import {
   Text,
   Badge,
   Circle,
-  useToast,
+  /* useToast — replaced by useAppToast */
   Tabs,
   TabList,
   TabPanels,
@@ -37,6 +37,7 @@ import { ArrowLeft, Upload, X, Undo2, Check, ImageIcon, MapPin } from 'lucide-re
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
 import useAppStore from '../store/useAppStore';
+import useAppToast from '../hooks/useAppToast';
 import type { Project, UploadedImage } from '../types';
 import PageShell from '../components/PageShell';
 import EmptyState from '../components/EmptyState';
@@ -158,10 +159,10 @@ function PipelineCard({ projectId, project }: { projectId: string; project: Proj
 function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const toast = useToast();
+  const toast = useAppToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { setCurrentProject } = useAppStore();
+  const { setCurrentProject, clearPipelineResults, currentProject } = useAppStore();
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -177,9 +178,13 @@ function ProjectDetail() {
 
   useEffect(() => {
     if (project) {
+      // Clear pipeline results when switching to a different project
+      if (currentProject && currentProject.id !== project.id) {
+        clearPipelineResults();
+      }
       setCurrentProject(project);
     }
-  }, [project, setCurrentProject]);
+  }, [project, setCurrentProject, clearPipelineResults, currentProject]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

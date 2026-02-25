@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, CalculatorInfo, IndicatorRecommendation, SemanticClass } from '../types';
+import type { Project, CalculatorInfo, IndicatorRecommendation, SemanticClass, ZoneAnalysisResult, DesignStrategyResult, ProjectPipelineResult } from '../types';
 
 interface AppState {
   // Current project
@@ -12,6 +12,17 @@ interface AppState {
   addSelectedIndicator: (indicator: IndicatorRecommendation) => void;
   removeSelectedIndicator: (indicatorId: string) => void;
   clearSelectedIndicators: () => void;
+
+  // Pipeline results (persist across page navigation)
+  recommendations: IndicatorRecommendation[];
+  setRecommendations: (recs: IndicatorRecommendation[]) => void;
+  zoneAnalysisResult: ZoneAnalysisResult | null;
+  setZoneAnalysisResult: (r: ZoneAnalysisResult | null) => void;
+  designStrategyResult: DesignStrategyResult | null;
+  setDesignStrategyResult: (r: DesignStrategyResult | null) => void;
+  pipelineResult: ProjectPipelineResult | null;
+  setPipelineResult: (r: ProjectPipelineResult | null) => void;
+  clearPipelineResults: () => void;
 
   // Calculators
   calculators: CalculatorInfo[];
@@ -50,6 +61,23 @@ export const useAppStore = create<AppState>((set) => ({
       ),
     })),
   clearSelectedIndicators: () => set({ selectedIndicators: [] }),
+
+  // Pipeline results
+  recommendations: [],
+  setRecommendations: (recs) => set({ recommendations: recs }),
+  zoneAnalysisResult: null,
+  setZoneAnalysisResult: (r) => set({ zoneAnalysisResult: r }),
+  designStrategyResult: null,
+  setDesignStrategyResult: (r) => set({ designStrategyResult: r }),
+  pipelineResult: null,
+  setPipelineResult: (r) => set({ pipelineResult: r }),
+  clearPipelineResults: () => set({
+    recommendations: [],
+    selectedIndicators: [],
+    zoneAnalysisResult: null,
+    designStrategyResult: null,
+    pipelineResult: null,
+  }),
 
   // Calculators
   calculators: [],

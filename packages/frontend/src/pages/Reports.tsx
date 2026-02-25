@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Box,
@@ -18,369 +17,398 @@ import {
   Tr,
   Th,
   Td,
-  Select,
-  Input,
-  Alert,
-  AlertIcon,
-  useToast,
-  Spinner,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
   Divider,
+  Progress,
+  Wrap,
+  WrapItem,
+  Tag,
+  TagLabel,
+  Icon,
 } from '@chakra-ui/react';
-import { Download } from 'lucide-react';
-import { useCalculators, useProjects, useProject } from '../hooks/useApi';
+import { Download, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
-import api from '../api';
+import { generateReport } from '../utils/generateReport';
+import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 
-interface CalculationSummary {
-  indicator_id: string;
-  indicator_name: string;
-  total_images: number;
-  successful: number;
-  failed: number;
-  statistics: {
-    mean?: number;
-    std?: number;
-    min?: number;
-    max?: number;
-    median?: number;
-  };
-}
-
 function Reports() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
-  const { data: calculators } = useCalculators();
-  const { currentProject, selectedIndicators } = useAppStore();
-  const toast = useToast();
+  const toast = useAppToast();
 
-  const [selectedCalculator, setSelectedCalculator] = useState('');
-  const [imagePaths, setImagePaths] = useState('');
+  const {
+    currentProject,
+    recommendations,
+    selectedIndicators,
+    zoneAnalysisResult,
+    designStrategyResult,
+    pipelineResult,
+  } = useAppStore();
 
-  const [selectedProjectId, setSelectedProjectId] = useState(routeProjectId || currentProject?.id || '');
-  const { data: projects } = useProjects();
-  const { data: selectedProject } = useProject(selectedProjectId);
+  const projectName = currentProject?.project_name || pipelineResult?.project_name || 'Unknown Project';
 
-  useEffect(() => {
-    if (routeProjectId) {
-      setSelectedProjectId(routeProjectId);
-    }
-  }, [routeProjectId]);
+  // Pipeline completion status
+  const hasVision = (currentProject?.uploaded_images?.length ?? 0) > 0;
+  const hasIndicators = recommendations.length > 0;
+  const hasAnalysis = zoneAnalysisResult !== null;
+  const hasDesign = designStrategyResult !== null;
 
-  useEffect(() => {
-    if (selectedProject) {
-      const paths = selectedProject.uploaded_images
-        .filter((img: { zone_id: string | null }) => img.zone_id)
-        .map((img: { mask_filepaths?: Record<string, string>; filepath: string }) =>
-          img.mask_filepaths?.semantic_map || img.filepath
-        );
-      if (paths.length > 0) {
-        setImagePaths(paths.join('\n'));
-      }
-    }
-  }, [selectedProject]);
+  const steps = [
+    { name: 'Vision', done: hasVision },
+    { name: 'Indicators', done: hasIndicators },
+    { name: 'Analysis', done: hasAnalysis },
+    { name: 'Design', done: hasDesign },
+  ];
+  const completedSteps = steps.filter(s => s.done).length;
 
-  const recommendedIds = selectedIndicators.map(i => i.indicator_id);
-  const calcSynced = useRef(false);
-  useEffect(() => {
-    if (calcSynced.current) return;
-    if (recommendedIds.length > 0 && calculators) {
-      const match = calculators.find(c => recommendedIds.includes(c.id));
-      if (match) {
-        setSelectedCalculator(match.id);
-        calcSynced.current = true;
-      }
-    }
-  }, [calculators, recommendedIds.length]);
-  const [calculating, setCalculating] = useState(false);
-  const [results, setResults] = useState<CalculationSummary | null>(null);
-  const [rawResults, setRawResults] = useState<unknown[]>([]);
+  const isEmpty = !hasIndicators && !hasAnalysis && !hasDesign;
 
-  const handleCalculate = async () => {
-    if (!selectedCalculator || !imagePaths.trim()) {
-      toast({ title: 'Select a calculator and enter image paths', status: 'warning' });
+  const handleDownloadMarkdown = () => {
+    if (!zoneAnalysisResult) {
+      toast({ title: 'No analysis data to export', status: 'warning' });
       return;
     }
-
-    const paths = imagePaths.split('\n').map((p) => p.trim()).filter(Boolean);
-    if (paths.length === 0) {
-      toast({ title: 'Enter at least one image path', status: 'warning' });
-      return;
-    }
-
-    setCalculating(true);
-    setResults(null);
-    setRawResults([]);
-
-    try {
-      const response = await api.metrics.calculateBatch(selectedCalculator, paths);
-      const data = response.data;
-
-      setResults({
-        indicator_id: data.indicator_id,
-        indicator_name: data.indicator_name,
-        total_images: data.total_images,
-        successful: data.successful_calculations,
-        failed: data.failed_calculations,
-        statistics: {
-          mean: data.mean_value,
-          std: data.std_value,
-          min: data.min_value,
-          max: data.max_value,
-        },
-      });
-      setRawResults(data.results || []);
-
-      toast({
-        title: 'Calculation complete',
-        description: `${data.successful_calculations}/${data.total_images} images processed`,
-        status: 'success',
-      });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Calculation failed';
-      toast({ title: message, status: 'error' });
-    }
-
-    setCalculating(false);
-  };
-
-  const handleExportJson = () => {
-    if (!results) return;
-
-    const exportData = {
-      indicator: results,
-      results: rawResults,
-      exported_at: new Date().toISOString(),
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const md = generateReport({
+      projectName,
+      pipelineResult,
+      zoneResult: zoneAnalysisResult,
+      designResult: designStrategyResult,
+    });
+    const blob = new Blob([md], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${results.indicator_id}_results.json`;
+    a.download = `${projectName.replace(/\s+/g, '_')}_report.md`;
     a.click();
     URL.revokeObjectURL(url);
+    toast({ title: 'Report downloaded', status: 'success' });
   };
+
+  const handleExportJson = () => {
+    const data = {
+      project_name: projectName,
+      exported_at: new Date().toISOString(),
+      recommendations,
+      selected_indicators: selectedIndicators,
+      zone_analysis: zoneAnalysisResult,
+      design_strategies: designStrategyResult,
+      pipeline_result: pipelineResult,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName.replace(/\s+/g, '_')}_data.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'JSON exported', status: 'success' });
+  };
+
+  // Sort zone diagnostics by priority
+  const sortedDiags = zoneAnalysisResult
+    ? [...zoneAnalysisResult.zone_diagnostics].sort((a, b) => b.total_priority - a.total_priority)
+    : [];
 
   return (
     <PageShell>
-      <PageHeader title="Report Generation" />
+      <PageHeader title="Report Generation">
+        <HStack>
+          <Button
+            size="sm"
+            leftIcon={<Download size={14} />}
+            onClick={handleDownloadMarkdown}
+            isDisabled={!hasAnalysis}
+            colorScheme="blue"
+          >
+            Download MD
+          </Button>
+          <Button
+            size="sm"
+            leftIcon={<FileText size={14} />}
+            onClick={handleExportJson}
+            isDisabled={isEmpty}
+          >
+            Export JSON
+          </Button>
+        </HStack>
+      </PageHeader>
 
-      <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-        {/* Left: Configuration */}
+      {isEmpty ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="No pipeline results yet"
+          description="Complete the pipeline steps (Vision → Indicators → Analysis) to generate a report. Navigate to your project to get started."
+        />
+      ) : (
         <VStack spacing={6} align="stretch">
-          {selectedIndicators.length > 0 && (
-            <Alert status="info">
-              <AlertIcon />
-              {selectedIndicators.length} indicator(s) selected from recommendations
-            </Alert>
-          )}
-
+          {/* Pipeline Overview */}
           <Card>
             <CardHeader>
-              <Heading size="md">Calculate Indicator</Heading>
+              <Heading size="md">Pipeline Overview</Heading>
             </CardHeader>
             <CardBody>
-              <VStack spacing={4}>
-                <Box w="full">
-                  <Text fontSize="sm" mb={1} fontWeight="medium">Project Image Source</Text>
-                  {routeProjectId ? (
-                    <Text fontWeight="bold" mb={3}>
-                      {selectedProject?.project_name || routeProjectId}
-                    </Text>
-                  ) : (
-                    <Select
-                      placeholder="Manual input (no project)"
-                      value={selectedProjectId}
-                      onChange={(e) => setSelectedProjectId(e.target.value)}
-                      mb={3}
-                      size="sm"
-                    >
-                      {projects?.map((p: { id: string; project_name: string }) => (
-                        <option key={p.id} value={p.id}>
-                          {p.project_name}
-                        </option>
-                      ))}
-                    </Select>
+              <VStack align="stretch" spacing={4}>
+                <HStack justify="space-between" flexWrap="wrap" gap={2}>
+                  <Text><strong>Project:</strong> {projectName}</Text>
+                  {pipelineResult && (
+                    <>
+                      <Text><strong>Images:</strong> {pipelineResult.total_images}</Text>
+                      <Text><strong>Zone Images:</strong> {pipelineResult.zone_assigned_images}</Text>
+                      <Text><strong>Calculations:</strong> {pipelineResult.calculations_succeeded}/{pipelineResult.calculations_run}</Text>
+                    </>
                   )}
-                </Box>
+                </HStack>
+                <Divider />
+                <HStack spacing={4} flexWrap="wrap">
+                  {steps.map(s => (
+                    <HStack key={s.name} spacing={1}>
+                      <Icon
+                        as={s.done ? CheckCircle : AlertTriangle}
+                        color={s.done ? 'green.500' : 'gray.400'}
+                        boxSize={4}
+                      />
+                      <Text fontSize="sm" color={s.done ? 'green.600' : 'gray.500'}>
+                        {s.name}
+                      </Text>
+                    </HStack>
+                  ))}
+                  <Text fontSize="sm" color="gray.500" ml="auto">
+                    {completedSteps}/{steps.length} completed
+                  </Text>
+                </HStack>
 
-                <Select
-                  placeholder="Select calculator"
-                  value={selectedCalculator}
-                  onChange={(e) => setSelectedCalculator(e.target.value)}
-                >
-                  {calculators
-                    ?.slice()
-                    .sort((a, b) => {
-                      const aRec = recommendedIds.includes(a.id) ? 0 : 1;
-                      const bRec = recommendedIds.includes(b.id) ? 0 : 1;
-                      return aRec - bRec;
-                    })
-                    .map((calc) => (
-                      <option key={calc.id} value={calc.id}>
-                        {recommendedIds.includes(calc.id) ? '\u2605 ' : ''}{calc.id} - {calc.name}
-                      </option>
-                    ))}
-                </Select>
-
-                <Box w="full">
-                  <Text fontSize="sm" mb={2}>Image Paths (one per line):</Text>
-                  <Input
-                    as="textarea"
-                    value={imagePaths}
-                    onChange={(e) => setImagePaths(e.target.value)}
-                    placeholder="/path/to/image1.png&#10;/path/to/image2.png"
-                    rows={6}
-                    fontFamily="mono"
-                    fontSize="sm"
-                  />
-                </Box>
-
-                <Button
-                  colorScheme="green"
-                  w="full"
-                  onClick={handleCalculate}
-                  isLoading={calculating}
-                  isDisabled={!selectedCalculator || !imagePaths.trim()}
-                >
-                  Calculate
-                </Button>
+                {/* Pipeline steps detail */}
+                {pipelineResult && pipelineResult.steps.length > 0 && (
+                  <Box>
+                    <Text fontSize="sm" fontWeight="medium" mb={2}>Pipeline Steps:</Text>
+                    <VStack align="stretch" spacing={1}>
+                      {pipelineResult.steps.map((s, i) => (
+                        <HStack key={i} fontSize="sm">
+                          <Badge colorScheme={s.status === 'completed' ? 'green' : s.status === 'skipped' ? 'gray' : 'red'} fontSize="xs">
+                            {s.status}
+                          </Badge>
+                          <Text fontWeight="medium">{s.step}</Text>
+                          <Text color="gray.500">{s.detail}</Text>
+                        </HStack>
+                      ))}
+                    </VStack>
+                  </Box>
+                )}
               </VStack>
             </CardBody>
           </Card>
-        </VStack>
 
-        {/* Right: Results */}
-        <VStack spacing={6} align="stretch">
-          {calculating && (
+          {/* Recommended Indicators */}
+          {recommendations.length > 0 && (
             <Card>
-              <CardBody textAlign="center" py={10}>
-                <Spinner size="xl" />
-                <Text mt={4}>Calculating indicator values...</Text>
+              <CardHeader>
+                <HStack justify="space-between">
+                  <Heading size="md">Recommended Indicators ({recommendations.length})</Heading>
+                  <Badge colorScheme="blue">{selectedIndicators.length} selected</Badge>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <Wrap spacing={3}>
+                  {recommendations.map(rec => {
+                    const selected = selectedIndicators.some(s => s.indicator_id === rec.indicator_id);
+                    return (
+                      <WrapItem key={rec.indicator_id}>
+                        <Tag
+                          size="lg"
+                          colorScheme={selected ? 'green' : 'gray'}
+                          variant={selected ? 'solid' : 'outline'}
+                        >
+                          <TagLabel>
+                            {rec.indicator_id} {(rec.relevance_score * 100).toFixed(0)}%
+                          </TagLabel>
+                        </Tag>
+                      </WrapItem>
+                    );
+                  })}
+                </Wrap>
               </CardBody>
             </Card>
           )}
 
-          {results && (
-            <>
-              <Card>
-                <CardHeader>
-                  <HStack justify="space-between">
-                    <Heading size="md">Results Summary</Heading>
-                    <Button size="sm" onClick={handleExportJson} leftIcon={<Download size={14} />}>
-                      Export JSON
-                    </Button>
-                  </HStack>
-                </CardHeader>
-                <CardBody>
-                  <VStack align="stretch" spacing={4}>
-                    <HStack justify="space-between">
-                      <Text fontWeight="bold">{results.indicator_name}</Text>
-                      <Badge colorScheme="blue">{results.indicator_id}</Badge>
-                    </HStack>
-
-                    <Divider />
-
-                    <SimpleGrid columns={3} spacing={4}>
-                      <Stat>
-                        <StatLabel>Total</StatLabel>
-                        <StatNumber>{results.total_images}</StatNumber>
-                        <StatHelpText>images</StatHelpText>
-                      </Stat>
-                      <Stat>
-                        <StatLabel>Success</StatLabel>
-                        <StatNumber color="green.500">{results.successful}</StatNumber>
-                      </Stat>
-                      <Stat>
-                        <StatLabel>Failed</StatLabel>
-                        <StatNumber color="red.500">{results.failed}</StatNumber>
-                      </Stat>
-                    </SimpleGrid>
-
-                    <Divider />
-
-                    <SimpleGrid columns={2} spacing={4}>
-                      <Stat>
-                        <StatLabel>Mean</StatLabel>
-                        <StatNumber>{results.statistics.mean?.toFixed(2) || 'N/A'}</StatNumber>
-                      </Stat>
-                      <Stat>
-                        <StatLabel>Std Dev</StatLabel>
-                        <StatNumber>{results.statistics.std?.toFixed(2) || 'N/A'}</StatNumber>
-                      </Stat>
-                      <Stat>
-                        <StatLabel>Min</StatLabel>
-                        <StatNumber>{results.statistics.min?.toFixed(2) || 'N/A'}</StatNumber>
-                      </Stat>
-                      <Stat>
-                        <StatLabel>Max</StatLabel>
-                        <StatNumber>{results.statistics.max?.toFixed(2) || 'N/A'}</StatNumber>
-                      </Stat>
-                    </SimpleGrid>
-                  </VStack>
-                </CardBody>
-              </Card>
-
-              {rawResults.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <Heading size="md">Detailed Results</Heading>
-                  </CardHeader>
-                  <CardBody p={0}>
-                    <Box overflowX="auto">
-                      <Table size="sm">
-                        <Thead>
-                          <Tr>
-                            <Th>Image</Th>
-                            <Th isNumeric>Value</Th>
-                            <Th>Status</Th>
+          {/* Zone Diagnostics Summary */}
+          {sortedDiags.length > 0 && (
+            <Card>
+              <CardHeader>
+                <Heading size="md">Zone Diagnostics Summary</Heading>
+              </CardHeader>
+              <CardBody p={0}>
+                <Box overflowX="auto">
+                  <Table size="sm">
+                    <Thead>
+                      <Tr>
+                        <Th>Zone</Th>
+                        <Th>Status</Th>
+                        <Th isNumeric>Total Priority</Th>
+                        <Th isNumeric>High Priority Problems</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {sortedDiags.map(d => {
+                        const highProblems = Object.values(d.problems_by_layer)
+                          .flat()
+                          .filter(p => p.priority >= 4).length;
+                        return (
+                          <Tr key={d.zone_id}>
+                            <Td fontWeight="medium">{d.zone_name}</Td>
+                            <Td>
+                              <Badge colorScheme={
+                                d.status.toLowerCase().includes('critical') ? 'red' :
+                                d.status.toLowerCase().includes('poor') ? 'orange' :
+                                d.status.toLowerCase().includes('moderate') ? 'yellow' : 'green'
+                              }>
+                                {d.status}
+                              </Badge>
+                            </Td>
+                            <Td isNumeric>{d.total_priority}</Td>
+                            <Td isNumeric>
+                              {highProblems > 0 ? (
+                                <Badge colorScheme="red">{highProblems}</Badge>
+                              ) : (
+                                <Text color="gray.400">0</Text>
+                              )}
+                            </Td>
                           </Tr>
-                        </Thead>
-                        <Tbody>
-                          {rawResults.map((r: unknown, idx: number) => {
-                            const result = r as { image_path: string; value: number | null; success: boolean; error?: string };
-                            return (
-                              <Tr key={idx}>
-                                <Td>
-                                  <Text fontSize="xs" noOfLines={1}>
-                                    {result.image_path.split('/').pop()}
-                                  </Text>
-                                </Td>
-                                <Td isNumeric>
-                                  {result.value !== null ? result.value.toFixed(3) : '-'}
-                                </Td>
-                                <Td>
-                                  <Badge colorScheme={result.success ? 'green' : 'red'}>
-                                    {result.success ? 'OK' : 'Error'}
-                                  </Badge>
-                                </Td>
-                              </Tr>
-                            );
-                          })}
-                        </Tbody>
-                      </Table>
-                    </Box>
-                  </CardBody>
-                </Card>
-              )}
-            </>
+                        );
+                      })}
+                    </Tbody>
+                  </Table>
+                </Box>
+              </CardBody>
+            </Card>
           )}
 
-          {!calculating && !results && (
-            <EmptyState
-              icon={Download}
-              title="No results yet"
-              description="Select a calculator and enter image paths to generate reports."
-            />
+          {/* Zone Statistics Overview */}
+          {zoneAnalysisResult && zoneAnalysisResult.zone_statistics.length > 0 && (
+            <Card>
+              <CardHeader>
+                <Heading size="md">Zone Statistics — Full Layer</Heading>
+              </CardHeader>
+              <CardBody p={0}>
+                <Box overflowX="auto">
+                  <Table size="sm">
+                    <Thead>
+                      <Tr>
+                        <Th>Zone</Th>
+                        <Th>Indicator</Th>
+                        <Th isNumeric>Mean</Th>
+                        <Th isNumeric>Z-score</Th>
+                        <Th isNumeric>Priority</Th>
+                        <Th>Classification</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {zoneAnalysisResult.zone_statistics
+                        .filter(s => s.layer === 'full')
+                        .sort((a, b) => b.priority - a.priority)
+                        .slice(0, 20)
+                        .map((s, i) => (
+                          <Tr key={i}>
+                            <Td>{s.zone_name}</Td>
+                            <Td><Badge>{s.indicator_id}</Badge></Td>
+                            <Td isNumeric>{s.mean !== null && s.mean !== undefined ? s.mean.toFixed(3) : '-'}</Td>
+                            <Td isNumeric>{s.z_score !== null && s.z_score !== undefined ? s.z_score.toFixed(2) : '-'}</Td>
+                            <Td isNumeric>
+                              <Badge colorScheme={s.priority >= 4 ? 'red' : s.priority >= 2 ? 'yellow' : 'green'}>
+                                {s.priority}
+                              </Badge>
+                            </Td>
+                            <Td>
+                              <Badge colorScheme={
+                                s.classification === 'Critical' ? 'red' :
+                                s.classification === 'Poor' ? 'orange' :
+                                s.classification === 'Moderate' ? 'yellow' : 'green'
+                              }>
+                                {s.classification}
+                              </Badge>
+                            </Td>
+                          </Tr>
+                        ))}
+                    </Tbody>
+                  </Table>
+                </Box>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Design Strategies */}
+          {designStrategyResult && (
+            <Card>
+              <CardHeader>
+                <HStack justify="space-between">
+                  <Heading size="md">Design Strategies</Heading>
+                  <Badge colorScheme="purple">
+                    {designStrategyResult.metadata.total_strategies} strategies
+                  </Badge>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <VStack align="stretch" spacing={4}>
+                  {Object.values(designStrategyResult.zones).map(zone => (
+                    <Box key={zone.zone_id} p={4} borderWidth="1px" borderRadius="md">
+                      <HStack justify="space-between" mb={2}>
+                        <Text fontWeight="bold">{zone.zone_name}</Text>
+                        <Badge colorScheme={
+                          zone.status.toLowerCase().includes('critical') ? 'red' :
+                          zone.status.toLowerCase().includes('poor') ? 'orange' : 'green'
+                        }>
+                          {zone.status}
+                        </Badge>
+                      </HStack>
+                      {zone.overall_assessment && (
+                        <Text fontSize="sm" color="gray.600" mb={2}>{zone.overall_assessment}</Text>
+                      )}
+                      <Text fontSize="sm" fontWeight="medium" mb={1}>
+                        {zone.design_strategies.length} strategies:
+                      </Text>
+                      <VStack align="stretch" spacing={1} pl={3}>
+                        {zone.design_strategies.map((s, i) => (
+                          <HStack key={i} fontSize="sm">
+                            <Badge size="sm" colorScheme="purple">{s.priority}</Badge>
+                            <Text>{s.strategy_name}</Text>
+                            <Text color="gray.500">({s.confidence})</Text>
+                          </HStack>
+                        ))}
+                      </VStack>
+                    </Box>
+                  ))}
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Download section */}
+          {hasAnalysis && (
+            <Card>
+              <CardBody>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <Button
+                    size="lg"
+                    colorScheme="blue"
+                    leftIcon={<Download size={18} />}
+                    onClick={handleDownloadMarkdown}
+                  >
+                    Download Markdown Report
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    leftIcon={<FileText size={18} />}
+                    onClick={handleExportJson}
+                  >
+                    Export Full JSON Data
+                  </Button>
+                </SimpleGrid>
+              </CardBody>
+            </Card>
           )}
         </VStack>
-      </SimpleGrid>
+      )}
 
       {routeProjectId && (
         <HStack justify="space-between" mt={6}>

@@ -17,7 +17,7 @@ import {
   Text,
   Badge,
   Checkbox,
-  useToast,
+  /* useToast — replaced by useAppToast */
   IconButton,
   Tag,
   TagLabel,
@@ -49,6 +49,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../api';
+import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 
 // ============ Constants ============
@@ -209,7 +210,7 @@ function ProjectWizard() {
   const { projectId } = useParams<{ projectId: string }>();
   const isEditMode = !!projectId;
   const navigate = useNavigate();
-  const toast = useToast();
+  const toast = useAppToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { isOpen: isRelationsOpen, onToggle: toggleRelations } = useDisclosure();

@@ -19,7 +19,7 @@ import {
   CheckboxGroup,
   Alert,
   AlertIcon,
-  useToast,
+  /* useToast — replaced by useAppToast */
   Accordion,
   AccordionItem,
   AccordionButton,
@@ -35,6 +35,7 @@ import { Lightbulb } from 'lucide-react';
 import { useKnowledgeBaseSummary, useRecommendIndicators, useProject } from '../hooks/useApi';
 import type { IndicatorRecommendation } from '../types';
 import useAppStore from '../store/useAppStore';
+import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
@@ -54,9 +55,9 @@ function Indicators() {
   const { data: kbSummary, isLoading: kbLoading } = useKnowledgeBaseSummary();
   const { data: routeProject } = useProject(routeProjectId || '');
   const recommendMutation = useRecommendIndicators();
-  const toast = useToast();
+  const toast = useAppToast();
 
-  const { currentProject, selectedIndicators, addSelectedIndicator, removeSelectedIndicator, clearSelectedIndicators } = useAppStore();
+  const { currentProject, selectedIndicators, addSelectedIndicator, removeSelectedIndicator, clearSelectedIndicators, recommendations, setRecommendations } = useAppStore();
 
   const activeProject = routeProject || currentProject;
 
@@ -74,8 +75,7 @@ function Indicators() {
     }
   }, [activeProject]);
 
-  // Results
-  const [recommendations, setRecommendations] = useState<IndicatorRecommendation[]>([]);
+  // recommendations now from store (persisted across navigation)
 
   const handleRecommend = async () => {
     if (!projectName || selectedDimensions.length === 0) {

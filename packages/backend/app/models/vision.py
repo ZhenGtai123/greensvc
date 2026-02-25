@@ -39,8 +39,11 @@ class VisionAnalysisResponse(BaseModel):
     # Statistics
     statistics: dict = Field(default_factory=dict)
 
-    # Image data (base64 encoded or file paths)
-    images: dict[str, Any] = Field(default_factory=dict)
+    # Image data (bytes from Vision API — excluded from JSON serialization)
+    images: dict[str, Any] = Field(default_factory=dict, exclude=True)
+
+    # Mask file paths (populated after saving masks to disk)
+    mask_paths: dict[str, str] = Field(default_factory=dict)
 
     # Instance detection results
     instances: list[dict] = Field(default_factory=list)

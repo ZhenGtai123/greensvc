@@ -21,7 +21,7 @@ import {
   Progress,
   Alert,
   AlertIcon,
-  useToast,
+  /* useToast — replaced by useAppToast */
   Slider,
   SliderTrack,
   SliderFilledTrack,
@@ -32,13 +32,14 @@ import {
   TabPanels,
   TabPanel,
 } from '@chakra-ui/react';
-import { ScanSearch } from 'lucide-react';
+import { ScanSearch, Download, Eye } from 'lucide-react';
 import { useSemanticConfig, useTaskStatus, useProject } from '../hooks/useApi';
 import api from '../api';
 import type { SemanticClass, UploadedImage } from '../types';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import useAppToast from '../hooks/useAppToast';
 
 function VisionAnalysis() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
@@ -47,7 +48,7 @@ function VisionAnalysis() {
 
   const { data: semanticConfig, isLoading: configLoading } = useSemanticConfig();
   const { data: project, isLoading: projectLoading } = useProject(projectId || '');
-  const toast = useToast();
+  const toast = useAppToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
@@ -66,6 +67,9 @@ function VisionAnalysis() {
   const [analyzing, setAnalyzing] = useState(false);
   const [statistics, setStatistics] = useState<Record<string, unknown> | null>(null);
   const [batchProgress, setBatchProgress] = useState<{current: number; total: number} | null>(null);
+
+  // Mask results: array of {imageId, maskPaths} for each analyzed image
+  const [maskResults, setMaskResults] = useState<Array<{imageId: string; maskPaths: Record<string, string>}>>([]);
 
   // Batch task state
   const [taskId] = useState<string | null>(null);
@@ -132,6 +136,7 @@ function VisionAnalysis() {
     setAnalyzing(true);
     setStatistics(null);
     setBatchProgress(null);
+    setMaskResults([]);
 
     try {
       if (imageSource === 'upload' && selectedFile) {
@@ -153,6 +158,7 @@ function VisionAnalysis() {
       } else if (imageSource === 'project' && selectedProjectImages.length > 0) {
         let processed = 0;
         const allResults: Record<string, unknown>[] = [];
+        const allMasks: Array<{imageId: string; maskPaths: Record<string, string>}> = [];
         const requestPayload = {
           semantic_classes: selectedClasses,
           semantic_countability: countability,
@@ -178,8 +184,13 @@ function VisionAnalysis() {
 
           if (response.data.status === 'success') {
             allResults.push(response.data.statistics);
+            if (response.data.mask_paths && Object.keys(response.data.mask_paths).length > 0) {
+              allMasks.push({ imageId, maskPaths: response.data.mask_paths });
+            }
           }
         }
+
+        setMaskResults(allMasks);
 
         if (allResults.length > 0) {
           setStatistics({
@@ -525,6 +536,96 @@ function VisionAnalysis() {
                       )}
                     </>
                   )}
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Mask Previews */}
+          {maskResults.length > 0 && (
+            <Card>
+              <CardHeader>
+                <HStack justify="space-between">
+                  <Heading size="md">Output Masks</Heading>
+                  <Badge colorScheme="green">{maskResults.reduce((s, r) => s + Object.keys(r.maskPaths).length, 0)} files</Badge>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <VStack align="stretch" spacing={4}>
+                  {maskResults.map(({ imageId, maskPaths }) => {
+                    const img = project?.uploaded_images.find(i => i.image_id === imageId);
+                    return (
+                      <Box key={imageId}>
+                        {maskResults.length > 1 && (
+                          <Text fontSize="sm" fontWeight="semibold" mb={2} color="gray.700">
+                            {img?.filename || imageId}
+                          </Text>
+                        )}
+                        <SimpleGrid columns={3} spacing={2}>
+                          {Object.entries(maskPaths).map(([maskKey]) => {
+                            const maskUrl = `/api/masks/${projectId}/${imageId}/${maskKey}.png`;
+                            const label = maskKey.replace(/_/g, ' ');
+                            return (
+                              <Box key={maskKey} position="relative" borderRadius="md" overflow="hidden" bg="gray.50">
+                                <Image
+                                  src={maskUrl}
+                                  alt={label}
+                                  w="100%"
+                                  h="80px"
+                                  objectFit="cover"
+                                  fallback={
+                                    <Box h="80px" display="flex" alignItems="center" justifyContent="center">
+                                      <Text fontSize="2xs" color="gray.400">{label}</Text>
+                                    </Box>
+                                  }
+                                />
+                                <HStack
+                                  position="absolute"
+                                  bottom={0}
+                                  left={0}
+                                  right={0}
+                                  bg="blackAlpha.600"
+                                  px={1}
+                                  py={0.5}
+                                  justify="space-between"
+                                >
+                                  <Text fontSize="2xs" color="white" noOfLines={1}>{label}</Text>
+                                  <HStack spacing={0}>
+                                    <Button
+                                      as="a"
+                                      href={maskUrl}
+                                      target="_blank"
+                                      size="xs"
+                                      variant="ghost"
+                                      color="white"
+                                      minW="auto"
+                                      p={0}
+                                      _hover={{ bg: 'whiteAlpha.300' }}
+                                    >
+                                      <Eye size={12} />
+                                    </Button>
+                                    <Button
+                                      as="a"
+                                      href={maskUrl}
+                                      download={`${maskKey}.png`}
+                                      size="xs"
+                                      variant="ghost"
+                                      color="white"
+                                      minW="auto"
+                                      p={0}
+                                      _hover={{ bg: 'whiteAlpha.300' }}
+                                    >
+                                      <Download size={12} />
+                                    </Button>
+                                  </HStack>
+                                </HStack>
+                              </Box>
+                            );
+                          })}
+                        </SimpleGrid>
+                      </Box>
+                    );
+                  })}
                 </VStack>
               </CardBody>
             </Card>

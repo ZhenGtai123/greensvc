@@ -16,7 +16,7 @@ import {
   Td,
   IconButton,
   useDisclosure,
-  useToast,
+  /* useToast — replaced by useAppToast */
   Badge,
   HStack,
   Card,
@@ -29,11 +29,12 @@ import { useProjects, useDeleteProject } from '../hooks/useApi';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import useAppToast from '../hooks/useAppToast';
 
 function Projects() {
   const { data: projects, isLoading } = useProjects();
   const deleteProject = useDeleteProject();
-  const toast = useToast();
+  const toast = useAppToast();
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);

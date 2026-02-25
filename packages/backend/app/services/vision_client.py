@@ -43,7 +43,7 @@ class VisionModelClient:
         random.seed(42)
         color_set = set(tuple(c) for c in semantic_colors.values())
 
-        for i in range(21, 100):
+        for i in range(21, 201):
             while True:
                 new_color = [random.randint(30, 255) for _ in range(3)]
                 if tuple(new_color) not in color_set:
@@ -60,7 +60,7 @@ class VisionModelClient:
     def _generate_colors_for_classes(self, num_classes: int) -> dict[str, list[int]]:
         """Generate color mapping for specified number of classes"""
         colors = self._get_default_colors()['semantic_colors']
-        return {str(i): colors.get(str(i), [128, 128, 128]) for i in range(num_classes + 1)}
+        return {str(i): colors.get(str(i), [128, 128, 128]) for i in range(min(num_classes + 1, 201))}
 
     async def check_health(self) -> bool:
         """Check API health status with caching"""
@@ -157,6 +157,7 @@ class VisionModelClient:
                     )
 
             elapsed_time = time.time() - start_time
+            logger.info("Vision API responded: status=%d elapsed=%.1fs image=%s", response.status_code, elapsed_time, path.name)
 
             if response.status_code == 200:
                 result = response.json()
@@ -228,8 +229,8 @@ class VisionModelClient:
         if not semantic_classes:
             return False, "Semantic classes list cannot be empty"
 
-        if len(semantic_classes) > 99:
-            return False, f"Class count ({len(semantic_classes)}) exceeds maximum (99)"
+        if len(semantic_classes) > 200:
+            return False, f"Class count ({len(semantic_classes)}) exceeds maximum (200)"
 
         if len(semantic_countability) != len(semantic_classes):
             return False, f"Countability length ({len(semantic_countability)}) doesn't match classes ({len(semantic_classes)})"
