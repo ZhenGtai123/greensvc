@@ -1,11 +1,9 @@
 import { useState, useRef } from 'react';
 import {
   Box,
-  Container,
   Heading,
   Button,
   SimpleGrid,
-  Card,
   CardHeader,
   CardBody,
   Badge,
@@ -24,8 +22,12 @@ import {
   VStack,
   HStack,
 } from '@chakra-ui/react';
+import { Code2, Trash2, Upload } from 'lucide-react';
 import { useCalculators, useUploadCalculator } from '../hooks/useApi';
 import api from '../api';
+import PageShell from '../components/PageShell';
+import PageHeader from '../components/PageHeader';
+import AnimatedCard from '../components/AnimatedCard';
 
 function Calculators() {
   const { data: calculators, isLoading, refetch } = useCalculators();
@@ -45,7 +47,7 @@ function Calculators() {
     try {
       const response = await api.metrics.getCode(id);
       setCode(response.data.code);
-    } catch (error) {
+    } catch {
       toast({ title: 'Failed to load code', status: 'error' });
       setCode('// Failed to load code');
     }
@@ -60,11 +62,10 @@ function Calculators() {
       await uploadCalculator.mutateAsync(file);
       toast({ title: 'Calculator uploaded successfully', status: 'success' });
       refetch();
-    } catch (error) {
+    } catch {
       toast({ title: 'Failed to upload calculator', status: 'error' });
     }
 
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -76,59 +77,50 @@ function Calculators() {
         await api.metrics.delete(id);
         toast({ title: 'Calculator deleted', status: 'success' });
         refetch();
-      } catch (error) {
+      } catch {
         toast({ title: 'Failed to delete calculator', status: 'error' });
       }
     }
   };
 
-  if (isLoading) {
-    return (
-      <Container maxW="container.xl" py={8} textAlign="center">
-        <Spinner size="xl" />
-      </Container>
-    );
-  }
-
   return (
-    <Container maxW="container.xl" py={8}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={6}>
-        <Heading>Calculators</Heading>
-        <HStack>
-          <Input
-            ref={fileInputRef}
-            type="file"
-            accept=".py"
-            display="none"
-            onChange={handleUpload}
-          />
-          <Button
-            colorScheme="blue"
-            onClick={() => fileInputRef.current?.click()}
-            isLoading={uploadCalculator.isPending}
-          >
-            Upload Calculator
-          </Button>
-        </HStack>
-      </Box>
+    <PageShell isLoading={isLoading} loadingText="Loading calculators...">
+      <PageHeader title="Calculators">
+        <Input
+          ref={fileInputRef}
+          type="file"
+          accept=".py"
+          display="none"
+          onChange={handleUpload}
+        />
+        <Button
+          colorScheme="blue"
+          onClick={() => fileInputRef.current?.click()}
+          isLoading={uploadCalculator.isPending}
+          leftIcon={<Upload size={16} />}
+        >
+          Upload Calculator
+        </Button>
+      </PageHeader>
 
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-        {calculators?.map((calc) => (
-          <Card key={calc.id}>
+        {calculators?.map((calc, i) => (
+          <AnimatedCard key={calc.id} hoverable delay={i * 0.05}>
             <CardHeader pb={2}>
               <HStack justify="space-between">
                 <Badge colorScheme="blue" fontSize="md">
                   {calc.id}
                 </Badge>
                 <HStack>
-                  <Button size="xs" onClick={() => handleViewCode(calc.id)}>
-                    View Code
+                  <Button size="xs" onClick={() => handleViewCode(calc.id)} leftIcon={<Code2 size={12} />}>
+                    Code
                   </Button>
                   <Button
                     size="xs"
                     colorScheme="red"
                     variant="ghost"
                     onClick={() => handleDelete(calc.id)}
+                    leftIcon={<Trash2 size={12} />}
                   >
                     Delete
                   </Button>
@@ -172,7 +164,7 @@ function Calculators() {
                 )}
               </VStack>
             </CardBody>
-          </Card>
+          </AnimatedCard>
         ))}
       </SimpleGrid>
 
@@ -204,7 +196,7 @@ function Calculators() {
           </ModalBody>
         </ModalContent>
       </Modal>
-    </Container>
+    </PageShell>
   );
 }
 

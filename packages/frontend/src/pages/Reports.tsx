@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Box,
-  Container,
   Heading,
   Button,
   VStack,
@@ -31,9 +30,13 @@ import {
   StatHelpText,
   Divider,
 } from '@chakra-ui/react';
+import { Download } from 'lucide-react';
 import { useCalculators, useProjects, useProject } from '../hooks/useApi';
 import useAppStore from '../store/useAppStore';
 import api from '../api';
+import PageShell from '../components/PageShell';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 interface CalculationSummary {
   indicator_id: string;
@@ -59,19 +62,16 @@ function Reports() {
   const [selectedCalculator, setSelectedCalculator] = useState('');
   const [imagePaths, setImagePaths] = useState('');
 
-  // Project image source — route project takes priority
   const [selectedProjectId, setSelectedProjectId] = useState(routeProjectId || currentProject?.id || '');
   const { data: projects } = useProjects();
   const { data: selectedProject } = useProject(selectedProjectId);
 
-  // Sync route project ID
   useEffect(() => {
     if (routeProjectId) {
       setSelectedProjectId(routeProjectId);
     }
   }, [routeProjectId]);
 
-  // Auto-fill image paths from selected project
   useEffect(() => {
     if (selectedProject) {
       const paths = selectedProject.uploaded_images
@@ -85,7 +85,6 @@ function Reports() {
     }
   }, [selectedProject]);
 
-  // Auto-select first recommended calculator from store (once)
   const recommendedIds = selectedIndicators.map(i => i.indicator_id);
   const calcSynced = useRef(false);
   useEffect(() => {
@@ -169,13 +168,12 @@ function Reports() {
   };
 
   return (
-    <Container maxW="container.xl" py={8}>
-      <Heading mb={6}>Report Generation</Heading>
+    <PageShell>
+      <PageHeader title="Report Generation" />
 
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
         {/* Left: Configuration */}
         <VStack spacing={6} align="stretch">
-          {/* Selected Indicators from Recommendation */}
           {selectedIndicators.length > 0 && (
             <Alert status="info">
               <AlertIcon />
@@ -275,7 +273,7 @@ function Reports() {
                 <CardHeader>
                   <HStack justify="space-between">
                     <Heading size="md">Results Summary</Heading>
-                    <Button size="sm" onClick={handleExportJson}>
+                    <Button size="sm" onClick={handleExportJson} leftIcon={<Download size={14} />}>
                       Export JSON
                     </Button>
                   </HStack>
@@ -329,7 +327,6 @@ function Reports() {
                 </CardBody>
               </Card>
 
-              {/* Raw Results Table */}
               {rawResults.length > 0 && (
                 <Card>
                   <CardHeader>
@@ -376,18 +373,15 @@ function Reports() {
           )}
 
           {!calculating && !results && (
-            <Card>
-              <CardBody textAlign="center" py={10}>
-                <Text color="gray.500">
-                  Select a calculator and enter image paths to generate reports.
-                </Text>
-              </CardBody>
-            </Card>
+            <EmptyState
+              icon={Download}
+              title="No results yet"
+              description="Select a calculator and enter image paths to generate reports."
+            />
           )}
         </VStack>
       </SimpleGrid>
 
-      {/* Navigation button for pipeline mode */}
       {routeProjectId && (
         <HStack justify="space-between" mt={6}>
           <Button as={Link} to={`/projects/${routeProjectId}/analysis`} variant="outline">
@@ -398,7 +392,7 @@ function Reports() {
           </Button>
         </HStack>
       )}
-    </Container>
+    </PageShell>
   );
 }
 

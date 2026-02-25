@@ -237,6 +237,10 @@ async def run_project_pipeline(
                         calc_fail += 1
                         logger.error("Layer calc exception %s/%s on %s: %s", ind_id, layer, img.image_id, e)
 
+    # Persist calculated metrics to SQLite
+    if calc_ok > 0:
+        projects_store.save(project)
+
     steps.append(ProjectPipelineProgress(
         step="run_calculations",
         status="completed" if calc_ok > 0 or calc_run == 0 else "failed",

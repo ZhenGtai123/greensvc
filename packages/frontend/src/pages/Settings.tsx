@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   Box,
-  Container,
   Heading,
   Button,
   VStack,
@@ -15,15 +14,17 @@ import {
   Text,
   Badge,
   useToast,
-  Spinner,
   Divider,
   Code,
   Select,
 } from '@chakra-ui/react';
+import { Server, Eye, Brain, Database } from 'lucide-react';
 import { useConfig, useHealth, useKnowledgeBaseSummary, useLLMProviders, queryKeys } from '../hooks/useApi';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../api';
 import type { LLMProviderInfo } from '../types';
+import PageShell from '../components/PageShell';
+import PageHeader from '../components/PageHeader';
 
 function Settings() {
   const { data: config, isLoading: configLoading } = useConfig();
@@ -50,7 +51,7 @@ function Settings() {
         title: response.data.healthy ? 'Vision API connected' : 'Vision API not available',
         status: response.data.healthy ? 'success' : 'warning',
       });
-    } catch (error) {
+    } catch {
       setVisionHealthy(false);
       toast({ title: 'Failed to connect to Vision API', status: 'error' });
     }
@@ -68,7 +69,7 @@ function Settings() {
           : 'LLM not configured',
         status: response.data.configured ? 'success' : 'warning',
       });
-    } catch (error) {
+    } catch {
       setLlmStatus(null);
       toast({ title: 'Failed to test LLM connection', status: 'error' });
     }
@@ -84,7 +85,6 @@ function Settings() {
         description: `Model: ${response.data.model}`,
         status: 'success',
       });
-      // Refresh providers and config
       queryClient.invalidateQueries({ queryKey: queryKeys.llmProviders });
       queryClient.invalidateQueries({ queryKey: queryKeys.config });
       setLlmStatus(null);
@@ -95,17 +95,9 @@ function Settings() {
     setSwitchingProvider(false);
   };
 
-  if (configLoading) {
-    return (
-      <Container maxW="container.xl" py={8} textAlign="center">
-        <Spinner size="xl" />
-      </Container>
-    );
-  }
-
   return (
-    <Container maxW="container.xl" py={8}>
-      <Heading mb={6}>Settings</Heading>
+    <PageShell isLoading={configLoading} loadingText="Loading settings...">
+      <PageHeader title="Settings" />
 
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
         {/* System Status */}
@@ -116,14 +108,20 @@ function Settings() {
           <CardBody>
             <VStack align="stretch" spacing={4}>
               <HStack justify="space-between">
-                <Text>Backend API</Text>
+                <HStack spacing={2}>
+                  <Server size={16} />
+                  <Text>Backend API</Text>
+                </HStack>
                 <Badge colorScheme={health?.status === 'healthy' ? 'green' : 'red'}>
                   {health?.status || 'Unknown'}
                 </Badge>
               </HStack>
 
               <HStack justify="space-between">
-                <Text>Vision API</Text>
+                <HStack spacing={2}>
+                  <Eye size={16} />
+                  <Text>Vision API</Text>
+                </HStack>
                 <HStack>
                   {visionHealthy !== null && (
                     <Badge colorScheme={visionHealthy ? 'green' : 'red'}>
@@ -137,7 +135,10 @@ function Settings() {
               </HStack>
 
               <HStack justify="space-between">
-                <Text>LLM Provider</Text>
+                <HStack spacing={2}>
+                  <Brain size={16} />
+                  <Text>LLM Provider</Text>
+                </HStack>
                 <HStack>
                   {llmStatus !== null && (
                     <Badge colorScheme={llmStatus.configured ? 'green' : 'yellow'}>
@@ -153,7 +154,10 @@ function Settings() {
               <Divider />
 
               <HStack justify="space-between">
-                <Text>Knowledge Base</Text>
+                <HStack spacing={2}>
+                  <Database size={16} />
+                  <Text>Knowledge Base</Text>
+                </HStack>
                 <Badge colorScheme={kbSummary?.loaded ? 'green' : 'yellow'}>
                   {kbSummary?.loaded ? `${kbSummary.total_evidence} records` : 'Not Loaded'}
                 </Badge>
@@ -316,7 +320,7 @@ function Settings() {
           </CardBody>
         </Card>
       </SimpleGrid>
-    </Container>
+    </PageShell>
   );
 }
 

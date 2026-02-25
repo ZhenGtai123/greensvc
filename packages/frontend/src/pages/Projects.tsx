@@ -1,6 +1,12 @@
+import { useRef } from 'react';
 import {
-  Container,
-  Heading,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  Box,
   Button,
   Table,
   Thead,
@@ -9,114 +15,161 @@ import {
   Th,
   Td,
   IconButton,
+  useDisclosure,
   useToast,
-  Spinner,
   Badge,
   HStack,
+  Card,
+  CardBody,
 } from '@chakra-ui/react';
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Plus, Eye, Trash2, FolderPlus } from 'lucide-react';
 import { useProjects, useDeleteProject } from '../hooks/useApi';
+import PageShell from '../components/PageShell';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 function Projects() {
   const { data: projects, isLoading } = useProjects();
   const deleteProject = useDeleteProject();
   const toast = useToast();
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this project?')) {
-      try {
-        await deleteProject.mutateAsync(id);
-        toast({ title: 'Project deleted', status: 'success' });
-      } catch (error) {
-        toast({ title: 'Failed to delete project', status: 'error' });
-      }
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  const askDelete = (id: string) => {
+    setPendingDeleteId(id);
+    onOpen();
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    try {
+      await deleteProject.mutateAsync(pendingDeleteId);
+      toast({ title: 'Project deleted', status: 'success' });
+    } catch {
+      toast({ title: 'Failed to delete project', status: 'error' });
+    } finally {
+      onClose();
+      setPendingDeleteId(null);
     }
   };
 
-  if (isLoading) {
-    return (
-      <Container maxW="container.xl" py={8} textAlign="center">
-        <Spinner size="xl" />
-      </Container>
-    );
-  }
-
   return (
-    <Container maxW="container.xl" py={8}>
-      <HStack justify="space-between" mb={6}>
-        <Heading>Projects</Heading>
-        <Button as={Link} to="/projects/new" colorScheme="blue">
-          + New Project
+    <PageShell isLoading={isLoading} loadingText="Loading projects...">
+      <PageHeader title="Projects">
+        <Button as={Link} to="/projects/new" colorScheme="green" leftIcon={<Plus size={16} />}>
+          New Project
         </Button>
-      </HStack>
+      </PageHeader>
 
-      <Table variant="simple">
-        <Thead>
-          <Tr>
-            <Th>ID</Th>
-            <Th>Name</Th>
-            <Th>Location</Th>
-            <Th>Scale</Th>
-            <Th>Zones</Th>
-            <Th>Images</Th>
-            <Th>Actions</Th>
-          </Tr>
-        </Thead>
-        <Tbody>
-          {projects?.map((project) => (
-            <Tr key={project.id} _hover={{ bg: 'gray.50' }}>
-              <Td>
-                <Badge>{project.id}</Badge>
-              </Td>
-              <Td>
-                <Button
-                  as={Link}
-                  to={`/projects/${project.id}`}
-                  variant="link"
-                  colorScheme="blue"
-                  fontWeight="bold"
-                >
-                  {project.project_name}
-                </Button>
-              </Td>
-              <Td>{project.project_location || '-'}</Td>
-              <Td>{project.site_scale || '-'}</Td>
-              <Td>{project.spatial_zones?.length ?? 0}</Td>
-              <Td>{project.uploaded_images?.length ?? 0}</Td>
-              <Td>
-                <HStack>
-                  <Button
-                    as={Link}
-                    to={`/projects/${project.id}`}
-                    size="sm"
-                    colorScheme="blue"
-                    variant="ghost"
-                  >
-                    View
-                  </Button>
-                  <IconButton
-                    aria-label="Delete project"
-                    icon={<span>🗑️</span>}
-                    size="sm"
-                    colorScheme="red"
-                    variant="ghost"
-                    onClick={() => handleDelete(project.id)}
-                  />
-                </HStack>
-              </Td>
-            </Tr>
-          ))}
-          {projects?.length === 0 && (
-            <Tr>
-              <Td colSpan={7} textAlign="center" color="gray.500">
-                No projects yet. Create one to get started.
-              </Td>
-            </Tr>
-          )}
-        </Tbody>
-      </Table>
+      {projects?.length === 0 ? (
+        <EmptyState
+          icon={FolderPlus}
+          title="No projects yet"
+          description="Create one to get started."
+        >
+          <Button as={Link} to="/projects/new" colorScheme="green" leftIcon={<Plus size={16} />}>
+            New Project
+          </Button>
+        </EmptyState>
+      ) : (
+        <Card>
+          <CardBody p={0}>
+            <Box overflowX="auto">
+              <Table variant="simple">
+                <Thead>
+                  <Tr>
+                    <Th>ID</Th>
+                    <Th>Name</Th>
+                    <Th>Location</Th>
+                    <Th>Scale</Th>
+                    <Th>Zones</Th>
+                    <Th>Images</Th>
+                    <Th>Actions</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {projects?.map((project) => (
+                    <Tr key={project.id}>
+                      <Td>
+                        <Badge>{project.id}</Badge>
+                      </Td>
+                      <Td>
+                        <Button
+                          as={Link}
+                          to={`/projects/${project.id}`}
+                          variant="link"
+                          colorScheme="blue"
+                          fontWeight="bold"
+                        >
+                          {project.project_name}
+                        </Button>
+                      </Td>
+                      <Td>{project.project_location || '-'}</Td>
+                      <Td>{project.site_scale || '-'}</Td>
+                      <Td>{project.spatial_zones?.length ?? 0}</Td>
+                      <Td>{project.uploaded_images?.length ?? 0}</Td>
+                      <Td>
+                        <HStack>
+                          <Button
+                            as={Link}
+                            to={`/projects/${project.id}`}
+                            size="sm"
+                            colorScheme="blue"
+                            variant="ghost"
+                            leftIcon={<Eye size={14} />}
+                          >
+                            View
+                          </Button>
+                          <IconButton
+                            aria-label="Delete project"
+                            icon={<Trash2 size={14} />}
+                            size="sm"
+                            colorScheme="red"
+                            variant="ghost"
+                            onClick={() => askDelete(project.id)}
+                          />
+                        </HStack>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </Box>
+          </CardBody>
+        </Card>
+      )}
 
-    </Container>
+      {/* Delete confirmation dialog */}
+      <AlertDialog isOpen={isOpen} leastDestructiveRef={cancelRef} onClose={onClose}>
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Delete Project
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              Are you sure? This action cannot be undone.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                colorScheme="red"
+                onClick={confirmDelete}
+                ml={3}
+                isLoading={deleteProject.isPending}
+              >
+                Delete
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+    </PageShell>
   );
 }
 

@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File, Form, Query
 
 from app.api.deps import get_vision_client, get_settings_dep
 from app.core.config import Settings
@@ -148,15 +148,16 @@ async def analyze_image_by_path(
                     if img.image_id == image_id:
                         img.mask_filepaths.update(saved)
                         break
+                projects_store.save(project)
 
     return result
 
 
 @router.post("/analyze/project-image", response_model=VisionAnalysisResponse)
 async def analyze_project_image(
-    project_id: str,
-    image_id: str,
-    request: VisionAnalysisRequest,
+    project_id: str = Query(...),
+    image_id: str = Query(...),
+    request: VisionAnalysisRequest = Body(...),
     vision_client: VisionModelClient = Depends(get_vision_client),
     settings: Settings = Depends(get_settings_dep),
 ):
@@ -184,6 +185,10 @@ async def analyze_project_image(
         raise HTTPException(status_code=404, detail=f"Image file not found on disk: {img.filepath}")
 
     # Validate parameters
+    logger.debug(
+        "analyze_project_image: classes=%d, countability=%d, openness=%d",
+        len(request.semantic_classes), len(request.semantic_countability), len(request.openness_list),
+    )
     valid, error = vision_client.validate_parameters(
         request.semantic_classes,
         request.semantic_countability,
@@ -199,6 +204,7 @@ async def analyze_project_image(
     if result.status == "success" and result.images:
         saved = await _save_masks_to_project(result, project_id, image_id, settings)
         img.mask_filepaths.update(saved)
+        projects_store.save(project)
         logger.info("Saved %d masks for project %s image %s", len(saved), project_id, image_id)
 
     return result

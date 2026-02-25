@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useSearchParams, useParams, Link } from 'react-router-dom';
 import {
   Box,
-  Container,
   Heading,
   Button,
   VStack,
@@ -23,7 +22,6 @@ import {
   Alert,
   AlertIcon,
   useToast,
-  Spinner,
   Slider,
   SliderTrack,
   SliderFilledTrack,
@@ -34,9 +32,13 @@ import {
   TabPanels,
   TabPanel,
 } from '@chakra-ui/react';
+import { ScanSearch } from 'lucide-react';
 import { useSemanticConfig, useTaskStatus, useProject } from '../hooks/useApi';
 import api from '../api';
 import type { SemanticClass, UploadedImage } from '../types';
+import PageShell from '../components/PageShell';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 function VisionAnalysis() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
@@ -133,7 +135,6 @@ function VisionAnalysis() {
 
     try {
       if (imageSource === 'upload' && selectedFile) {
-        // Single file upload analysis
         const response = await api.vision.analyze(selectedFile, {
           semantic_classes: selectedClasses,
           semantic_countability: countability,
@@ -150,7 +151,6 @@ function VisionAnalysis() {
           toast({ title: response.data.error || 'Analysis failed', status: 'error' });
         }
       } else if (imageSource === 'project' && selectedProjectImages.length > 0) {
-        // Batch analysis using project images
         let processed = 0;
         const allResults: Record<string, unknown>[] = [];
         const requestPayload = {
@@ -168,10 +168,8 @@ function VisionAnalysis() {
 
           let response;
           if (projectId) {
-            // Project-aware endpoint: persists masks to project
             response = await api.vision.analyzeProjectImage(projectId, imageId, requestPayload);
           } else {
-            // Fallback to path-based analysis
             response = await api.vision.analyzeByPath(img.filepath, requestPayload);
           }
 
@@ -183,7 +181,6 @@ function VisionAnalysis() {
           }
         }
 
-        // Aggregate results
         if (allResults.length > 0) {
           setStatistics({
             images_processed: allResults.length,
@@ -207,19 +204,11 @@ function VisionAnalysis() {
     setBatchProgress(null);
   };
 
-  if (configLoading || (projectId && projectLoading)) {
-    return (
-      <Container maxW="container.xl" py={8} textAlign="center">
-        <Spinner size="xl" />
-        <Text mt={4}>Loading...</Text>
-      </Container>
-    );
-  }
+  const isPageLoading = configLoading || (projectId && projectLoading);
 
   return (
-    <Container maxW="container.xl" py={8}>
-      <HStack justify="space-between" mb={6}>
-        <Heading>Vision Analysis</Heading>
+    <PageShell isLoading={!!isPageLoading} loadingText="Loading...">
+      <PageHeader title="Vision Analysis">
         {project && (
           <HStack>
             <Text color="gray.500">Project:</Text>
@@ -228,7 +217,7 @@ function VisionAnalysis() {
             </Button>
           </HStack>
         )}
-      </HStack>
+      </PageHeader>
 
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
         {/* Left: Configuration */}
@@ -499,7 +488,6 @@ function VisionAnalysis() {
               <CardBody>
                 <VStack align="stretch" spacing={3}>
                   {(statistics as Record<string, number>).images_processed !== undefined ? (
-                    // Batch results
                     <>
                       <HStack justify="space-between">
                         <Text>Images Processed:</Text>
@@ -512,7 +500,6 @@ function VisionAnalysis() {
                       </Text>
                     </>
                   ) : (
-                    // Single image results
                     <>
                       <HStack justify="space-between">
                         <Text>Detected Classes:</Text>
@@ -544,15 +531,13 @@ function VisionAnalysis() {
           )}
 
           {!analyzing && !statistics && (
-            <Card>
-              <CardBody textAlign="center" py={10}>
-                <Text color="gray.500">
-                  {project
-                    ? 'Select images from the project, choose classes, then click Analyze.'
-                    : 'Select an image and classes, then click Analyze to see results.'}
-                </Text>
-              </CardBody>
-            </Card>
+            <EmptyState
+              icon={ScanSearch}
+              title="No results yet"
+              description={project
+                ? 'Select images from the project, choose classes, then click Analyze.'
+                : 'Select an image and classes, then click Analyze to see results.'}
+            />
           )}
         </VStack>
       </SimpleGrid>
@@ -568,7 +553,7 @@ function VisionAnalysis() {
           </Button>
         </HStack>
       )}
-    </Container>
+    </PageShell>
   );
 }
 

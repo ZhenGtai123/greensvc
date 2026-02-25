@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Box,
-  Container,
   Heading,
   Button,
   VStack,
@@ -27,11 +26,30 @@ import {
   Collapse,
   useDisclosure,
   Image,
-  Spinner,
 } from '@chakra-ui/react';
+import {
+  ClipboardList,
+  Globe,
+  Target,
+  Map,
+  Link2,
+  ImagePlus,
+  X,
+  Eye,
+  Footprints,
+  Thermometer,
+  DollarSign,
+  Leaf,
+  Heart,
+  Users,
+  ChevronUp,
+  ChevronDown,
+  Plus,
+} from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../api';
+import PageShell from '../components/PageShell';
 
 // ============ Constants ============
 
@@ -113,13 +131,13 @@ const AGE_GROUPS = [
 ];
 
 const PERFORMANCE_DIMENSIONS = [
-  { id: 'PRF_AES', name: 'Visual-Spatial Quality', icon: '👁️', desc: 'Aesthetic quality and spatial legibility' },
-  { id: 'PRF_BEH', name: 'Use, Accessibility & Safety', icon: '🚶', desc: 'Use patterns, accessibility, safety' },
-  { id: 'PRF_COM', name: 'Comfort', icon: '😌', desc: 'Thermal and composite comfort' },
-  { id: 'PRF_ECO', name: 'Economic Value', icon: '💶', desc: 'Financial value and economic return' },
-  { id: 'PRF_ENV', name: 'Environmental Quality', icon: '🌿', desc: 'Air quality and environmental measures' },
-  { id: 'PRF_HLT', name: 'Health & Wellbeing', icon: '🧠', desc: 'Physical and psychological health' },
-  { id: 'PRF_SOC', name: 'Social Outcomes & Equity', icon: '🤝', desc: 'Social interaction and equity' },
+  { id: 'PRF_AES', name: 'Visual-Spatial Quality', icon: Eye, desc: 'Aesthetic quality and spatial legibility' },
+  { id: 'PRF_BEH', name: 'Use, Accessibility & Safety', icon: Footprints, desc: 'Use patterns, accessibility, safety' },
+  { id: 'PRF_COM', name: 'Comfort', icon: Thermometer, desc: 'Thermal and composite comfort' },
+  { id: 'PRF_ECO', name: 'Economic Value', icon: DollarSign, desc: 'Financial value and economic return' },
+  { id: 'PRF_ENV', name: 'Environmental Quality', icon: Leaf, desc: 'Air quality and environmental measures' },
+  { id: 'PRF_HLT', name: 'Health & Wellbeing', icon: Heart, desc: 'Physical and psychological health' },
+  { id: 'PRF_SOC', name: 'Social Outcomes & Equity', icon: Users, desc: 'Social interaction and equity' },
 ];
 
 const DEFAULT_ZONE_TYPES = [
@@ -141,6 +159,22 @@ const DEFAULT_RELATION_TYPES = [
   { id: 'visual', name: 'Visual Connection', color: '#f59e0b', style: 'dashed' },
   { id: 'functional', name: 'Functional Link', color: '#ef4444', style: 'dotted' },
 ];
+
+// ============ Section Title ============
+
+function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle: string }) {
+  return (
+    <HStack>
+      <Box p={2} borderRadius="lg" bg="brand.50">
+        <Icon size={20} color="var(--chakra-colors-brand-600)" />
+      </Box>
+      <Box>
+        <Heading size="md">{title}</Heading>
+        <Text fontSize="sm" color="gray.500">{subtitle}</Text>
+      </Box>
+    </HStack>
+  );
+}
 
 // ============ Types ============
 
@@ -231,7 +265,6 @@ function ProjectWizard() {
       api.projects.get(projectId)
         .then((res) => {
           const project = res.data;
-          // Populate form fields
           setProjectName(project.project_name);
           setProjectLocation(project.project_location || '');
           setSiteScale(project.site_scale || '');
@@ -244,7 +277,6 @@ function ProjectWizard() {
           setDesignBrief(project.design_brief || '');
           setSelectedDimensions(project.performance_dimensions || []);
 
-          // Load zones
           const loadedZones: SpatialZone[] = (project.spatial_zones || []).map((z: { zone_id: string; zone_name: string; zone_types?: string[]; area?: number; status?: string; description?: string }) => ({
             id: z.zone_id,
             name: z.zone_name,
@@ -255,7 +287,6 @@ function ProjectWizard() {
           }));
           setZones(loadedZones);
 
-          // Load relations
           const loadedRelations: SpatialRelation[] = (project.spatial_relations || []).map((r: { from_zone: string; to_zone: string; relation_type: string; direction?: string }, idx: number) => ({
             id: `rel_${idx}`,
             fromZone: r.from_zone,
@@ -265,7 +296,6 @@ function ProjectWizard() {
           }));
           setRelations(loadedRelations);
 
-          // Load existing images and remember original zone assignments
           const imgs = project.uploaded_images || [];
           setExistingImages(imgs);
           const zoneMap: Record<string, string | null> = {};
@@ -303,9 +333,7 @@ function ProjectWizard() {
 
   const removeZone = (id: string) => {
     setZones(prev => prev.filter(z => z.id !== id));
-    // Also remove any relations involving this zone
     setRelations(prev => prev.filter(r => r.fromZone !== id && r.toZone !== id));
-    // Move images back to ungrouped
     setImages(prev => prev.map(img => img.zoneId === id ? { ...img, zoneId: null } : img));
   };
 
@@ -323,7 +351,6 @@ function ProjectWizard() {
   // ============ Relation Functions ============
 
   const addRelation = (fromZone: string, toZone: string, relationType: string, direction: 'single' | 'double') => {
-    // Check if relation already exists
     const exists = relations.some(r =>
       r.fromZone === fromZone && r.toZone === toZone && r.relationType === relationType
     );
@@ -426,11 +453,9 @@ function ProjectWizard() {
       let savedProjectId: string;
 
       if (isEditMode && projectId) {
-        // Update existing project
         await api.projects.update(projectId, projectData);
         savedProjectId = projectId;
 
-        // Batch update zone assignments for images that actually changed
         const changedAssignments = existingImages
           .filter(img => (img.zone_id ?? null) !== (originalZoneMap.current[img.image_id] ?? null))
           .map(img => ({ image_id: img.image_id, zone_id: img.zone_id }));
@@ -438,14 +463,11 @@ function ProjectWizard() {
           await api.projects.batchAssignZones(projectId, changedAssignments);
         }
       } else {
-        // Create new project
         const response = await api.projects.create(projectData);
         savedProjectId = response.data.id;
       }
 
-      // Upload new images if any
       if (images.length > 0) {
-        // Group images by zone
         const imagesByZone: Record<string, File[]> = {};
 
         for (const img of images) {
@@ -456,14 +478,12 @@ function ProjectWizard() {
           imagesByZone[zoneKey].push(img.file);
         }
 
-        // Upload images for each zone
         for (const [zoneKey, files] of Object.entries(imagesByZone)) {
           const zoneId = zoneKey === '__ungrouped__' ? undefined : zoneKey;
           await api.projects.uploadImages(savedProjectId, files, zoneId);
         }
       }
 
-      // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['project', savedProjectId] });
 
@@ -473,7 +493,7 @@ function ProjectWizard() {
       });
 
       navigate(`/projects/${savedProjectId}`);
-    } catch (error) {
+    } catch {
       toast({
         title: isEditMode ? 'Failed to update project' : 'Failed to create project',
         status: 'error',
@@ -487,11 +507,9 @@ function ProjectWizard() {
   const ungroupedImages = images.filter(img => !img.zoneId);
   const getZoneImages = (zoneId: string) => images.filter(img => img.zoneId === zoneId);
 
-  // Existing images helpers
   const ungroupedExistingImages = existingImages.filter(img => !img.zone_id);
   const getZoneExistingImages = (zoneId: string) => existingImages.filter(img => img.zone_id === zoneId);
 
-  // Handle drag-drop for existing images
   const handleExistingImageDrop = useCallback((e: React.DragEvent, targetZoneId: string | null) => {
     e.preventDefault();
     if (!draggedExistingImageId) return;
@@ -502,7 +520,6 @@ function ProjectWizard() {
     setDraggedExistingImageId(null);
   }, [draggedExistingImageId]);
 
-  // Handle delete existing image
   const handleDeleteExistingImage = async (imageId: string) => {
     if (!projectId) return;
     try {
@@ -514,17 +531,8 @@ function ProjectWizard() {
     }
   };
 
-  if (loading) {
-    return (
-      <Container maxW="container.xl" py={8} textAlign="center">
-        <Spinner size="xl" />
-        <Text mt={4}>Loading project...</Text>
-      </Container>
-    );
-  }
-
   return (
-    <Container maxW="container.xl" py={8}>
+    <PageShell isLoading={loading} loadingText="Loading project...">
       {/* Header */}
       <Box textAlign="center" mb={8}>
         <Heading size="lg">{isEditMode ? 'Edit Project' : 'Create New Project'}</Heading>
@@ -537,13 +545,7 @@ function ProjectWizard() {
         {/* Section 1: Project Information */}
         <Card>
           <CardHeader>
-            <HStack>
-              <Text fontSize="xl">📋</Text>
-              <Box>
-                <Heading size="md">Project Information</Heading>
-                <Text fontSize="sm" color="gray.500">Basic project details</Text>
-              </Box>
-            </HStack>
+            <SectionTitle icon={ClipboardList} title="Project Information" subtitle="Basic project details" />
           </CardHeader>
           <CardBody>
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
@@ -586,13 +588,7 @@ function ProjectWizard() {
         {/* Section 2: Site Context */}
         <Card>
           <CardHeader>
-            <HStack>
-              <Text fontSize="xl">🌍</Text>
-              <Box>
-                <Heading size="md">Site Context</Heading>
-                <Text fontSize="sm" color="gray.500">Climate, setting, and user context</Text>
-              </Box>
-            </HStack>
+            <SectionTitle icon={Globe} title="Site Context" subtitle="Climate, setting, and user context" />
           </CardHeader>
           <CardBody>
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
@@ -643,13 +639,7 @@ function ProjectWizard() {
         {/* Section 3: Performance Goals */}
         <Card>
           <CardHeader>
-            <HStack>
-              <Text fontSize="xl">🎯</Text>
-              <Box>
-                <Heading size="md">Performance Goals</Heading>
-                <Text fontSize="sm" color="gray.500">Select target performance dimensions</Text>
-              </Box>
-            </HStack>
+            <SectionTitle icon={Target} title="Performance Goals" subtitle="Select target performance dimensions" />
           </CardHeader>
           <CardBody>
             <FormControl mb={4}>
@@ -664,39 +654,46 @@ function ProjectWizard() {
 
             <FormLabel mb={2}>Performance Dimensions</FormLabel>
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={3}>
-              {PERFORMANCE_DIMENSIONS.map(dim => (
-                <Box
-                  key={dim.id}
-                  p={3}
-                  borderWidth={2}
-                  borderRadius="lg"
-                  borderColor={selectedDimensions.includes(dim.id) ? 'blue.500' : 'gray.200'}
-                  bg={selectedDimensions.includes(dim.id) ? 'blue.50' : 'white'}
-                  cursor="pointer"
-                  onClick={() => {
-                    setSelectedDimensions(prev =>
-                      prev.includes(dim.id)
-                        ? prev.filter(d => d !== dim.id)
-                        : [...prev, dim.id]
-                    );
-                  }}
-                  _hover={{ borderColor: 'blue.300' }}
-                >
-                  <HStack>
-                    <Checkbox
-                      isChecked={selectedDimensions.includes(dim.id)}
-                      onChange={() => {}}
-                      pointerEvents="none"
-                    />
-                    <Box>
-                      <Text fontWeight="bold" fontSize="sm">
-                        {dim.icon} {dim.name}
-                      </Text>
-                      <Text fontSize="xs" color="gray.500">{dim.desc}</Text>
-                    </Box>
-                  </HStack>
-                </Box>
-              ))}
+              {PERFORMANCE_DIMENSIONS.map(dim => {
+                const DimIcon = dim.icon;
+                return (
+                  <Box
+                    key={dim.id}
+                    p={3}
+                    borderWidth={2}
+                    borderRadius="lg"
+                    borderColor={selectedDimensions.includes(dim.id) ? 'blue.500' : 'gray.200'}
+                    bg={selectedDimensions.includes(dim.id) ? 'blue.50' : 'white'}
+                    cursor="pointer"
+                    onClick={() => {
+                      setSelectedDimensions(prev =>
+                        prev.includes(dim.id)
+                          ? prev.filter(d => d !== dim.id)
+                          : [...prev, dim.id]
+                      );
+                    }}
+                    _hover={{ borderColor: 'blue.300' }}
+                    transition="all 0.15s"
+                  >
+                    <HStack>
+                      <Checkbox
+                        isChecked={selectedDimensions.includes(dim.id)}
+                        onChange={() => {}}
+                        pointerEvents="none"
+                      />
+                      <Box color="brand.600" flexShrink={0}>
+                        <DimIcon size={16} />
+                      </Box>
+                      <Box>
+                        <Text fontWeight="bold" fontSize="sm">
+                          {dim.name}
+                        </Text>
+                        <Text fontSize="xs" color="gray.500">{dim.desc}</Text>
+                      </Box>
+                    </HStack>
+                  </Box>
+                );
+              })}
             </SimpleGrid>
           </CardBody>
         </Card>
@@ -705,15 +702,9 @@ function ProjectWizard() {
         <Card>
           <CardHeader>
             <HStack justify="space-between">
-              <HStack>
-                <Text fontSize="xl">🗺️</Text>
-                <Box>
-                  <Heading size="md">Spatial Zones</Heading>
-                  <Text fontSize="sm" color="gray.500">Define analysis zones and their characteristics</Text>
-                </Box>
-              </HStack>
-              <Button colorScheme="blue" size="sm" onClick={addZone}>
-                + Add Zone
+              <SectionTitle icon={Map} title="Spatial Zones" subtitle="Define analysis zones and their characteristics" />
+              <Button colorScheme="blue" size="sm" onClick={addZone} leftIcon={<Plus size={14} />}>
+                Add Zone
               </Button>
             </HStack>
           </CardHeader>
@@ -814,14 +805,10 @@ function ProjectWizard() {
         <Card>
           <CardHeader cursor="pointer" onClick={toggleRelations}>
             <HStack justify="space-between">
-              <HStack>
-                <Text fontSize="xl">🔗</Text>
-                <Box>
-                  <Heading size="md">Spatial Relations (Optional)</Heading>
-                  <Text fontSize="sm" color="gray.500">Define connections between zones</Text>
-                </Box>
-              </HStack>
-              <Text>{isRelationsOpen ? '▲' : '▼'}</Text>
+              <SectionTitle icon={Link2} title="Spatial Relations (Optional)" subtitle="Define connections between zones" />
+              <Box color="gray.400">
+                {isRelationsOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </Box>
             </HStack>
           </CardHeader>
           <Collapse in={isRelationsOpen}>
@@ -832,7 +819,6 @@ function ProjectWizard() {
                 </Box>
               ) : (
                 <VStack spacing={4} align="stretch">
-                  {/* Add Relation Form */}
                   <SimpleGrid columns={{ base: 1, md: 4 }} spacing={3} p={4} bg="gray.50" borderRadius="lg">
                     <FormControl>
                       <FormLabel fontSize="sm">From Zone</FormLabel>
@@ -878,7 +864,6 @@ function ProjectWizard() {
                     </FormControl>
                   </SimpleGrid>
 
-                  {/* Relations List */}
                   {relations.length > 0 && (
                     <Box>
                       <Text fontWeight="bold" mb={2}>Relations ({relations.length})</Text>
@@ -898,13 +883,18 @@ function ProjectWizard() {
                             >
                               <HStack>
                                 <Badge>{fromZone?.name || rel.fromZone}</Badge>
-                                <Text color={relType?.color}>→</Text>
+                                <Text color={relType?.color}>&rarr;</Text>
                                 <Badge>{toZone?.name || rel.toZone}</Badge>
                                 <Tag size="sm" colorScheme="blue">{relType?.name}</Tag>
                               </HStack>
-                              <Button size="xs" colorScheme="red" variant="ghost" onClick={() => removeRelation(rel.id)}>
-                                ✕
-                              </Button>
+                              <IconButton
+                                aria-label="Remove relation"
+                                icon={<X size={12} />}
+                                size="xs"
+                                colorScheme="red"
+                                variant="ghost"
+                                onClick={() => removeRelation(rel.id)}
+                              />
                             </HStack>
                           );
                         })}
@@ -920,13 +910,7 @@ function ProjectWizard() {
         {/* Section 6: Image Upload */}
         <Card>
           <CardHeader>
-            <HStack>
-              <Text fontSize="xl">📸</Text>
-              <Box>
-                <Heading size="md">Image Upload & Grouping</Heading>
-                <Text fontSize="sm" color="gray.500">Upload site photos and group them by zones</Text>
-              </Box>
-            </HStack>
+            <SectionTitle icon={ImagePlus} title="Image Upload & Grouping" subtitle="Upload site photos and group them by zones" />
           </CardHeader>
           <CardBody>
             {/* Upload Area */}
@@ -938,10 +922,13 @@ function ProjectWizard() {
               textAlign="center"
               cursor="pointer"
               bg="gray.50"
-              _hover={{ borderColor: 'blue.400', bg: 'blue.50' }}
+              _hover={{ borderColor: 'brand.400', bg: 'brand.50' }}
+              transition="all 0.2s ease"
               onClick={() => fileInputRef.current?.click()}
             >
-              <Text fontSize="3xl" mb={2}>📸</Text>
+              <Box color="gray.400" mb={2} display="flex" justifyContent="center">
+                <ImagePlus size={32} />
+              </Box>
               <Text fontWeight="bold">Drag images here or click to select</Text>
               <Text fontSize="sm" color="gray.500">Supports batch upload - JPG/PNG</Text>
               <input
@@ -988,7 +975,6 @@ function ProjectWizard() {
                   }}
                 >
                   <SimpleGrid columns={{ base: 4, md: 8 }} spacing={2}>
-                    {/* Existing images */}
                     {ungroupedExistingImages.map(img => (
                       <Box
                         key={img.image_id}
@@ -1009,11 +995,11 @@ function ProjectWizard() {
                           h="60px"
                           w="100%"
                           objectFit="cover"
-                          fallback={<Box h="60px" bg="gray.200" display="flex" alignItems="center" justifyContent="center"><Text fontSize="xs">📷</Text></Box>}
+                          fallback={<Box h="60px" bg="gray.200" display="flex" alignItems="center" justifyContent="center"><Text fontSize="xs">img</Text></Box>}
                         />
                         <IconButton
                           aria-label="Remove"
-                          icon={<Text>✕</Text>}
+                          icon={<X size={10} />}
                           size="xs"
                           position="absolute"
                           top={1}
@@ -1023,7 +1009,6 @@ function ProjectWizard() {
                         />
                       </Box>
                     ))}
-                    {/* New images */}
                     {ungroupedImages.map(img => (
                       <Box
                         key={img.id}
@@ -1039,7 +1024,7 @@ function ProjectWizard() {
                         <Image src={img.url} alt={img.name} h="60px" w="100%" objectFit="cover" />
                         <IconButton
                           aria-label="Remove"
-                          icon={<Text>✕</Text>}
+                          icon={<X size={10} />}
                           size="xs"
                           position="absolute"
                           top={1}
@@ -1069,10 +1054,11 @@ function ProjectWizard() {
                         p={3}
                         borderWidth={2}
                         borderStyle="dashed"
-                        borderColor={isDragging ? 'green.300' : 'gray.200'}
+                        borderColor={isDragging ? 'brand.300' : 'gray.200'}
                         borderRadius="lg"
-                        bg={isDragging ? 'green.50' : 'white'}
+                        bg={isDragging ? 'brand.50' : 'white'}
                         minH="120px"
+                        transition="all 0.2s ease"
                         onDragOver={handleDragOver}
                         onDrop={(e) => {
                           handleDrop(e, zone.id);
@@ -1085,7 +1071,6 @@ function ProjectWizard() {
                         </HStack>
                         {totalZoneImages > 0 ? (
                           <SimpleGrid columns={4} spacing={1}>
-                            {/* Existing images in zone */}
                             {zoneExistingImages.map(img => (
                               <Box
                                 key={img.image_id}
@@ -1109,7 +1094,6 @@ function ProjectWizard() {
                                 />
                               </Box>
                             ))}
-                            {/* New images in zone */}
                             {zoneImages.map(img => (
                               <Box
                                 key={img.id}
@@ -1149,7 +1133,7 @@ function ProjectWizard() {
           </Button>
         </HStack>
       </VStack>
-    </Container>
+    </PageShell>
   );
 }
 

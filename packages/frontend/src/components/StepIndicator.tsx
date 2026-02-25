@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom';
 import { HStack, Box, Text } from '@chakra-ui/react';
+import { Check } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+const MotionBox = motion.create(Box);
 
 const STEPS = [
   { step: 1, label: 'Vision Analysis', path: 'vision' },
@@ -35,31 +39,50 @@ function StepIndicator({ currentStep, projectId }: StepIndicatorProps) {
               _hover={{ bg: 'gray.50' }}
               textDecoration="none"
             >
-              <Box
-                w={6}
-                h={6}
-                borderRadius="full"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                fontSize="xs"
-                fontWeight="bold"
-                bg={isCompleted ? 'green.500' : isActive ? 'blue.500' : 'gray.200'}
-                color={isCompleted || isActive ? 'white' : 'gray.500'}
-              >
-                {isCompleted ? '\u2713' : s.step}
-              </Box>
+              {isActive ? (
+                <MotionBox
+                  w={8}
+                  h={8}
+                  borderRadius="full"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  fontSize="xs"
+                  fontWeight="bold"
+                  bg="blue.500"
+                  color="white"
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  {s.step}
+                </MotionBox>
+              ) : (
+                <Box
+                  w={8}
+                  h={8}
+                  borderRadius="full"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  fontSize="xs"
+                  fontWeight="bold"
+                  bg={isCompleted ? 'brand.500' : 'gray.200'}
+                  color={isCompleted ? 'white' : 'gray.500'}
+                >
+                  {isCompleted ? <Check size={14} /> : s.step}
+                </Box>
+              )}
               <Text
                 fontSize="sm"
                 fontWeight={isActive ? 'bold' : 'normal'}
-                color={isCompleted ? 'green.600' : isActive ? 'blue.600' : 'gray.500'}
+                color={isCompleted ? 'brand.600' : isActive ? 'blue.600' : 'gray.500'}
                 whiteSpace="nowrap"
               >
                 {s.label}
               </Text>
             </Box>
             {connector && (
-              <Box flex={1} h="2px" bg={isCompleted ? 'green.300' : 'gray.200'} mx={1} />
+              <Box flex={1} h="3px" bg={isCompleted ? 'brand.300' : 'gray.200'} mx={1} borderRadius="full" />
             )}
           </HStack>
         );

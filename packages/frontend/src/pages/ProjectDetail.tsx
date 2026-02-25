@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Box,
-  Container,
+  Flex,
   Heading,
   Button,
   VStack,
@@ -13,7 +13,7 @@ import {
   CardBody,
   Text,
   Badge,
-  Spinner,
+  Circle,
   useToast,
   Tabs,
   TabList,
@@ -31,10 +31,129 @@ import {
   Progress,
   Checkbox,
   Select,
+  Spinner,
 } from '@chakra-ui/react';
+import { ArrowLeft, Upload, X, Undo2, Check, ImageIcon, MapPin } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
 import useAppStore from '../store/useAppStore';
+import type { Project, UploadedImage } from '../types';
+import PageShell from '../components/PageShell';
+import EmptyState from '../components/EmptyState';
+
+/** Build the static-file URL for a project image. */
+function imageUrl(projectId: string, img: UploadedImage): string {
+  return `/api/uploads/${projectId}/${img.image_id}_${img.filename}`;
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline progress card — shows sequential stage status
+// ---------------------------------------------------------------------------
+const STAGES = [
+  { key: 'vision', label: 'Vision Analysis', desc: 'Segment images with AI vision model' },
+  { key: 'indicators', label: 'Indicators', desc: 'Get indicator recommendations' },
+  { key: 'analysis', label: 'Analysis', desc: 'Run zone statistics & design strategies' },
+  { key: 'reports', label: 'Reports', desc: 'Calculate metrics & generate reports' },
+] as const;
+
+function getStageStatus(project: Project) {
+  const hasImages = (project.uploaded_images?.length ?? 0) > 0;
+  const hasZones = (project.spatial_zones?.length ?? 0) > 0;
+  const hasMasks = project.uploaded_images?.some(
+    (img) => img.mask_filepaths && Object.keys(img.mask_filepaths).length > 0,
+  );
+  const hasDimensions = (project.performance_dimensions?.length ?? 0) > 0;
+  const hasMetrics = project.uploaded_images?.some(
+    (img) => img.metrics_results && Object.keys(img.metrics_results).length > 0,
+  );
+
+  return [
+    { done: !!hasMasks, ready: hasImages && hasZones },
+    { done: hasDimensions, ready: true },
+    { done: !!hasMetrics, ready: !!hasMasks && hasDimensions },
+    { done: false, ready: !!hasMetrics },
+  ];
+}
+
+function PipelineCard({ projectId, project }: { projectId: string; project: Project }) {
+  const statuses = getStageStatus(project);
+  const nextIdx = statuses.findIndex((s) => !s.done && s.ready);
+
+  return (
+    <Card>
+      <CardHeader pb={2}>
+        <Heading size="sm">Analysis Pipeline</Heading>
+      </CardHeader>
+      <CardBody pt={0}>
+        <VStack spacing={0} align="stretch">
+          {STAGES.map((stage, i) => {
+            const { done, ready } = statuses[i];
+            const isNext = i === nextIdx;
+            const locked = !done && !ready;
+
+            return (
+              <Flex
+                key={stage.key}
+                align="center"
+                py={3}
+                borderTop={i > 0 ? '1px solid' : 'none'}
+                borderColor="gray.100"
+                opacity={locked ? 0.45 : 1}
+              >
+                <Circle
+                  size="28px"
+                  bg={done ? 'brand.500' : isNext ? 'blue.500' : 'gray.200'}
+                  color={done || isNext ? 'white' : 'gray.500'}
+                  fontSize="xs"
+                  fontWeight="bold"
+                  mr={3}
+                  flexShrink={0}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  {done ? <Check size={14} /> : i + 1}
+                </Circle>
+
+                <Box flex={1} minW={0}>
+                  <Text fontSize="sm" fontWeight="600" color={locked ? 'gray.400' : 'gray.700'}>
+                    {stage.label}
+                  </Text>
+                  <Text fontSize="xs" color="gray.400" noOfLines={1}>
+                    {stage.desc}
+                  </Text>
+                </Box>
+
+                {done ? (
+                  <Button
+                    as={Link}
+                    to={`/projects/${projectId}/${stage.key}`}
+                    size="xs"
+                    variant="ghost"
+                    colorScheme="green"
+                    flexShrink={0}
+                  >
+                    View
+                  </Button>
+                ) : isNext ? (
+                  <Button
+                    as={Link}
+                    to={`/projects/${projectId}/${stage.key}`}
+                    size="xs"
+                    colorScheme="blue"
+                    flexShrink={0}
+                  >
+                    Start
+                  </Button>
+                ) : null}
+              </Flex>
+            );
+          })}
+        </VStack>
+      </CardBody>
+    </Card>
+  );
+}
 
 function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -50,21 +169,18 @@ function ProjectDetail() {
   const [targetZoneId, setTargetZoneId] = useState('');
   const [batchAssigning, setBatchAssigning] = useState(false);
 
-  // Fetch project data
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => api.projects.get(projectId!).then(res => res.data),
     enabled: !!projectId,
   });
 
-  // Set current project in store when loaded
   useEffect(() => {
     if (project) {
       setCurrentProject(project);
     }
   }, [project, setCurrentProject]);
 
-  // Handle image upload
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !projectId) return;
@@ -74,7 +190,7 @@ function ProjectDetail() {
 
     try {
       const fileArray = Array.from(files);
-      const chunkSize = 10; // Upload in chunks of 10
+      const chunkSize = 10;
       let uploaded = 0;
 
       for (let i = 0; i < fileArray.length; i += chunkSize) {
@@ -84,27 +200,17 @@ function ProjectDetail() {
         setUploadProgress(Math.round((uploaded / fileArray.length) * 100));
       }
 
-      toast({
-        title: `${fileArray.length} image(s) uploaded`,
-        status: 'success',
-      });
-
-      // Refresh project data
+      toast({ title: `${fileArray.length} image(s) uploaded`, status: 'success' });
       queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-    } catch (error) {
-      toast({
-        title: 'Failed to upload images',
-        status: 'error',
-      });
+    } catch {
+      toast({ title: 'Failed to upload images', status: 'error' });
     }
 
     setUploading(false);
     setUploadProgress(0);
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Batch assign images to a zone
   const handleBatchAssign = async () => {
     if (!targetZoneId || selectedImageIds.size === 0) return;
     setBatchAssigning(true);
@@ -126,7 +232,6 @@ function ProjectDetail() {
     }
   };
 
-  // Unassign a single image from its zone
   const handleUnassign = async (imageId: string) => {
     try {
       await api.projects.assignImageZone(projectId!, imageId, null);
@@ -146,7 +251,6 @@ function ProjectDetail() {
     });
   };
 
-  // Delete image
   const deleteImageMutation = useMutation({
     mutationFn: (imageId: string) => api.projects.deleteImage(projectId!, imageId),
     onSuccess: () => {
@@ -156,16 +260,12 @@ function ProjectDetail() {
   });
 
   if (isLoading) {
-    return (
-      <Container maxW="container.xl" py={8} textAlign="center">
-        <Spinner size="xl" />
-      </Container>
-    );
+    return <PageShell isLoading loadingText="Loading project..." />;
   }
 
   if (error || !project) {
     return (
-      <Container maxW="container.xl" py={8}>
+      <PageShell>
         <Alert status="error">
           <AlertIcon />
           Project not found
@@ -173,7 +273,7 @@ function ProjectDetail() {
         <Button mt={4} onClick={() => navigate('/projects')}>
           Back to Projects
         </Button>
-      </Container>
+      </PageShell>
     );
   }
 
@@ -182,38 +282,24 @@ function ProjectDetail() {
     project.uploaded_images.filter(img => img.zone_id === zoneId);
 
   return (
-    <Container maxW="container.xl" py={8}>
+    <PageShell>
       {/* Header */}
       <HStack justify="space-between" mb={6}>
         <Box>
           <HStack>
-            <Button variant="ghost" size="sm" as={Link} to="/projects">
-              ← Back
+            <Button variant="ghost" size="sm" as={Link} to="/projects" leftIcon={<ArrowLeft size={16} />}>
+              Back
             </Button>
             <Heading size="lg">{project.project_name}</Heading>
             <Badge colorScheme="blue">{project.id}</Badge>
           </HStack>
           <Text color="gray.500" mt={1}>
-            {project.project_location || 'No location'} • {project.site_scale || 'No scale'}
+            {project.project_location || 'No location'} &bull; {project.site_scale || 'No scale'}
           </Text>
         </Box>
-        <HStack>
-          <Button variant="outline" as={Link} to={`/projects/${projectId}/edit`}>
-            Edit Project
-          </Button>
-          <Button colorScheme="green" as={Link} to={`/projects/${projectId}/vision`}>
-            1. Vision
-          </Button>
-          <Button colorScheme="blue" as={Link} to={`/projects/${projectId}/indicators`}>
-            2. Indicators
-          </Button>
-          <Button colorScheme="teal" as={Link} to={`/projects/${projectId}/analysis`}>
-            3. Analysis
-          </Button>
-          <Button colorScheme="purple" as={Link} to={`/projects/${projectId}/reports`}>
-            4. Reports
-          </Button>
-        </HStack>
+        <Button variant="outline" as={Link} to={`/projects/${projectId}/edit`}>
+          Edit Project
+        </Button>
       </HStack>
 
       <Tabs>
@@ -226,7 +312,9 @@ function ProjectDetail() {
         <TabPanels>
           {/* Overview Tab */}
           <TabPanel>
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+            <PipelineCard projectId={projectId!} project={project} />
+
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mt={6}>
               <Card>
                 <CardHeader>
                   <Heading size="md">Project Information</Heading>
@@ -295,7 +383,7 @@ function ProjectDetail() {
                       <Text fontSize="sm" color="gray.500">Zones</Text>
                     </Box>
                     <Box textAlign="center">
-                      <Text fontSize="3xl" fontWeight="bold" color="green.500">
+                      <Text fontSize="3xl" fontWeight="bold" color="brand.500">
                         {project.uploaded_images.length}
                       </Text>
                       <Text fontSize="sm" color="gray.500">Images</Text>
@@ -315,9 +403,7 @@ function ProjectDetail() {
           {/* Zones Tab */}
           <TabPanel>
             {project.spatial_zones.length === 0 ? (
-              <Box textAlign="center" py={8} color="gray.500">
-                <Text>No zones defined for this project.</Text>
-              </Box>
+              <EmptyState icon={MapPin} title="No zones defined" description="No zones defined for this project." />
             ) : (
               <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
                 {project.spatial_zones.map(zone => {
@@ -355,7 +441,7 @@ function ProjectDetail() {
                             {zoneImages.slice(0, 4).map(img => (
                               <Image
                                 key={img.image_id}
-                                src={`/api/uploads/${project.id}/${img.image_id}_${img.filename}`}
+                                src={imageUrl(project.id, img)}
                                 alt={img.filename}
                                 boxSize="40px"
                                 objectFit="cover"
@@ -389,7 +475,8 @@ function ProjectDetail() {
                   textAlign="center"
                   cursor="pointer"
                   bg="gray.50"
-                  _hover={{ borderColor: 'blue.400', bg: 'blue.50' }}
+                  _hover={{ borderColor: 'brand.400', bg: 'brand.50' }}
+                  transition="all 0.2s ease"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {uploading ? (
@@ -400,7 +487,9 @@ function ProjectDetail() {
                     </VStack>
                   ) : (
                     <>
-                      <Text fontSize="3xl" mb={2}>📸</Text>
+                      <Box color="gray.400" mb={2}>
+                        <Upload size={32} />
+                      </Box>
                       <Text fontWeight="bold">Click to upload images</Text>
                       <Text fontSize="sm" color="gray.500">
                         Supports batch upload - JPG/PNG
@@ -469,7 +558,7 @@ function ProjectDetail() {
                     {ungroupedImages.map(img => (
                       <Box key={img.image_id} position="relative">
                         <Image
-                          src={`/api/uploads/${project.id}/${img.image_id}_${img.filename}`}
+                          src={imageUrl(project.id, img)}
                           alt={img.filename}
                           h="80px"
                           w="100%"
@@ -498,7 +587,7 @@ function ProjectDetail() {
                         )}
                         <IconButton
                           aria-label="Delete"
-                          icon={<Text>✕</Text>}
+                          icon={<X size={12} />}
                           size="xs"
                           position="absolute"
                           top={1}
@@ -530,7 +619,7 @@ function ProjectDetail() {
                       {zoneImages.map(img => (
                         <Box key={img.image_id} position="relative">
                           <Image
-                            src={`/api/uploads/${project.id}/${img.image_id}_${img.filename}`}
+                            src={imageUrl(project.id, img)}
                             alt={img.filename}
                             h="80px"
                             w="100%"
@@ -544,7 +633,7 @@ function ProjectDetail() {
                           />
                           <IconButton
                             aria-label="Unassign from zone"
-                            icon={<Text>↩</Text>}
+                            icon={<Undo2 size={12} />}
                             size="xs"
                             position="absolute"
                             top={1}
@@ -555,7 +644,7 @@ function ProjectDetail() {
                           />
                           <IconButton
                             aria-label="Delete"
-                            icon={<Text>✕</Text>}
+                            icon={<X size={12} />}
                             size="xs"
                             position="absolute"
                             top={1}
@@ -572,14 +661,12 @@ function ProjectDetail() {
             })}
 
             {project.uploaded_images.length === 0 && (
-              <Box textAlign="center" py={8} color="gray.500">
-                <Text>No images uploaded yet. Click above to upload.</Text>
-              </Box>
+              <EmptyState icon={ImageIcon} title="No images uploaded" description="Click above to upload images." />
             )}
           </TabPanel>
         </TabPanels>
       </Tabs>
-    </Container>
+    </PageShell>
   );
 }
 

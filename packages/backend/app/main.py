@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
-from app.core.database import init_db_async
+from app.db.project_store import init_project_store, get_project_store
 from app.api.routes import health, config, metrics, projects, vision, indicators, tasks, auth, analysis
 
 # Configure logging
@@ -32,16 +32,15 @@ async def lifespan(app: FastAPI):
     logger.info(f"Data directory: {settings.data_path}")
     logger.info(f"Vision API URL: {settings.vision_api_url}")
 
-    # Initialize database tables
-    try:
-        await init_db_async()
-        logger.info("Database tables initialized")
-    except Exception as e:
-        logger.warning(f"Database initialization skipped: {e}")
+    # Initialize SQLite project store
+    settings.ensure_directories()
+    store = init_project_store(settings.sqlite_path)
+    logger.info("SQLite project store initialized at %s", settings.sqlite_path)
 
     yield
 
     # Shutdown
+    store.close()
     logger.info("GreenSVC API shutting down...")
 
 

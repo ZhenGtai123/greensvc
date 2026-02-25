@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Box,
-  Container,
   Heading,
   Button,
   VStack,
@@ -72,6 +71,8 @@ import type {
 } from '../types';
 import { generateReport } from '../utils/generateReport';
 import useAppStore from '../store/useAppStore';
+import PageShell from '../components/PageShell';
+import PageHeader from '../components/PageHeader';
 
 const LAYERS = ['full', 'foreground', 'middleground', 'background'];
 const LAYER_LABELS: Record<string, string> = {
@@ -433,9 +434,8 @@ function Analysis() {
   }, []);
 
   return (
-    <Container maxW="container.xl" py={8}>
-      <HStack justify="space-between" mb={6}>
-        <Heading>Analysis Dashboard</Heading>
+    <PageShell>
+      <PageHeader title="Analysis Dashboard">
         {(zoneResult || designResult) && (
           <HStack spacing={2}>
             <Button size="sm" onClick={handleDownloadReport}>
@@ -446,7 +446,7 @@ function Analysis() {
             </Button>
           </HStack>
         )}
-      </HStack>
+      </PageHeader>
 
       {/* Input Section with Tabs */}
       <Card mb={6}>
@@ -1051,7 +1051,7 @@ function Analysis() {
           </Button>
         </HStack>
       )}
-    </Container>
+    </PageShell>
   );
 }
 

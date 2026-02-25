@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     # PostgreSQL Database
     database_url: str = "postgresql://postgres:postgres@localhost:5432/greensvc"
 
+    # SQLite (lightweight persistence)
+    sqlite_db_name: str = "greensvc.db"
+
     # Paths (relative to backend/)
     data_dir: str = "data"
     metrics_library_path: str = "data/A_indicators.xlsx"
@@ -91,6 +94,10 @@ class Settings(BaseSettings):
     @property
     def temp_full_path(self) -> Path:
         return self.base_dir / self.temp_dir
+
+    @property
+    def sqlite_path(self) -> str:
+        return str(self.data_path / self.sqlite_db_name)
 
     def ensure_directories(self) -> None:
         """Ensure all required directories exist"""

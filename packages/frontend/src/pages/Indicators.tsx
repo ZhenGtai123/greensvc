@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Container,
   Heading,
   Button,
   VStack,
@@ -21,7 +20,6 @@ import {
   Alert,
   AlertIcon,
   useToast,
-  Spinner,
   Accordion,
   AccordionItem,
   AccordionButton,
@@ -33,9 +31,13 @@ import {
   WrapItem,
   Progress,
 } from '@chakra-ui/react';
+import { Lightbulb } from 'lucide-react';
 import { useKnowledgeBaseSummary, useRecommendIndicators, useProject } from '../hooks/useApi';
 import type { IndicatorRecommendation } from '../types';
 import useAppStore from '../store/useAppStore';
+import PageShell from '../components/PageShell';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 // Performance dimensions
 const DIMENSIONS = [
@@ -56,7 +58,6 @@ function Indicators() {
 
   const { currentProject, selectedIndicators, addSelectedIndicator, removeSelectedIndicator, clearSelectedIndicators } = useAppStore();
 
-  // Use route project if available, otherwise fall back to store
   const activeProject = routeProject || currentProject;
 
   // Form state
@@ -117,17 +118,9 @@ function Indicators() {
     }
   };
 
-  if (kbLoading) {
-    return (
-      <Container maxW="container.xl" py={8} textAlign="center">
-        <Spinner size="xl" />
-      </Container>
-    );
-  }
-
   return (
-    <Container maxW="container.xl" py={8}>
-      <Heading mb={6}>Indicator Recommendation</Heading>
+    <PageShell isLoading={kbLoading} loadingText="Loading knowledge base...">
+      <PageHeader title="Indicator Recommendation" />
 
       {/* Knowledge Base Status */}
       {kbSummary && (
@@ -290,13 +283,11 @@ function Indicators() {
               </CardBody>
             </Card>
           ) : (
-            <Card>
-              <CardBody textAlign="center" py={10}>
-                <Text color="gray.500">
-                  Enter project details and select dimensions to get AI-powered indicator recommendations.
-                </Text>
-              </CardBody>
-            </Card>
+            <EmptyState
+              icon={Lightbulb}
+              title="No recommendations yet"
+              description="Enter project details and select dimensions to get AI-powered indicator recommendations."
+            />
           )}
         </VStack>
       </SimpleGrid>
@@ -312,7 +303,7 @@ function Indicators() {
           </Button>
         </HStack>
       )}
-    </Container>
+    </PageShell>
   );
 }
 

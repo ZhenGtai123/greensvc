@@ -26,21 +26,20 @@ class ZoneAssignment(BaseModel):
     image_id: str
     zone_id: Optional[str] = None
 from app.core.config import get_settings
+from app.db.project_store import get_project_store, ProjectStore
 
 router = APIRouter()
 
-# In-memory storage for Phase 1 (will be replaced with database in later phases)
-_projects: dict[str, ProjectResponse] = {}
 
-
-def get_projects_store() -> dict[str, ProjectResponse]:
-    """Get the in-memory projects store (used by pipeline endpoint)."""
-    return _projects
+def get_projects_store() -> ProjectStore:
+    """Get the SQLite-backed project store (used by vision.py, analysis.py)."""
+    return get_project_store()
 
 
 @router.post("", response_model=ProjectResponse)
 async def create_project(project: ProjectCreate):
     """Create a new project"""
+    store = get_project_store()
     project_id = str(uuid.uuid4())[:8]
 
     # Convert SpatialZoneCreate to SpatialZone with proper IDs
@@ -76,7 +75,7 @@ async def create_project(project: ProjectCreate):
         uploaded_images=[],
     )
 
-    _projects[project_id] = response
+    store.save(response)
     return response
 
 
@@ -86,25 +85,27 @@ async def list_projects(
     offset: int = Query(default=0, ge=0),
 ):
     """List all projects"""
-    projects = list(_projects.values())
-    return projects[offset:offset + limit]
+    store = get_project_store()
+    return store.list(limit, offset)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: str):
     """Get project by ID"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
-    return _projects[project_id]
+    return project
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
 async def update_project(project_id: str, updates: ProjectUpdate):
     """Update project"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
-
-    project = _projects[project_id]
 
     # Apply updates
     update_data = updates.model_dump(exclude_unset=True)
@@ -144,17 +145,16 @@ async def update_project(project_id: str, updates: ProjectUpdate):
         setattr(project, field, value)
 
     project.updated_at = datetime.now()
-    _projects[project_id] = project
+    store.save(project)
     return project
 
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: str):
     """Delete project"""
-    if project_id not in _projects:
+    store = get_project_store()
+    if not store.delete(project_id):
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
-
-    del _projects[project_id]
     return {"success": True, "project_id": project_id}
 
 
@@ -167,10 +167,11 @@ async def add_zone(
     description: str = "",
 ):
     """Add a spatial zone to project"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
 
-    project = _projects[project_id]
     zone_id = f"zone_{len(project.spatial_zones) + 1}"
 
     zone = SpatialZone(
@@ -182,16 +183,18 @@ async def add_zone(
 
     project.spatial_zones.append(zone)
     project.updated_at = datetime.now()
+    store.save(project)
     return zone
 
 
 @router.delete("/{project_id}/zones/{zone_id}")
 async def delete_zone(project_id: str, zone_id: str):
     """Remove a spatial zone"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
 
-    project = _projects[project_id]
     project.spatial_zones = [z for z in project.spatial_zones if z.zone_id != zone_id]
 
     # Unassign images from deleted zone
@@ -200,6 +203,7 @@ async def delete_zone(project_id: str, zone_id: str):
             img.zone_id = None
 
     project.updated_at = datetime.now()
+    store.save(project)
     return {"success": True, "zone_id": zone_id}
 
 
@@ -211,11 +215,12 @@ async def upload_images(
     zone_id: Optional[str] = Form(None),
 ):
     """Upload images to a project"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
 
     settings = get_settings()
-    project = _projects[project_id]
 
     # Create project upload directory
     upload_dir = settings.temp_full_path / "uploads" / project_id
@@ -243,6 +248,7 @@ async def upload_images(
         uploaded.append(image)
 
     project.updated_at = datetime.now()
+    store.save(project)
     return {
         "success": True,
         "uploaded_count": len(uploaded),
@@ -256,10 +262,11 @@ async def batch_assign_zones(
     assignments: List[ZoneAssignment],
 ):
     """Batch assign images to zones"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
 
-    project = _projects[project_id]
     image_lookup = {img.image_id: img for img in project.uploaded_images}
 
     updated = 0
@@ -271,6 +278,7 @@ async def batch_assign_zones(
 
     if updated > 0:
         project.updated_at = datetime.now()
+        store.save(project)
 
     return {"success": True, "updated": updated}
 
@@ -282,15 +290,16 @@ async def assign_image_to_zone(
     zone_id: Optional[str] = None,
 ):
     """Assign or unassign an image to a zone"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
-
-    project = _projects[project_id]
 
     for img in project.uploaded_images:
         if img.image_id == image_id:
             img.zone_id = zone_id
             project.updated_at = datetime.now()
+            store.save(project)
             return {"success": True, "image_id": image_id, "zone_id": zone_id}
 
     raise HTTPException(status_code=404, detail=f"Image not found: {image_id}")
@@ -299,10 +308,10 @@ async def assign_image_to_zone(
 @router.delete("/{project_id}/images/{image_id}")
 async def delete_image(project_id: str, image_id: str):
     """Delete an image from project"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
-
-    project = _projects[project_id]
 
     for i, img in enumerate(project.uploaded_images):
         if img.image_id == image_id:
@@ -313,6 +322,7 @@ async def delete_image(project_id: str, image_id: str):
                 pass
             project.uploaded_images.pop(i)
             project.updated_at = datetime.now()
+            store.save(project)
             return {"success": True, "image_id": image_id}
 
     raise HTTPException(status_code=404, detail=f"Image not found: {image_id}")
@@ -321,10 +331,11 @@ async def delete_image(project_id: str, image_id: str):
 @router.get("/{project_id}/images")
 async def list_project_images(project_id: str):
     """Get all images for a project"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
 
-    project = _projects[project_id]
     return {
         "project_id": project_id,
         "total": len(project.uploaded_images),
@@ -336,8 +347,9 @@ async def list_project_images(project_id: str):
 @router.get("/{project_id}/export", response_model=ProjectQuery)
 async def export_project(project_id: str):
     """Export project as ProjectQuery format"""
-    if project_id not in _projects:
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
 
-    project = _projects[project_id]
     return ProjectQuery.from_project(project)
