@@ -6,9 +6,6 @@ import {
   Button,
   VStack,
   HStack,
-  FormControl,
-  FormLabel,
-  Select,
   Checkbox,
   CheckboxGroup,
   SimpleGrid,
@@ -21,25 +18,26 @@ import {
   Progress,
   Alert,
   AlertIcon,
-  /* useToast — replaced by useAppToast */
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
   Tabs,
   TabList,
   Tab,
   TabPanels,
   TabPanel,
+  Switch,
+  FormControl,
+  FormLabel,
+  FormHelperText,
 } from '@chakra-ui/react';
-import { ScanSearch, Download, Eye } from 'lucide-react';
-import { useSemanticConfig, useTaskStatus, useProject } from '../hooks/useApi';
+import { ScanSearch, Download, Eye, Archive } from 'lucide-react';
+import JSZip from 'jszip';
+import { useSemanticConfig, useProject } from '../hooks/useApi';
 import api from '../api';
 import type { SemanticClass, UploadedImage } from '../types';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import useAppToast from '../hooks/useAppToast';
+import useAppStore from '../store/useAppStore';
 
 function VisionAnalysis() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
@@ -55,30 +53,44 @@ function VisionAnalysis() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
-  const [encoder, setEncoder] = useState('vitb');
-  const [threshold, setThreshold] = useState(0.3);
   const [holeFilling, setHoleFilling] = useState(false);
 
   // Project image selection
   const [selectedProjectImages, setSelectedProjectImages] = useState<string[]>([]);
   const [imageSource, setImageSource] = useState<'upload' | 'project'>(projectId ? 'project' : 'upload');
 
+  // Panorama mode
+  const [isPanorama, setIsPanorama] = useState(false);
+
   // Analysis state
   const [analyzing, setAnalyzing] = useState(false);
-  const [statistics, setStatistics] = useState<Record<string, unknown> | null>(null);
   const [batchProgress, setBatchProgress] = useState<{current: number; total: number} | null>(null);
 
-  // Mask results: array of {imageId, maskPaths} for each analyzed image
-  const [maskResults, setMaskResults] = useState<Array<{imageId: string; maskPaths: Record<string, string>}>>([]);
-
-  // Batch task state
-  const [taskId] = useState<string | null>(null);
-  const { data: taskStatus } = useTaskStatus(taskId);
+  // Vision results persisted in store (survive navigation)
+  const { visionMaskResults: maskResults, setVisionMaskResults: setMaskResults, visionStatistics: statistics, setVisionStatistics: setStatistics } = useAppStore();;
 
   // Reset image source when project changes
   useEffect(() => {
     setImageSource(projectId ? 'project' : 'upload');
   }, [projectId]);
+
+  // Default: select all semantic classes once when config loads
+  const classesInitialized = useRef(false);
+  useEffect(() => {
+    if (!classesInitialized.current && semanticConfig?.classes) {
+      setSelectedClasses(semanticConfig.classes.map((c) => c.name));
+      classesInitialized.current = true;
+    }
+  }, [semanticConfig]);
+
+  // Default: select all project images once when project loads
+  const imagesInitialized = useRef(false);
+  useEffect(() => {
+    if (!imagesInitialized.current && project?.uploaded_images && project.uploaded_images.length > 0) {
+      setSelectedProjectImages(project.uploaded_images.map(img => img.image_id));
+      imagesInitialized.current = true;
+    }
+  }, [project]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -144,8 +156,6 @@ function VisionAnalysis() {
           semantic_classes: selectedClasses,
           semantic_countability: countability,
           openness_list: openness,
-          encoder,
-          detection_threshold: threshold,
           enable_hole_filling: holeFilling,
         });
 
@@ -163,8 +173,6 @@ function VisionAnalysis() {
           semantic_classes: selectedClasses,
           semantic_countability: countability,
           openness_list: openness,
-          encoder,
-          detection_threshold: threshold,
           enable_hole_filling: holeFilling,
         };
 
@@ -172,20 +180,44 @@ function VisionAnalysis() {
           const img = project?.uploaded_images.find(i => i.image_id === imageId);
           if (!img) continue;
 
-          let response;
-          if (projectId) {
-            response = await api.vision.analyzeProjectImage(projectId, imageId, requestPayload);
+          if (isPanorama && projectId) {
+            // Panorama mode: call panorama endpoint, get 3 views per image
+            const response = await api.vision.analyzeProjectImagePanorama(projectId, imageId, requestPayload);
+            processed++;
+            setBatchProgress({ current: processed, total: selectedProjectImages.length });
+
+            const views = response.data.views as Record<string, {
+              status: string;
+              mask_paths: Record<string, string>;
+              statistics: Record<string, unknown>;
+            }> | undefined;
+            if (views) {
+              for (const [viewName, viewData] of Object.entries(views)) {
+                if (viewData.status === 'success') {
+                  allResults.push(viewData.statistics);
+                  if (viewData.mask_paths && Object.keys(viewData.mask_paths).length > 0) {
+                    allMasks.push({ imageId: `${imageId}_${viewName}`, maskPaths: viewData.mask_paths });
+                  }
+                }
+              }
+            }
           } else {
-            response = await api.vision.analyzeByPath(img.filepath, requestPayload);
-          }
+            // Standard single-image mode
+            let response;
+            if (projectId) {
+              response = await api.vision.analyzeProjectImage(projectId, imageId, requestPayload);
+            } else {
+              response = await api.vision.analyzeByPath(img.filepath, requestPayload);
+            }
 
-          processed++;
-          setBatchProgress({ current: processed, total: selectedProjectImages.length });
+            processed++;
+            setBatchProgress({ current: processed, total: selectedProjectImages.length });
 
-          if (response.data.status === 'success') {
-            allResults.push(response.data.statistics);
-            if (response.data.mask_paths && Object.keys(response.data.mask_paths).length > 0) {
-              allMasks.push({ imageId, maskPaths: response.data.mask_paths });
+            if (response.data.status === 'success') {
+              allResults.push(response.data.statistics);
+              if (response.data.mask_paths && Object.keys(response.data.mask_paths).length > 0) {
+                allMasks.push({ imageId, maskPaths: response.data.mask_paths });
+              }
             }
           }
         }
@@ -372,44 +404,37 @@ function VisionAnalysis() {
             </CardBody>
           </Card>
 
-          {/* Model Settings */}
+          {/* Analysis Options */}
           <Card>
             <CardHeader>
-              <Heading size="md">Model Settings</Heading>
+              <Heading size="md">Options</Heading>
             </CardHeader>
             <CardBody>
-              <VStack spacing={4}>
-                <FormControl>
-                  <FormLabel>Encoder</FormLabel>
-                  <Select value={encoder} onChange={(e) => setEncoder(e.target.value)}>
-                    <option value="vits">ViT-S (Fast)</option>
-                    <option value="vitb">ViT-B (Balanced)</option>
-                    <option value="vitl">ViT-L (Accurate)</option>
-                  </Select>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Detection Threshold: {threshold}</FormLabel>
-                  <Slider
-                    value={threshold}
-                    onChange={setThreshold}
-                    min={0.1}
-                    max={0.9}
-                    step={0.1}
-                  >
-                    <SliderTrack>
-                      <SliderFilledTrack />
-                    </SliderTrack>
-                    <SliderThumb />
-                  </Slider>
-                </FormControl>
-
+              <VStack align="stretch" spacing={3}>
                 <Checkbox
                   isChecked={holeFilling}
                   onChange={(e) => setHoleFilling(e.target.checked)}
                 >
                   Enable Hole Filling
                 </Checkbox>
+                {imageSource === 'project' && (
+                  <FormControl display="flex" alignItems="center">
+                    <Switch
+                      id="panorama-mode"
+                      isChecked={isPanorama}
+                      onChange={(e) => setIsPanorama(e.target.checked)}
+                      mr={3}
+                    />
+                    <Box>
+                      <FormLabel htmlFor="panorama-mode" mb={0} fontSize="sm">
+                        Panorama Mode
+                      </FormLabel>
+                      <FormHelperText mt={0} fontSize="xs">
+                        Splits panoramic image into 3 views (left / front / right)
+                      </FormHelperText>
+                    </Box>
+                  </FormControl>
+                )}
               </VStack>
             </CardBody>
           </Card>
@@ -428,7 +453,7 @@ function VisionAnalysis() {
             <CardBody maxH="300px" overflowY="auto">
               <CheckboxGroup value={selectedClasses} onChange={(v) => setSelectedClasses(v as string[])}>
                 <SimpleGrid columns={2} spacing={2}>
-                  {semanticConfig?.classes.map((cls: SemanticClass) => (
+                  {semanticConfig?.classes?.map((cls: SemanticClass) => (
                     <Checkbox key={cls.name} value={cls.name} size="sm">
                       <HStack spacing={1}>
                         <Box w={3} h={3} bg={cls.color} borderRadius="sm" />
@@ -477,18 +502,6 @@ function VisionAnalysis() {
               hasStripe
               isAnimated
             />
-          )}
-
-          {taskStatus && taskStatus.status === 'PROGRESS' && (
-            <Card>
-              <CardBody>
-                <Text mb={2}>{taskStatus.progress?.status}</Text>
-                <Progress
-                  value={(taskStatus.progress?.current || 0) / (taskStatus.progress?.total || 1) * 100}
-                  colorScheme="blue"
-                />
-              </CardBody>
-            </Card>
           )}
 
           {statistics && (
@@ -547,18 +560,69 @@ function VisionAnalysis() {
               <CardHeader>
                 <HStack justify="space-between">
                   <Heading size="md">Output Masks</Heading>
-                  <Badge colorScheme="green">{maskResults.reduce((s, r) => s + Object.keys(r.maskPaths).length, 0)} files</Badge>
+                  <HStack>
+                    <Badge colorScheme="green">{maskResults.reduce((s, r) => s + Object.keys(r.maskPaths).length, 0)} files</Badge>
+                    <Button
+                      size="xs"
+                      leftIcon={<Archive size={12} />}
+                      colorScheme="blue"
+                      onClick={async () => {
+                        const zip = new JSZip();
+                        for (const { imageId, maskPaths } of maskResults) {
+                          // Handle panorama view entries (e.g. "img1_left")
+                          const vm = imageId.match(/^(.+)_(left|front|right)$/);
+                          const baseId = vm ? vm[1] : imageId;
+                          const view = vm ? vm[2] : null;
+                          const img = project?.uploaded_images.find(i => i.image_id === baseId);
+                          const baseName = img?.filename
+                            ? img.filename.replace(/\.[^/.]+$/, '')
+                            : baseId;
+                          const folderName = view ? `${baseName}_${view}` : baseName;
+                          const folder = zip.folder(folderName)!;
+                          for (const maskKey of Object.keys(maskPaths)) {
+                            const url = `/api/masks/${projectId}/${imageId}/${maskKey}.png`;
+                            try {
+                              const resp = await fetch(url);
+                              if (resp.ok) {
+                                const blob = await resp.blob();
+                                folder.file(`${maskKey}.png`, blob);
+                              }
+                            } catch {
+                              // skip failed fetches
+                            }
+                          }
+                        }
+                        const blob = await zip.generateAsync({ type: 'blob' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${project?.project_name?.replace(/\s+/g, '_') || 'masks'}_vision_outputs.zip`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      Download All (ZIP)
+                    </Button>
+                  </HStack>
                 </HStack>
               </CardHeader>
               <CardBody>
                 <VStack align="stretch" spacing={4}>
                   {maskResults.map(({ imageId, maskPaths }) => {
-                    const img = project?.uploaded_images.find(i => i.image_id === imageId);
+                    // For panorama entries like "img1_left", parse the view suffix
+                    const viewMatch = imageId.match(/^(.+)_(left|front|right)$/);
+                    const baseImageId = viewMatch ? viewMatch[1] : imageId;
+                    const viewName = viewMatch ? viewMatch[2] : null;
+                    const img = project?.uploaded_images.find(i => i.image_id === baseImageId);
+                    const viewLabels: Record<string, string> = { left: 'Left View', front: 'Front View', right: 'Right View' };
+                    const displayLabel = viewName
+                      ? `${img?.filename || baseImageId} — ${viewLabels[viewName]}`
+                      : (img?.filename || imageId);
                     return (
                       <Box key={imageId}>
                         {maskResults.length > 1 && (
                           <Text fontSize="sm" fontWeight="semibold" mb={2} color="gray.700">
-                            {img?.filename || imageId}
+                            {displayLabel}
                           </Text>
                         )}
                         <SimpleGrid columns={3} spacing={2}>

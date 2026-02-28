@@ -27,9 +27,12 @@ async def recommend_indicators(
     the most relevant indicators for the project.
     """
     if not recommendation_service.check_api_key():
+        provider = recommendation_service.llm.provider
         raise HTTPException(
             status_code=503,
-            detail="LLM provider not configured. Please set the appropriate API key."
+            detail=f"LLM provider '{provider}' failed to initialize. "
+                   f"Check the API key and that the required SDK is installed. "
+                   f"See server logs for details."
         )
 
     # Get recommendations

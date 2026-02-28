@@ -38,6 +38,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
 import useAppStore from '../store/useAppStore';
 import useAppToast from '../hooks/useAppToast';
+import { getStageStatuses } from '../utils/pipelineStatus';
 import type { Project, UploadedImage } from '../types';
 import PageShell from '../components/PageShell';
 import EmptyState from '../components/EmptyState';
@@ -57,27 +58,9 @@ const STAGES = [
   { key: 'reports', label: 'Reports', desc: 'Calculate metrics & generate reports' },
 ] as const;
 
-function getStageStatus(project: Project) {
-  const hasImages = (project.uploaded_images?.length ?? 0) > 0;
-  const hasZones = (project.spatial_zones?.length ?? 0) > 0;
-  const hasMasks = project.uploaded_images?.some(
-    (img) => img.mask_filepaths && Object.keys(img.mask_filepaths).length > 0,
-  );
-  const hasDimensions = (project.performance_dimensions?.length ?? 0) > 0;
-  const hasMetrics = project.uploaded_images?.some(
-    (img) => img.metrics_results && Object.keys(img.metrics_results).length > 0,
-  );
-
-  return [
-    { done: !!hasMasks, ready: hasImages && hasZones },
-    { done: hasDimensions, ready: true },
-    { done: !!hasMetrics, ready: !!hasMasks && hasDimensions },
-    { done: false, ready: !!hasMetrics },
-  ];
-}
-
 function PipelineCard({ projectId, project }: { projectId: string; project: Project }) {
-  const statuses = getStageStatus(project);
+  const { recommendations, zoneAnalysisResult } = useAppStore();
+  const statuses = getStageStatuses(project, { recommendations, zoneAnalysisResult });
   const nextIdx = statuses.findIndex((s) => !s.done && s.ready);
 
   return (
@@ -162,7 +145,7 @@ function ProjectDetail() {
   const toast = useAppToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { setCurrentProject, clearPipelineResults, currentProject } = useAppStore();
+  const { setCurrentProject, clearPipelineResults } = useAppStore();
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -178,13 +161,14 @@ function ProjectDetail() {
 
   useEffect(() => {
     if (project) {
-      // Clear pipeline results when switching to a different project
-      if (currentProject && currentProject.id !== project.id) {
+      // Read previous project without subscribing to avoid re-render loop
+      const prev = useAppStore.getState().currentProject;
+      if (prev && prev.id !== project.id) {
         clearPipelineResults();
       }
       setCurrentProject(project);
     }
-  }, [project, setCurrentProject, clearPipelineResults, currentProject]);
+  }, [project, setCurrentProject, clearPipelineResults]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

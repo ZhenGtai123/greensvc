@@ -51,15 +51,11 @@ class VisionModelClient:
                     color_set.add(tuple(new_color))
                     break
 
-        return {
-            'semantic_colors': semantic_colors,
-            'openness_colors': {"0": [113, 6, 230], "1": [173, 255, 0]},
-            'fmb_colors': {"0": [220, 20, 60], "1": [46, 125, 50], "2": [30, 144, 255]}
-        }
+        return semantic_colors
 
     def _generate_colors_for_classes(self, num_classes: int) -> dict[str, list[int]]:
         """Generate color mapping for specified number of classes"""
-        colors = self._get_default_colors()['semantic_colors']
+        colors = self._get_default_colors()
         return {str(i): colors.get(str(i), [128, 128, 128]) for i in range(min(num_classes + 1, 201))}
 
     async def check_health(self) -> bool:
@@ -125,22 +121,16 @@ class VisionModelClient:
 
             # Generate colors
             semantic_colors = self._generate_colors_for_classes(len(request.semantic_classes))
-            default_colors = self._get_default_colors()
 
-            # Prepare request data
+            # Prepare request data — only fields the Vision API actually uses
             request_data = {
                 "image_id": request.image_id or f"img_{int(time.time() * 1000)}",
                 "semantic_classes": request.semantic_classes,
                 "semantic_countability": request.semantic_countability,
                 "openness_list": request.openness_list,
-                "encoder": request.encoder,
                 "semantic_colors": semantic_colors,
-                "openness_colors": default_colors['openness_colors'],
-                "fmb_colors": default_colors['fmb_colors'],
-                "segmentation_mode": request.segmentation_mode,
-                "detection_threshold": request.detection_threshold,
-                "min_object_area_ratio": request.min_object_area_ratio,
                 "enable_hole_filling": request.enable_hole_filling,
+                "enable_median_blur": request.enable_median_blur,
             }
 
             start_time = time.time()
@@ -174,8 +164,6 @@ class VisionModelClient:
                         status="success",
                         image_path=image_path,
                         processing_time=elapsed_time,
-                        encoder=request.encoder,
-                        segmentation_mode=result.get('segmentation_mode', request.segmentation_mode),
                         hole_filling_enabled=result.get('hole_filling_enabled', False),
                         image_count=len(processed_images),
                         statistics={
@@ -205,6 +193,103 @@ class VisionModelClient:
         except Exception as e:
             logger.error(f"Vision API exception: {e}", exc_info=True)
             return VisionAnalysisResponse(status="error", error=str(e))
+
+    async def analyze_panorama(
+        self,
+        image_path: str,
+        request: VisionAnalysisRequest,
+    ) -> dict[str, VisionAnalysisResponse]:
+        """
+        Analyze a panorama image using Vision API panorama endpoint.
+        The API crops the panorama into 3 views (left/front/right), each producing masks.
+
+        Returns:
+            Dict mapping view name (left/front/right) to VisionAnalysisResponse
+        """
+        try:
+            path = Path(image_path)
+            if not path.exists():
+                err = VisionAnalysisResponse(status="error", error=f"Image file not found: {image_path}")
+                return {"left": err, "front": err, "right": err}
+
+            semantic_colors = self._generate_colors_for_classes(len(request.semantic_classes))
+
+            request_data = {
+                "image_id": request.image_id or f"img_{int(time.time() * 1000)}",
+                "semantic_classes": request.semantic_classes,
+                "semantic_countability": request.semantic_countability,
+                "openness_list": request.openness_list,
+                "semantic_colors": semantic_colors,
+                "enable_hole_filling": request.enable_hole_filling,
+                "enable_median_blur": request.enable_median_blur,
+            }
+
+            start_time = time.time()
+
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                with open(image_path, 'rb') as f:
+                    files = {'file': (path.name, f, 'image/jpeg')}
+                    data = {'request_data': json.dumps(request_data)}
+
+                    response = await client.post(
+                        f"{self.base_url}/analyze/panorama",
+                        files=files,
+                        data=data,
+                    )
+
+            elapsed_time = time.time() - start_time
+            logger.info("Vision panorama API responded: status=%d elapsed=%.1fs image=%s",
+                        response.status_code, elapsed_time, path.name)
+
+            if response.status_code == 200:
+                result = response.json()
+
+                if result.get('status') == 'success' and 'views' in result:
+                    views: dict[str, VisionAnalysisResponse] = {}
+                    for view_name, view_data in result['views'].items():
+                        processed_images = {}
+                        if 'images' in view_data:
+                            for key, hex_data in view_data['images'].items():
+                                if isinstance(hex_data, str):
+                                    processed_images[key] = bytes.fromhex(hex_data)
+
+                        views[view_name] = VisionAnalysisResponse(
+                            status=view_data.get('status', 'error'),
+                            image_path=image_path,
+                            processing_time=elapsed_time / max(len(result['views']), 1),
+                            hole_filling_enabled=view_data.get('hole_filling_enabled', False),
+                            image_count=len(processed_images),
+                            statistics={
+                                'detected_classes': view_data.get('detected_classes', 0),
+                                'total_classes': view_data.get('total_classes', len(request.semantic_classes)),
+                                'class_statistics': view_data.get('class_statistics', {}),
+                                'fmb_statistics': view_data.get('fmb_statistics', {}),
+                            },
+                            images=processed_images,
+                            instances=view_data.get('instances', []),
+                        )
+                    return views
+                else:
+                    err = VisionAnalysisResponse(
+                        status="error",
+                        error=result.get('detail', 'Panorama API returned error status')
+                    )
+                    return {"left": err, "front": err, "right": err}
+            else:
+                error_msg = f"API error: {response.status_code}"
+                try:
+                    error_detail = response.json()
+                    error_msg += f" - {error_detail.get('detail', response.text[:200])}"
+                except Exception:
+                    error_msg += f" - {response.text[:200]}"
+
+                err = VisionAnalysisResponse(status="error", error=error_msg)
+                return {"left": err, "front": err, "right": err}
+
+        except Exception as e:
+            logger.error(f"Vision panorama API exception: {e}", exc_info=True)
+            err = VisionAnalysisResponse(status="error", error=str(e))
+            return {"left": err, "front": err, "right": err}
 
     async def batch_analyze(
         self,

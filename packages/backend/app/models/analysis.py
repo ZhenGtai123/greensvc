@@ -86,6 +86,8 @@ class ZoneDiagnostic(BaseModel):
     area_sqm: float = 0
     status: str = ""  # Critical | Poor | Moderate | Good
     total_priority: int = 0
+    composite_zscore: float = 0.0
+    rank: int = 0
     priority_by_layer: dict[str, int] = Field(default_factory=dict)
     problems_by_layer: dict[str, list[ZoneProblem]] = Field(default_factory=dict)
     indicator_status: dict[str, dict[str, Any]] = Field(default_factory=dict)
@@ -109,6 +111,7 @@ class ZoneAnalysisResult(BaseModel):
     pvalue_by_layer: dict[str, dict[str, dict[str, float]]] = Field(default_factory=dict)
     indicator_definitions: dict[str, IndicatorDefinitionInput] = Field(default_factory=dict)
     layer_statistics: dict[str, dict] = Field(default_factory=dict)
+    radar_profiles: dict[str, dict[str, float]] = Field(default_factory=dict)
     computation_metadata: ComputationMetadata = Field(default_factory=ComputationMetadata)
 
 

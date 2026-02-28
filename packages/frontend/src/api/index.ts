@@ -114,6 +114,10 @@ export const api = {
       apiClient.post('/api/vision/analyze/project-image', request, {
         params: { project_id: projectId, image_id: imageId },
       }),
+    analyzeProjectImagePanorama: (projectId: string, imageId: string, request: Record<string, unknown>) =>
+      apiClient.post('/api/vision/analyze/project-image/panorama', request, {
+        params: { project_id: projectId, image_id: imageId },
+      }),
   },
 
   // Indicators
@@ -143,7 +147,6 @@ export const api = {
       semantic_classes: string[];
       semantic_countability: number[];
       openness_list: number[];
-      encoder?: string;
       output_dir?: string;
     }) => apiClient.post('/api/tasks/vision/batch', data),
     submitMetricsBatch: (data: {

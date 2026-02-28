@@ -32,6 +32,7 @@ import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import { RadarProfileChart, ZonePriorityChart } from '../components/AnalysisCharts';
 
 function Reports() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
@@ -41,6 +42,8 @@ function Reports() {
     currentProject,
     recommendations,
     selectedIndicators,
+    indicatorRelationships,
+    recommendationSummary,
     zoneAnalysisResult,
     designStrategyResult,
     pipelineResult,
@@ -107,7 +110,7 @@ function Reports() {
 
   // Sort zone diagnostics by priority
   const sortedDiags = zoneAnalysisResult
-    ? [...zoneAnalysisResult.zone_diagnostics].sort((a, b) => b.total_priority - a.total_priority)
+    ? [...zoneAnalysisResult.zone_diagnostics].sort((a, b) => (a.rank || 999) - (b.rank || 999))
     : [];
 
   return (
@@ -231,6 +234,66 @@ function Reports() {
             </Card>
           )}
 
+          {/* Indicator Relationships */}
+          {indicatorRelationships.length > 0 && (
+            <Card>
+              <CardHeader>
+                <Heading size="md">Indicator Relationships</Heading>
+              </CardHeader>
+              <CardBody>
+                <VStack align="stretch" spacing={2}>
+                  {indicatorRelationships.map((rel, i) => (
+                    <HStack key={i} fontSize="sm" spacing={2}>
+                      <Badge colorScheme="blue">{rel.indicator_a}</Badge>
+                      <Badge
+                        colorScheme={rel.relationship_type === 'synergistic' ? 'green' : rel.relationship_type === 'inverse' ? 'red' : 'gray'}
+                      >
+                        {rel.relationship_type}
+                      </Badge>
+                      <Badge colorScheme="blue">{rel.indicator_b}</Badge>
+                      {rel.explanation && (
+                        <Text fontSize="xs" color="gray.500" noOfLines={1} flex={1}>{rel.explanation}</Text>
+                      )}
+                    </HStack>
+                  ))}
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Recommendation Summary */}
+          {recommendationSummary && (
+            <Card>
+              <CardHeader>
+                <Heading size="md">Recommendation Summary</Heading>
+              </CardHeader>
+              <CardBody>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  {recommendationSummary.key_findings.length > 0 && (
+                    <Box>
+                      <Text fontSize="sm" fontWeight="bold" mb={1}>Key Findings</Text>
+                      <VStack align="stretch" spacing={1}>
+                        {recommendationSummary.key_findings.map((f, i) => (
+                          <Text key={i} fontSize="sm">&#x2713; {f}</Text>
+                        ))}
+                      </VStack>
+                    </Box>
+                  )}
+                  {recommendationSummary.evidence_gaps.length > 0 && (
+                    <Box>
+                      <Text fontSize="sm" fontWeight="bold" mb={1}>Evidence Gaps</Text>
+                      <VStack align="stretch" spacing={1}>
+                        {recommendationSummary.evidence_gaps.map((g, i) => (
+                          <Text key={i} fontSize="sm">&#x26A0; {g}</Text>
+                        ))}
+                      </VStack>
+                    </Box>
+                  )}
+                </SimpleGrid>
+              </CardBody>
+            </Card>
+          )}
+
           {/* Zone Diagnostics Summary */}
           {sortedDiags.length > 0 && (
             <Card>
@@ -242,8 +305,10 @@ function Reports() {
                   <Table size="sm">
                     <Thead>
                       <Tr>
+                        <Th>Rank</Th>
                         <Th>Zone</Th>
                         <Th>Status</Th>
+                        <Th isNumeric>Composite Z</Th>
                         <Th isNumeric>Total Priority</Th>
                         <Th isNumeric>High Priority Problems</Th>
                       </Tr>
@@ -255,6 +320,9 @@ function Reports() {
                           .filter(p => p.priority >= 4).length;
                         return (
                           <Tr key={d.zone_id}>
+                            <Td>
+                              {d.rank > 0 && <Badge colorScheme="purple">#{d.rank}</Badge>}
+                            </Td>
                             <Td fontWeight="medium">{d.zone_name}</Td>
                             <Td>
                               <Badge colorScheme={
@@ -265,6 +333,7 @@ function Reports() {
                                 {d.status}
                               </Badge>
                             </Td>
+                            <Td isNumeric>{d.composite_zscore?.toFixed(2) ?? '-'}</Td>
                             <Td isNumeric>{d.total_priority}</Td>
                             <Td isNumeric>
                               {highProblems > 0 ? (
@@ -279,6 +348,30 @@ function Reports() {
                     </Tbody>
                   </Table>
                 </Box>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Zone Priority Chart */}
+          {sortedDiags.length > 0 && (
+            <Card>
+              <CardHeader>
+                <Heading size="md">Zone Priority Overview</Heading>
+              </CardHeader>
+              <CardBody>
+                <ZonePriorityChart diagnostics={sortedDiags} />
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Radar Profile Chart */}
+          {zoneAnalysisResult?.radar_profiles && Object.keys(zoneAnalysisResult.radar_profiles).length > 0 && (
+            <Card>
+              <CardHeader>
+                <Heading size="md">Radar Profiles</Heading>
+              </CardHeader>
+              <CardBody>
+                <RadarProfileChart radarProfiles={zoneAnalysisResult.radar_profiles} />
               </CardBody>
             </Card>
           )}

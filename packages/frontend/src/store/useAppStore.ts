@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import type { Project, CalculatorInfo, IndicatorRecommendation, SemanticClass, ZoneAnalysisResult, DesignStrategyResult, ProjectPipelineResult } from '../types';
+import type { Project, CalculatorInfo, IndicatorRecommendation, IndicatorRelationship, RecommendationSummary, SemanticClass, ZoneAnalysisResult, DesignStrategyResult, ProjectPipelineResult } from '../types';
+
+export interface VisionMaskResult {
+  imageId: string;
+  maskPaths: Record<string, string>;
+}
 
 interface AppState {
   // Current project
@@ -13,9 +18,19 @@ interface AppState {
   removeSelectedIndicator: (indicatorId: string) => void;
   clearSelectedIndicators: () => void;
 
+  // Vision results (persist across page navigation)
+  visionMaskResults: VisionMaskResult[];
+  setVisionMaskResults: (results: VisionMaskResult[]) => void;
+  visionStatistics: Record<string, unknown> | null;
+  setVisionStatistics: (stats: Record<string, unknown> | null) => void;
+
   // Pipeline results (persist across page navigation)
   recommendations: IndicatorRecommendation[];
   setRecommendations: (recs: IndicatorRecommendation[]) => void;
+  indicatorRelationships: IndicatorRelationship[];
+  setIndicatorRelationships: (rels: IndicatorRelationship[]) => void;
+  recommendationSummary: RecommendationSummary | null;
+  setRecommendationSummary: (s: RecommendationSummary | null) => void;
   zoneAnalysisResult: ZoneAnalysisResult | null;
   setZoneAnalysisResult: (r: ZoneAnalysisResult | null) => void;
   designStrategyResult: DesignStrategyResult | null;
@@ -62,9 +77,19 @@ export const useAppStore = create<AppState>((set) => ({
     })),
   clearSelectedIndicators: () => set({ selectedIndicators: [] }),
 
+  // Vision results
+  visionMaskResults: [],
+  setVisionMaskResults: (results) => set({ visionMaskResults: results }),
+  visionStatistics: null,
+  setVisionStatistics: (stats) => set({ visionStatistics: stats }),
+
   // Pipeline results
   recommendations: [],
   setRecommendations: (recs) => set({ recommendations: recs }),
+  indicatorRelationships: [],
+  setIndicatorRelationships: (rels) => set({ indicatorRelationships: rels }),
+  recommendationSummary: null,
+  setRecommendationSummary: (s) => set({ recommendationSummary: s }),
   zoneAnalysisResult: null,
   setZoneAnalysisResult: (r) => set({ zoneAnalysisResult: r }),
   designStrategyResult: null,
@@ -72,7 +97,11 @@ export const useAppStore = create<AppState>((set) => ({
   pipelineResult: null,
   setPipelineResult: (r) => set({ pipelineResult: r }),
   clearPipelineResults: () => set({
+    visionMaskResults: [],
+    visionStatistics: null,
     recommendations: [],
+    indicatorRelationships: [],
+    recommendationSummary: null,
     selectedIndicators: [],
     zoneAnalysisResult: null,
     designStrategyResult: null,

@@ -120,12 +120,36 @@ export interface CalculationResult {
 }
 
 // Indicator types
+export interface EvidenceCitation {
+  evidence_id: string;
+  citation: string;
+  year: number | null;
+  doi: string;
+  direction: string;
+  effect_size: string;
+  confidence: string;
+}
+
+export interface IndicatorRelationship {
+  indicator_a: string;
+  indicator_b: string;
+  relationship_type: string;
+  explanation: string;
+}
+
+export interface RecommendationSummary {
+  key_findings: string[];
+  evidence_gaps: string[];
+}
+
 export interface IndicatorRecommendation {
   indicator_id: string;
   indicator_name: string;
   relevance_score: number;
   rationale: string;
   evidence_ids: string[];
+  evidence_citations: EvidenceCitation[];
+  rank: number;
   relationship_direction: string;
   confidence: string;
 }
@@ -133,6 +157,8 @@ export interface IndicatorRecommendation {
 export interface RecommendationResponse {
   success: boolean;
   recommendations: IndicatorRecommendation[];
+  indicator_relationships: IndicatorRelationship[];
+  summary: RecommendationSummary | null;
   total_evidence_reviewed: number;
   model_used: string;
   error?: string;
@@ -279,6 +305,8 @@ export interface ZoneDiagnostic {
   area_sqm: number;
   status: string;
   total_priority: number;
+  composite_zscore: number;
+  rank: number;
   priority_by_layer: Record<string, number>;
   problems_by_layer: Record<string, ZoneProblem[]>;
   indicator_status: Record<string, Record<string, unknown>>;
@@ -299,6 +327,7 @@ export interface ZoneAnalysisResult {
   pvalue_by_layer: Record<string, Record<string, Record<string, number>>>;
   indicator_definitions: Record<string, IndicatorDefinitionInput>;
   layer_statistics: Record<string, Record<string, { N: number; Mean: number | null; Std: number | null; Min: number | null; Max: number | null }>>;
+  radar_profiles: Record<string, Record<string, number>>;
   computation_metadata: ComputationMetadata;
 }
 

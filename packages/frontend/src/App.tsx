@@ -1,9 +1,12 @@
 import { BrowserRouter, Routes, Route, Link, Outlet, useParams, useLocation } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { ChakraProvider, Box, Divider, Flex, Heading, Text, VStack } from '@chakra-ui/react';
 import { LayoutDashboard, FolderKanban, Calculator, Settings as SettingsIcon } from 'lucide-react';
 import theme from './theme';
 import StepIndicator from './components/StepIndicator';
+import useAppStore from './store/useAppStore';
+import { getStageStatuses } from './utils/pipelineStatus';
+import api from './api';
 
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
@@ -139,14 +142,23 @@ function Sidebar() {
 function ProjectPipelineLayout() {
   const { projectId } = useParams<{ projectId: string }>();
   const { pathname } = useLocation();
+  const { recommendations, zoneAnalysisResult } = useAppStore();
+
+  const { data: project } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: () => api.projects.get(projectId!).then(res => res.data),
+    enabled: !!projectId,
+  });
 
   const segment = pathname.split('/').pop() || '';
   const stepMap: Record<string, number> = { vision: 1, indicators: 2, analysis: 3, reports: 4 };
   const currentStep = stepMap[segment] || 1;
 
+  const stageStatuses = getStageStatuses(project ?? null, { recommendations, zoneAnalysisResult });
+
   return (
     <>
-      <StepIndicator currentStep={currentStep} projectId={projectId || ''} />
+      <StepIndicator currentStep={currentStep} projectId={projectId || ''} stageStatuses={stageStatuses} />
       <Outlet />
     </>
   );

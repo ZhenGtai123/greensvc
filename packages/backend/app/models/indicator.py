@@ -18,13 +18,39 @@ class IndicatorDefinition(BaseModel):
     note: str = ""
 
 
+class EvidenceCitation(BaseModel):
+    """Citation detail for a recommended indicator."""
+    evidence_id: str
+    citation: str = ""
+    year: int | None = None
+    doi: str = ""
+    direction: str = ""
+    effect_size: str = ""
+    confidence: str = ""
+
+
+class IndicatorRelationship(BaseModel):
+    """Relationship between two recommended indicators."""
+    indicator_a: str
+    indicator_b: str
+    relationship_type: str = ""
+    explanation: str = ""
+
+
+class RecommendationSummary(BaseModel):
+    key_findings: list[str] = Field(default_factory=list)
+    evidence_gaps: list[str] = Field(default_factory=list)
+
+
 class IndicatorRecommendation(BaseModel):
-    """Single indicator recommendation from Gemini"""
+    """Single indicator recommendation from LLM"""
     indicator_id: str
     indicator_name: str
     relevance_score: float = Field(ge=0, le=1)
     rationale: str
     evidence_ids: list[str] = Field(default_factory=list)
+    evidence_citations: list[EvidenceCitation] = Field(default_factory=list)
+    rank: int = 0
     relationship_direction: str = ""
     confidence: str = ""
 
@@ -45,6 +71,8 @@ class RecommendationResponse(BaseModel):
     """Response with indicator recommendations"""
     success: bool
     recommendations: list[IndicatorRecommendation] = Field(default_factory=list)
+    indicator_relationships: list[IndicatorRelationship] = Field(default_factory=list)
+    summary: RecommendationSummary | None = None
     total_evidence_reviewed: int = 0
     model_used: str = ""
     error: Optional[str] = None

@@ -74,6 +74,12 @@ import useAppStore from '../store/useAppStore';
 import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
+import {
+  RadarProfileChart,
+  ZonePriorityChart,
+  CorrelationHeatmap,
+  IndicatorComparisonChart,
+} from '../components/AnalysisCharts';
 
 const LAYERS = ['full', 'foreground', 'middleground', 'background'];
 const LAYER_LABELS: Record<string, string> = {
@@ -167,7 +173,7 @@ function Analysis() {
   const [zscoreModerate, setZscoreModerate] = useState(0.5);
   const [zscoreSignificant, setZscoreSignificant] = useState(1.0);
   const [zscoreCritical, setZscoreCritical] = useState(1.5);
-  const [useLlm, setUseLlm] = useState(false);
+  const [useLlm, setUseLlm] = useState(true);
 
   // Selected layer for filtering
   const [selectedLayer, setSelectedLayer] = useState(0);
@@ -745,7 +751,12 @@ function Analysis() {
                 <CardBody>
                   <VStack align="stretch" spacing={2}>
                     <HStack justify="space-between">
-                      <Text fontWeight="bold" fontSize="sm" noOfLines={1}>{diag.zone_name}</Text>
+                      <HStack spacing={1}>
+                        {diag.rank > 0 && (
+                          <Badge colorScheme="purple" fontSize="xs">#{diag.rank}</Badge>
+                        )}
+                        <Text fontWeight="bold" fontSize="sm" noOfLines={1}>{diag.zone_name}</Text>
+                      </HStack>
                       <Badge colorScheme={STATUS_COLORS[diag.status] || 'gray'}>
                         {diag.status}
                       </Badge>
@@ -753,6 +764,10 @@ function Analysis() {
                     <HStack justify="space-between">
                       <Text fontSize="xs" color="gray.600">Total Priority</Text>
                       <Text fontWeight="bold">{diag.total_priority}</Text>
+                    </HStack>
+                    <HStack justify="space-between">
+                      <Text fontSize="xs" color="gray.600">Composite Z</Text>
+                      <Text fontWeight="bold">{diag.composite_zscore?.toFixed(2) ?? '-'}</Text>
                     </HStack>
                     <HStack justify="space-between">
                       <Text fontSize="xs" color="gray.600">Problems (P{'\u2265'}4)</Text>
@@ -768,6 +783,18 @@ function Analysis() {
             ))}
           </SimpleGrid>
 
+          {/* Zone Priority Chart */}
+          {sortedDiagnostics.length > 0 && (
+            <Card mb={6}>
+              <CardHeader>
+                <Heading size="sm">Zone Priority Overview</Heading>
+              </CardHeader>
+              <CardBody>
+                <ZonePriorityChart diagnostics={sortedDiagnostics} />
+              </CardBody>
+            </Card>
+          )}
+
           {/* Statistics Table + Correlation Matrix with shared layer tabs */}
           <Tabs index={selectedLayer} onChange={setSelectedLayer} colorScheme="green" mb={6}>
             <TabList>
@@ -777,6 +804,18 @@ function Analysis() {
             <TabPanels>
               {LAYERS.map((layer) => (
                 <TabPanel key={layer} px={0}>
+                  {/* Indicator Comparison Chart */}
+                  {zoneResult && zoneResult.zone_statistics.filter(s => s.layer === layer).length > 0 && (
+                    <Card mb={6}>
+                      <CardHeader>
+                        <Heading size="sm">Indicator Comparison — {LAYER_LABELS[layer]}</Heading>
+                      </CardHeader>
+                      <CardBody>
+                        <IndicatorComparisonChart stats={zoneResult.zone_statistics} layer={layer} />
+                      </CardBody>
+                    </Card>
+                  )}
+
                   {/* Statistics Table */}
                   <Card mb={6}>
                     <CardHeader>
@@ -835,7 +874,7 @@ function Analysis() {
 
                   {/* Correlation Matrix */}
                   {correlationData && (
-                    <Card>
+                    <Card mb={6}>
                       <CardHeader>
                         <Heading size="sm">Correlation Matrix — {LAYER_LABELS[layer]}</Heading>
                       </CardHeader>
@@ -894,10 +933,80 @@ function Analysis() {
                       </CardBody>
                     </Card>
                   )}
+
+                  {/* Correlation Heatmap Chart */}
+                  {correlationData && correlationData.indicators.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <Heading size="sm">Correlation Heatmap — {LAYER_LABELS[layer]}</Heading>
+                      </CardHeader>
+                      <CardBody>
+                        <CorrelationHeatmap
+                          corr={correlationData.corr}
+                          pval={correlationData.pval}
+                          indicators={correlationData.indicators}
+                        />
+                      </CardBody>
+                    </Card>
+                  )}
                 </TabPanel>
               ))}
             </TabPanels>
           </Tabs>
+
+          {/* Radar Profiles (full-layer percentiles per zone) */}
+          {zoneResult?.radar_profiles && Object.keys(zoneResult.radar_profiles).length > 0 && (() => {
+            const zones = Object.keys(zoneResult.radar_profiles);
+            const allIndicators = Array.from(new Set(zones.flatMap(z => Object.keys(zoneResult.radar_profiles[z])))).sort();
+            return (
+              <Card mb={6}>
+                <CardHeader>
+                  <Heading size="sm">Radar Profiles (Full Layer Percentiles)</Heading>
+                </CardHeader>
+                <CardBody p={0}>
+                  <Box overflowX="auto">
+                    <Table size="sm">
+                      <Thead>
+                        <Tr>
+                          <Th>Zone</Th>
+                          {allIndicators.map(ind => <Th key={ind} isNumeric>{ind}</Th>)}
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {zones.map(zone => (
+                          <Tr key={zone}>
+                            <Td fontSize="xs" fontWeight="medium">{zone}</Td>
+                            {allIndicators.map(ind => {
+                              const val = zoneResult.radar_profiles[zone]?.[ind];
+                              return (
+                                <Td key={ind} isNumeric fontSize="xs"
+                                  bg={val != null ? (val >= 75 ? 'green.50' : val <= 25 ? 'red.50' : undefined) : undefined}
+                                >
+                                  {val != null ? val.toFixed(1) : '-'}
+                                </Td>
+                              );
+                            })}
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </Box>
+                </CardBody>
+              </Card>
+            );
+          })()}
+
+          {/* Radar Profile Chart */}
+          {zoneResult?.radar_profiles && Object.keys(zoneResult.radar_profiles).length > 0 && (
+            <Card mb={6}>
+              <CardHeader>
+                <Heading size="sm">Radar Profile Chart</Heading>
+              </CardHeader>
+              <CardBody>
+                <RadarProfileChart radarProfiles={zoneResult.radar_profiles} />
+              </CardBody>
+            </Card>
+          )}
 
           {/* Generate Strategies button (if no design results yet) */}
           {!designResult && (

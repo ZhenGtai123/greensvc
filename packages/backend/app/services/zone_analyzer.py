@@ -133,7 +133,7 @@ class ZoneAnalyzer:
                 for c1 in pval_m.index
             }
 
-        # 7) Zone diagnostics
+        # 7) Zone diagnostics (with composite z-score + rank)
         diagnostics = self._build_diagnostics(
             zone_names, ind_ids, ind_defs,
             priority_by_layer, classification_by_layer,
@@ -143,6 +143,18 @@ class ZoneAnalyzer:
         # 8) Layer-level statistics (mean/std/N across zones, per indicator)
         layer_statistics = self._compute_layer_statistics(raw_by_layer, meta_by_layer)
 
+        # 9) Radar profiles from full-layer percentiles
+        radar_profiles: dict[str, dict[str, float]] = {}
+        if "full" in pct_by_layer:
+            pct_full = pct_by_layer["full"]
+            for zone in zone_names:
+                if zone in pct_full.index:
+                    radar_profiles[zone] = {
+                        ind_id: round(float(pct_full.loc[zone, ind_id]), 2)
+                        for ind_id in ind_ids
+                        if not pd.isna(pct_full.loc[zone, ind_id])
+                    }
+
         return ZoneAnalysisResult(
             zone_statistics=enriched,
             zone_diagnostics=diagnostics,
@@ -150,6 +162,7 @@ class ZoneAnalyzer:
             pvalue_by_layer=pval_out,
             indicator_definitions=ind_defs,
             layer_statistics=layer_statistics,
+            radar_profiles=radar_profiles,
             computation_metadata=ComputationMetadata(
                 n_indicators=len(ind_ids),
                 n_zones=len(zone_names),
@@ -191,7 +204,7 @@ class ZoneAnalyzer:
         for layer, zone_dict in by_layer.items():
             df = pd.DataFrame(zone_dict).T
             df = df.sort_index()
-            df.columns = sorted(df.columns)
+            df = df.reindex(columns=sorted(df.columns))
             result[layer] = df
 
         return result, meta
@@ -272,12 +285,24 @@ class ZoneAnalyzer:
             zone_id = zone
             area_sqm = 0.0
             for ind_id in ind_ids:
-                m = meta_by_layer.get((zone, ind_id, "full"), {})
-                if m.get("zone_id"):
-                    zone_id = m["zone_id"]
-                if m.get("area_sqm"):
-                    area_sqm = m["area_sqm"]
-                break
+                for lyr in LAYERS:
+                    m = meta_by_layer.get((zone, ind_id, lyr), {})
+                    if m.get("zone_id"):
+                        zone_id = m["zone_id"]
+                    if m.get("area_sqm"):
+                        area_sqm = m["area_sqm"]
+                    if zone_id != zone:
+                        break
+                if zone_id != zone:
+                    break
+
+            # Composite z-score: mean of abs(z_score) across all indicators in full layer
+            composite_zscore = 0.0
+            if "full" in zscore_by_layer and zone in zscore_by_layer["full"].index:
+                full_z = zscore_by_layer["full"].loc[zone]
+                abs_z = full_z.abs().dropna()
+                if len(abs_z) > 0:
+                    composite_zscore = round(float(abs_z.mean()), 4)
 
             diagnostics.append(ZoneDiagnostic(
                 zone_id=zone_id,
@@ -285,12 +310,16 @@ class ZoneAnalyzer:
                 area_sqm=area_sqm,
                 status=status,
                 total_priority=total_priority,
+                composite_zscore=composite_zscore,
                 priority_by_layer=layer_priorities,
                 problems_by_layer=problems_by_layer,
                 indicator_status=indicator_status,
             ))
 
-        diagnostics.sort(key=lambda d: d.total_priority, reverse=True)
+        diagnostics.sort(key=lambda d: d.composite_zscore, reverse=True)
+        # Assign rank: 1 = highest composite z-score (worst)
+        for rank_idx, diag in enumerate(diagnostics, start=1):
+            diag.rank = rank_idx
         return diagnostics
 
     @staticmethod

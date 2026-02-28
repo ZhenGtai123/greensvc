@@ -30,6 +30,10 @@ import {
   Wrap,
   WrapItem,
   Progress,
+  Box,
+  Divider,
+  List,
+  ListItem,
 } from '@chakra-ui/react';
 import { Lightbulb } from 'lucide-react';
 import { useKnowledgeBaseSummary, useRecommendIndicators, useProject } from '../hooks/useApi';
@@ -57,7 +61,7 @@ function Indicators() {
   const recommendMutation = useRecommendIndicators();
   const toast = useAppToast();
 
-  const { currentProject, selectedIndicators, addSelectedIndicator, removeSelectedIndicator, clearSelectedIndicators, recommendations, setRecommendations } = useAppStore();
+  const { currentProject, selectedIndicators, addSelectedIndicator, removeSelectedIndicator, clearSelectedIndicators, recommendations, setRecommendations, indicatorRelationships, setIndicatorRelationships, recommendationSummary, setRecommendationSummary } = useAppStore();
 
   const activeProject = routeProject || currentProject;
 
@@ -66,14 +70,16 @@ function Indicators() {
   const [designBrief, setDesignBrief] = useState('');
   const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
 
-  // Pre-fill from active project
+  // Pre-fill from active project (only when project ID changes, not on every refetch)
+  const activeProjectId = activeProject?.id;
   useEffect(() => {
     if (activeProject) {
       setProjectName(activeProject.project_name);
       setDesignBrief(activeProject.design_brief || '');
       setSelectedDimensions(activeProject.performance_dimensions || []);
     }
-  }, [activeProject]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId]);
 
   // recommendations now from store (persisted across navigation)
 
@@ -92,6 +98,8 @@ function Indicators() {
 
       if (result.success) {
         setRecommendations(result.recommendations);
+        setIndicatorRelationships(result.indicator_relationships || []);
+        setRecommendationSummary(result.summary || null);
         toast({
           title: `Found ${result.recommendations.length} recommendations`,
           description: `Reviewed ${result.total_evidence_reviewed} evidence records`,
@@ -259,9 +267,12 @@ function Indicators() {
                         <AccordionIcon />
                       </AccordionButton>
                       <AccordionPanel pb={4}>
-                        <VStack align="stretch" spacing={2}>
+                        <VStack align="stretch" spacing={3}>
                           <Text fontSize="sm">{rec.rationale}</Text>
                           <HStack>
+                            {rec.rank > 0 && (
+                              <Badge colorScheme="purple">#{rec.rank}</Badge>
+                            )}
                             <Badge colorScheme={rec.relationship_direction === 'positive' ? 'green' : 'orange'}>
                               {rec.relationship_direction}
                             </Badge>
@@ -269,12 +280,36 @@ function Indicators() {
                               {rec.confidence} confidence
                             </Badge>
                           </HStack>
-                          {rec.evidence_ids.length > 0 && (
+
+                          {/* Evidence citations */}
+                          {rec.evidence_citations && rec.evidence_citations.length > 0 ? (
+                            <Box>
+                              <Text fontSize="xs" fontWeight="bold" color="gray.600" mb={1}>Evidence Citations:</Text>
+                              <VStack align="stretch" spacing={1}>
+                                {rec.evidence_citations.map((cit) => (
+                                  <HStack key={cit.evidence_id} fontSize="xs" color="gray.600" align="start" spacing={2}>
+                                    <Badge size="sm" variant="outline" colorScheme="gray" flexShrink={0}>
+                                      {cit.evidence_id}
+                                    </Badge>
+                                    <Text noOfLines={2} flex={1}>
+                                      {cit.citation || 'No citation text'}
+                                      {cit.year ? ` (${cit.year})` : ''}
+                                    </Text>
+                                    {cit.direction && (
+                                      <Badge size="sm" colorScheme={cit.direction === 'positive' ? 'green' : 'orange'} flexShrink={0}>
+                                        {cit.direction}
+                                      </Badge>
+                                    )}
+                                  </HStack>
+                                ))}
+                              </VStack>
+                            </Box>
+                          ) : rec.evidence_ids.length > 0 ? (
                             <Text fontSize="xs" color="gray.500">
                               Evidence: {rec.evidence_ids.slice(0, 3).join(', ')}
                               {rec.evidence_ids.length > 3 && ` +${rec.evidence_ids.length - 3} more`}
                             </Text>
-                          )}
+                          ) : null}
                         </VStack>
                       </AccordionPanel>
                     </AccordionItem>
@@ -288,6 +323,73 @@ function Indicators() {
               title="No recommendations yet"
               description="Enter project details and select dimensions to get AI-powered indicator recommendations."
             />
+          )}
+
+          {/* Indicator Relationships */}
+          {indicatorRelationships.length > 0 && (
+            <Card>
+              <CardHeader>
+                <Heading size="sm">Indicator Relationships</Heading>
+              </CardHeader>
+              <CardBody pt={0}>
+                <VStack align="stretch" spacing={2}>
+                  {indicatorRelationships.map((rel, i) => (
+                    <HStack key={i} fontSize="sm" spacing={2}>
+                      <Badge colorScheme="blue">{rel.indicator_a}</Badge>
+                      <Badge
+                        colorScheme={rel.relationship_type === 'synergistic' ? 'green' : rel.relationship_type === 'inverse' ? 'red' : 'gray'}
+                      >
+                        {rel.relationship_type}
+                      </Badge>
+                      <Badge colorScheme="blue">{rel.indicator_b}</Badge>
+                      {rel.explanation && (
+                        <Text fontSize="xs" color="gray.500" noOfLines={1} flex={1}>{rel.explanation}</Text>
+                      )}
+                    </HStack>
+                  ))}
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Recommendation Summary */}
+          {recommendationSummary && (
+            <Card>
+              <CardHeader>
+                <Heading size="sm">Summary</Heading>
+              </CardHeader>
+              <CardBody pt={0}>
+                <VStack align="stretch" spacing={3}>
+                  {recommendationSummary.key_findings.length > 0 && (
+                    <Box>
+                      <Text fontSize="sm" fontWeight="bold" mb={1}>Key Findings</Text>
+                      <List spacing={1}>
+                        {recommendationSummary.key_findings.map((f, i) => (
+                          <ListItem key={i} fontSize="sm" display="flex" alignItems="start">
+                            <Box as="span" color="green.500" mr={2} mt={0.5} flexShrink={0}>&#x2713;</Box>
+                            {f}
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Box>
+                  )}
+                  {recommendationSummary.evidence_gaps.length > 0 && (
+                    <Box>
+                      <Divider mb={2} />
+                      <Text fontSize="sm" fontWeight="bold" mb={1}>Evidence Gaps</Text>
+                      <List spacing={1}>
+                        {recommendationSummary.evidence_gaps.map((g, i) => (
+                          <ListItem key={i} fontSize="sm" display="flex" alignItems="start">
+                            <Box as="span" color="orange.500" mr={2} mt={0.5} flexShrink={0}>&#x26A0;</Box>
+                            {g}
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Box>
+                  )}
+                </VStack>
+              </CardBody>
+            </Card>
           )}
         </VStack>
       </SimpleGrid>

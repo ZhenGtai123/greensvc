@@ -30,7 +30,6 @@ class VisionBatchRequest(BaseModel):
     semantic_classes: list[str]
     semantic_countability: list[int]
     openness_list: list[int]
-    encoder: str = "vitb"
     output_dir: Optional[str] = None
 
 
@@ -71,7 +70,6 @@ async def submit_vision_batch(request: VisionBatchRequest):
         "semantic_classes": request.semantic_classes,
         "semantic_countability": request.semantic_countability,
         "openness_list": request.openness_list,
-        "encoder": request.encoder,
     }
 
     task = batch_analyze_task.delay(

@@ -8,11 +8,18 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _find_env_file() -> str:
+    """Locate the .env file relative to this config module (backend/.env)."""
+    backend_dir = Path(__file__).resolve().parent.parent.parent
+    env_path = backend_dir / ".env"
+    return str(env_path) if env_path.exists() else ".env"
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_find_env_file(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",  # Ignore extra env vars from old .env files

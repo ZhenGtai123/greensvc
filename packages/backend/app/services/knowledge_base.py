@@ -26,6 +26,7 @@ class KnowledgeBase:
         # Indexes for fast lookup
         self._evidence_by_indicator: dict[str, list[dict]] = {}
         self._evidence_by_dimension: dict[str, list[dict]] = {}
+        self._evidence_by_id: dict[str, dict] = {}
 
         self.loaded = False
 
@@ -77,8 +78,14 @@ class KnowledgeBase:
         """Build indexes for fast lookup"""
         self._evidence_by_indicator = {}
         self._evidence_by_dimension = {}
+        self._evidence_by_id = {}
 
         for record in self.evidence:
+            # Index by evidence_id
+            evidence_id = record.get('evidence_id', '')
+            if evidence_id:
+                self._evidence_by_id[evidence_id] = record
+
             # Index by indicator
             indicator = record.get('indicator', {})
             indicator_id = indicator.get('indicator_id', '')
@@ -94,6 +101,10 @@ class KnowledgeBase:
                 if dimension_id not in self._evidence_by_dimension:
                     self._evidence_by_dimension[dimension_id] = []
                 self._evidence_by_dimension[dimension_id].append(record)
+
+    def get_evidence_by_id(self, evidence_id: str) -> dict | None:
+        """Get a single evidence record by its ID (O(1) lookup)."""
+        return self._evidence_by_id.get(evidence_id)
 
     def get_evidence_for_indicator(self, indicator_id: str) -> list[dict]:
         """Get all evidence records for an indicator"""
@@ -174,15 +185,14 @@ class KnowledgeBase:
             ]
 
         if min_confidence:
-            confidence_order = ['CON_LOW', 'CON_MED', 'CON_HIGH']
-            if min_confidence in confidence_order:
-                min_idx = confidence_order.index(min_confidence)
-                results = [
-                    r for r in results
-                    if confidence_order.index(
-                        r.get('quality', {}).get('confidence', {}).get('code', 'CON_LOW')
-                    ) >= min_idx
-                ]
+            confidence_rank = {'CON_LOW': 0, 'CON_MED': 1, 'CON_HIGH': 2}
+            min_rank = confidence_rank.get(min_confidence, 0)
+            results = [
+                r for r in results
+                if confidence_rank.get(
+                    r.get('quality', {}).get('confidence', {}).get('code', 'CON_LOW'), 0
+                ) >= min_rank
+            ]
 
         return results
 

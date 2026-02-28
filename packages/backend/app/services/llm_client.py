@@ -75,11 +75,13 @@ class GeminiLLM(LLMClient):
 
     def check_connection(self) -> bool:
         if not self.api_key:
+            logger.warning("Gemini: API key is empty")
             return False
         try:
             self._get_client()
             return True
-        except Exception:
+        except Exception as e:
+            logger.error("Gemini check_connection failed: %s", e)
             return False
 
 
@@ -120,11 +122,13 @@ class OpenAILLM(LLMClient):
 
     def check_connection(self) -> bool:
         if not self.api_key:
+            logger.warning("OpenAI: API key is empty")
             return False
         try:
             self._get_client()
             return True
-        except Exception:
+        except Exception as e:
+            logger.error("OpenAI check_connection failed: %s", e)
             return False
 
 
@@ -162,11 +166,13 @@ class AnthropicLLM(LLMClient):
 
     def check_connection(self) -> bool:
         if not self.api_key:
+            logger.warning("Anthropic: API key is empty")
             return False
         try:
             self._get_client()
             return True
-        except Exception:
+        except Exception as e:
+            logger.error("Anthropic check_connection failed: %s", e)
             return False
 
 

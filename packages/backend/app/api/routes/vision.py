@@ -10,7 +10,13 @@ from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File, F
 from app.api.deps import get_vision_client, get_settings_dep
 from app.core.config import Settings
 from app.services.vision_client import VisionModelClient
-from app.models.vision import VisionAnalysisRequest, VisionAnalysisResponse, SemanticConfig
+from app.models.vision import (
+    VisionAnalysisRequest,
+    VisionAnalysisResponse,
+    PanoramaViewResult,
+    PanoramaAnalysisResponse,
+    SemanticConfig,
+)
 from app.api.routes.projects import get_projects_store
 
 logger = logging.getLogger(__name__)
@@ -214,6 +220,72 @@ async def analyze_project_image(
         logger.info("Saved %d masks for project %s image %s", len(saved), project_id, image_id)
 
     return result
+
+
+@router.post("/analyze/project-image/panorama", response_model=PanoramaAnalysisResponse)
+async def analyze_project_image_panorama(
+    project_id: str = Query(...),
+    image_id: str = Query(...),
+    request: VisionAnalysisRequest = Body(...),
+    vision_client: VisionModelClient = Depends(get_vision_client),
+    settings: Settings = Depends(get_settings_dep),
+):
+    """
+    Analyze a project image as a panorama (split into left/front/right views).
+    Each view produces its own set of masks saved under {image_id}_{view}/.
+    """
+    logger.info("analyze_project_image_panorama: project_id=%s image_id=%s", project_id, image_id)
+    projects_store = get_projects_store()
+    project = projects_store.get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    img = None
+    for i in project.uploaded_images:
+        if i.image_id == image_id:
+            img = i
+            break
+    if not img:
+        raise HTTPException(status_code=404, detail=f"Image not found: {image_id}")
+
+    if not Path(img.filepath).exists():
+        raise HTTPException(status_code=404, detail=f"Image file not found on disk: {img.filepath}")
+
+    valid, error = vision_client.validate_parameters(
+        request.semantic_classes,
+        request.semantic_countability,
+        request.openness_list,
+    )
+    if not valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    views_result = await vision_client.analyze_panorama(img.filepath, request)
+
+    panorama_views: dict[str, PanoramaViewResult] = {}
+    for view_name, view_response in views_result.items():
+        if view_response.status == "success" and view_response.images:
+            view_image_id = f"{image_id}_{view_name}"
+            saved = await _save_masks_to_project(view_response, project_id, view_image_id, settings)
+            img.mask_filepaths.update({f"{view_name}_{k}": v for k, v in saved.items()})
+            panorama_views[view_name] = PanoramaViewResult(
+                status="success",
+                mask_paths=saved,
+                statistics=view_response.statistics,
+                processing_time=view_response.processing_time,
+            )
+        else:
+            panorama_views[view_name] = PanoramaViewResult(
+                status="error",
+                error=view_response.error or "View analysis failed",
+            )
+
+    projects_store.save(project)
+
+    all_success = all(v.status == "success" for v in panorama_views.values())
+    return PanoramaAnalysisResponse(
+        status="success" if all_success else "partial",
+        views=panorama_views,
+    )
 
 
 @router.post("/batch", response_model=list[VisionAnalysisResponse])
