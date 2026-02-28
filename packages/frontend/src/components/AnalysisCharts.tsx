@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Box, Text, Tooltip as ChakraTooltip } from '@chakra-ui/react';
+import { Box, Text } from '@chakra-ui/react';
 import {
   RadarChart,
   PolarGrid,
@@ -72,7 +72,12 @@ export function RadarProfileChart({ radarProfiles }: RadarProfileChartProps) {
     <ResponsiveContainer width="100%" height={400}>
       <RadarChart data={data} cx="50%" cy="50%" outerRadius="75%">
         <PolarGrid />
-        <PolarAngleAxis dataKey="indicator" tick={{ fontSize: 11 }} />
+        <PolarAngleAxis
+          dataKey="indicator"
+          tick={{ fontSize: 9 }}
+          tickLine={false}
+          tickFormatter={(v: string) => v.length > 10 ? v.slice(0, 10) + '…' : v}
+        />
         <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
         {zones.map((zone, i) => (
           <Radar
@@ -112,7 +117,7 @@ export function ZonePriorityChart({ diagnostics }: ZonePriorityChartProps) {
   if (data.length === 0) return null;
 
   return (
-    <ResponsiveContainer width="100%" height={Math.max(200, data.length * 50)}>
+    <ResponsiveContainer width="100%" height={Math.max(250, data.length * 50)}>
       <BarChart data={data} layout="vertical" margin={{ left: 20, right: 30, top: 5, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis type="number" tick={{ fontSize: 11 }} />
@@ -163,10 +168,10 @@ function significanceStars(p: number | undefined): string {
 }
 
 export function CorrelationHeatmap({ corr, pval, indicators }: CorrelationHeatmapProps) {
-  const cellSize = 48;
-  const labelWidth = 80;
-  const labelHeight = 80;
   const n = indicators.length;
+  const cellSize = Math.max(36, Math.min(48, 400 / Math.max(n, 1)));
+  const labelWidth = 100;
+  const labelHeight = 100;
 
   if (n === 0) return null;
 
@@ -186,7 +191,7 @@ export function CorrelationHeatmap({ corr, pval, indicators }: CorrelationHeatma
             fontSize={10}
             transform={`rotate(-45, ${labelWidth + col * cellSize + cellSize / 2}, ${labelHeight - 6})`}
           >
-            {ind.length > 12 ? ind.slice(0, 11) + '…' : ind}
+            {ind.length > 10 ? ind.slice(0, 10) + '…' : ind}
           </text>
         ))}
 
@@ -199,51 +204,49 @@ export function CorrelationHeatmap({ corr, pval, indicators }: CorrelationHeatma
               textAnchor="end"
               fontSize={10}
             >
-              {row.length > 12 ? row.slice(0, 11) + '…' : row}
+              {row.length > 10 ? row.slice(0, 10) + '…' : row}
             </text>
             {indicators.map((col, ci) => {
               const val = corr[row]?.[col];
               const p = pval?.[row]?.[col];
               const stars = significanceStars(p);
               return (
-                <ChakraTooltip
-                  key={`${row}-${col}`}
-                  label={`${row} × ${col}: ${val != null ? val.toFixed(3) : '-'}${stars ? ` (p${stars})` : ''}`}
-                  fontSize="xs"
-                >
-                  <g>
-                    <rect
-                      x={labelWidth + ci * cellSize}
-                      y={labelHeight + ri * cellSize}
-                      width={cellSize - 2}
-                      height={cellSize - 2}
-                      rx={3}
-                      fill={val != null ? corrColor(val) : '#EDF2F7'}
-                      stroke="#E2E8F0"
-                      strokeWidth={0.5}
-                    />
+                <g key={`${row}-${col}`}>
+                  <rect
+                    x={labelWidth + ci * cellSize}
+                    y={labelHeight + ri * cellSize}
+                    width={cellSize - 2}
+                    height={cellSize - 2}
+                    rx={3}
+                    fill={val != null ? corrColor(val) : '#EDF2F7'}
+                    stroke="#E2E8F0"
+                    strokeWidth={0.5}
+                  >
+                    <title>{`${row} × ${col}: ${val != null ? val.toFixed(3) : '-'}${stars ? ` (p${stars})` : ''}`}</title>
+                  </rect>
+                  <text
+                    x={labelWidth + ci * cellSize + (cellSize - 2) / 2}
+                    y={labelHeight + ri * cellSize + (cellSize - 2) / 2 + 4}
+                    textAnchor="middle"
+                    fontSize={9}
+                    fill={val != null && Math.abs(val) > 0.6 ? '#fff' : '#2D3748'}
+                    pointerEvents="none"
+                  >
+                    {val != null ? val.toFixed(2) : '-'}
+                  </text>
+                  {stars && (
                     <text
                       x={labelWidth + ci * cellSize + (cellSize - 2) / 2}
-                      y={labelHeight + ri * cellSize + (cellSize - 2) / 2 + 4}
+                      y={labelHeight + ri * cellSize + (cellSize - 2) / 2 + 14}
                       textAnchor="middle"
-                      fontSize={9}
-                      fill={val != null && Math.abs(val) > 0.6 ? '#fff' : '#2D3748'}
+                      fontSize={8}
+                      fill={val != null && Math.abs(val) > 0.6 ? '#fff' : '#718096'}
+                      pointerEvents="none"
                     >
-                      {val != null ? val.toFixed(2) : '-'}
+                      {stars}
                     </text>
-                    {stars && (
-                      <text
-                        x={labelWidth + ci * cellSize + (cellSize - 2) / 2}
-                        y={labelHeight + ri * cellSize + (cellSize - 2) / 2 + 14}
-                        textAnchor="middle"
-                        fontSize={8}
-                        fill={val != null && Math.abs(val) > 0.6 ? '#fff' : '#718096'}
-                      >
-                        {stars}
-                      </text>
-                    )}
-                  </g>
-                </ChakraTooltip>
+                  )}
+                </g>
               );
             })}
           </g>
@@ -294,7 +297,7 @@ export function IndicatorComparisonChart({ stats, layer }: IndicatorComparisonCh
     <ResponsiveContainer width="100%" height={Math.max(250, data.length * 35 + 60)}>
       <BarChart data={data} margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="indicator" tick={{ fontSize: 10 }} interval={0} angle={-30} textAnchor="end" height={60} />
+        <XAxis dataKey="indicator" tick={{ fontSize: 9 }} interval={0} angle={-45} textAnchor="end" height={80} />
         <YAxis tick={{ fontSize: 11 }} />
         <Tooltip />
         <Legend wrapperStyle={{ fontSize: 12 }} />

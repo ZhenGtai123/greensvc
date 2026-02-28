@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Box,
@@ -32,7 +33,7 @@ import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
-import { RadarProfileChart, ZonePriorityChart } from '../components/AnalysisCharts';
+import { RadarProfileChart, ZonePriorityChart, CorrelationHeatmap, IndicatorComparisonChart } from '../components/AnalysisCharts';
 
 function Reports() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
@@ -77,6 +78,8 @@ function Reports() {
       pipelineResult,
       zoneResult: zoneAnalysisResult,
       designResult: designStrategyResult,
+      radarProfiles: zoneAnalysisResult.radar_profiles ?? null,
+      correlationByLayer: zoneAnalysisResult.correlation_by_layer ?? null,
     });
     const blob = new Blob([md], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
@@ -112,6 +115,16 @@ function Reports() {
   const sortedDiags = zoneAnalysisResult
     ? [...zoneAnalysisResult.zone_diagnostics].sort((a, b) => (a.rank || 999) - (b.rank || 999))
     : [];
+
+  // Correlation data for full layer
+  const correlationData = useMemo(() => {
+    if (!zoneAnalysisResult) return null;
+    const corr = zoneAnalysisResult.correlation_by_layer?.['full'];
+    const pval = zoneAnalysisResult.pvalue_by_layer?.['full'];
+    if (!corr) return null;
+    const indicators = Object.keys(corr);
+    return { indicators, corr, pval };
+  }, [zoneAnalysisResult]);
 
   return (
     <PageShell>
@@ -376,6 +389,22 @@ function Reports() {
             </Card>
           )}
 
+          {/* Correlation Heatmap — Full Layer */}
+          {correlationData && correlationData.indicators.length > 0 && (
+            <Card>
+              <CardHeader>
+                <Heading size="md">Correlation Heatmap — Full Layer</Heading>
+              </CardHeader>
+              <CardBody>
+                <CorrelationHeatmap
+                  corr={correlationData.corr}
+                  pval={correlationData.pval}
+                  indicators={correlationData.indicators}
+                />
+              </CardBody>
+            </Card>
+          )}
+
           {/* Zone Statistics Overview */}
           {zoneAnalysisResult && zoneAnalysisResult.zone_statistics.length > 0 && (
             <Card>
@@ -425,6 +454,18 @@ function Reports() {
                     </Tbody>
                   </Table>
                 </Box>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* Indicator Comparison — Full Layer */}
+          {zoneAnalysisResult && zoneAnalysisResult.zone_statistics.length > 0 && (
+            <Card>
+              <CardHeader>
+                <Heading size="md">Indicator Comparison — Full Layer</Heading>
+              </CardHeader>
+              <CardBody>
+                <IndicatorComparisonChart stats={zoneAnalysisResult.zone_statistics} layer="full" />
               </CardBody>
             </Card>
           )}

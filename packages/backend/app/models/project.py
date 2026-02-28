@@ -44,9 +44,11 @@ class UploadedImage(BaseModel):
     longitude: Optional[float] = None
     metrics_results: dict[str, Optional[float]] = Field(default_factory=dict)
     mask_filepaths: dict[str, str] = Field(default_factory=dict)
-    # Keys from Vision API: "semantic_map", "depth_map", "fmb_map", "openness_map",
-    #        "foreground_map", "middleground_map", "background_map",
-    #        "sky_mask", "semantic_raw"
+    # 25 keys from Vision API (HEX_IMAGE_KEYS):
+    #   Base (5): semantic_map, depth_map, openness_map, fmb_map, original
+    #   FMB masks (3): foreground_map, middleground_map, background_map
+    #   Cross-products (5×3=15): {semantic,depth,openness,original,fmb}_{foreground,middleground,background}
+    #   Extra (2): sky_mask, semantic_raw
 
 
 class ProjectCreate(BaseModel):

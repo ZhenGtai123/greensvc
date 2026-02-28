@@ -24,8 +24,10 @@ export function generateReport(params: {
   pipelineResult?: ProjectPipelineResult | null;
   zoneResult: ZoneAnalysisResult;
   designResult?: DesignStrategyResult | null;
+  radarProfiles?: Record<string, Record<string, number>> | null;
+  correlationByLayer?: Record<string, Record<string, Record<string, number>>> | null;
 }): string {
-  const { projectName, pipelineResult, zoneResult, designResult } = params;
+  const { projectName, pipelineResult, zoneResult, designResult, radarProfiles, correlationByLayer } = params;
   const sections: string[] = [];
 
   // 1. Header
@@ -105,7 +107,41 @@ export function generateReport(params: {
     ));
   }
 
-  // 6. Design Strategies
+  // 6. Radar Profiles
+  if (radarProfiles && Object.keys(radarProfiles).length > 0) {
+    const zones = Object.keys(radarProfiles);
+    const allIndicators = Array.from(
+      new Set(zones.flatMap(z => Object.keys(radarProfiles[z]))),
+    ).sort();
+    if (allIndicators.length > 0) {
+      sections.push('## Radar Profiles');
+      sections.push(mdTable(
+        ['Indicator', ...zones],
+        allIndicators.map(ind =>
+          [ind, ...zones.map(z => fmt(radarProfiles[z]?.[ind], 0))],
+        ),
+      ));
+    }
+  }
+
+  // 7. Correlation Matrix — Full Layer
+  if (correlationByLayer) {
+    const corr = correlationByLayer['full'];
+    if (corr) {
+      const indicators = Object.keys(corr).sort();
+      if (indicators.length > 0) {
+        sections.push('## Correlation Matrix — Full Layer');
+        sections.push(mdTable(
+          ['', ...indicators],
+          indicators.map(row =>
+            [row, ...indicators.map(col => fmt(corr[row]?.[col], 3))],
+          ),
+        ));
+      }
+    }
+  }
+
+  // 8. Design Strategies
   if (designResult) {
     sections.push('## Design Strategies');
     for (const zone of Object.values(designResult.zones)) {
