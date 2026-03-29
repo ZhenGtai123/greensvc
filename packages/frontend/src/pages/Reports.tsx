@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback } from 'react';
+import { useMemo, useRef, useCallback, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Box,
@@ -25,15 +25,19 @@ import {
   Tag,
   TagLabel,
   Icon,
+  Textarea,
+  Collapse,
 } from '@chakra-ui/react';
-import { Download, FileText, FileImage, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Download, FileText, FileImage, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
 import { generateReport } from '../utils/generateReport';
+import { useGenerateReport } from '../hooks/useApi';
 import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
-import { RadarProfileChart, ZonePriorityChart, CorrelationHeatmap, IndicatorComparisonChart, PriorityHeatmap } from '../components/AnalysisCharts';
+// Charts removed — they live in Analysis page only
+import type { ReportRequest } from '../types';
 
 function Reports() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
@@ -51,6 +55,43 @@ function Reports() {
   } = useAppStore();
 
   const projectName = currentProject?.project_name || pipelineResult?.project_name || 'Unknown Project';
+
+  // Agent C report generation
+  const generateReportMutation = useGenerateReport();
+  const [aiReport, setAiReport] = useState<string | null>(null);
+  const [aiReportMeta, setAiReportMeta] = useState<Record<string, unknown> | null>(null);
+
+  const handleGenerateAiReport = useCallback(async () => {
+    if (!zoneAnalysisResult) return;
+    toast({ title: 'Generating AI report (Agent C)...', status: 'info', duration: 3000 });
+    try {
+      const request: ReportRequest = {
+        zone_analysis: zoneAnalysisResult,
+        design_strategies: designStrategyResult ?? undefined,
+        stage1_recommendations: recommendations.length > 0 ? recommendations : undefined,
+        project_context: currentProject ? {
+          project: { name: currentProject.project_name, location: currentProject.project_location },
+          context: {
+            climate: { koppen_zone_id: currentProject.koppen_zone_id },
+            urban_form: { space_type_id: currentProject.space_type_id, lcz_type_id: currentProject.lcz_type_id },
+            user: { age_group_id: currentProject.age_group_id },
+          },
+          performance_query: {
+            design_brief: currentProject.design_brief,
+            dimensions: currentProject.performance_dimensions,
+          },
+        } : undefined,
+        format: 'markdown',
+      };
+      const result = await generateReportMutation.mutateAsync(request);
+      setAiReport(result.content);
+      setAiReportMeta(result.metadata);
+      toast({ title: `AI report generated — ${result.metadata.word_count || '?'} words`, status: 'success' });
+    } catch (err) {
+      console.error('Agent C report failed:', err);
+      toast({ title: 'AI report generation failed', status: 'error' });
+    }
+  }, [zoneAnalysisResult, designStrategyResult, recommendations, currentProject, generateReportMutation, toast]);
 
   // Pipeline completion status
   const hasVision = (currentProject?.uploaded_images?.length ?? 0) > 0;
@@ -155,20 +196,22 @@ function Reports() {
     ? [...zoneAnalysisResult.zone_diagnostics].sort((a, b) => (a.rank || 999) - (b.rank || 999))
     : [];
 
-  // Correlation data for full layer
-  const correlationData = useMemo(() => {
-    if (!zoneAnalysisResult) return null;
-    const corr = zoneAnalysisResult.correlation_by_layer?.['full'];
-    const pval = zoneAnalysisResult.pvalue_by_layer?.['full'];
-    if (!corr) return null;
-    const indicators = Object.keys(corr);
-    return { indicators, corr, pval };
-  }, [zoneAnalysisResult]);
 
   return (
     <PageShell>
       <PageHeader title="Report Generation">
         <HStack>
+          <Button
+            size="sm"
+            leftIcon={<Sparkles size={14} />}
+            onClick={handleGenerateAiReport}
+            isDisabled={!hasAnalysis}
+            isLoading={generateReportMutation.isPending}
+            loadingText="Generating..."
+            colorScheme="purple"
+          >
+            Generate AI Report
+          </Button>
           <Button
             size="sm"
             leftIcon={<Download size={14} />}
@@ -262,6 +305,53 @@ function Reports() {
               </VStack>
             </CardBody>
           </Card>
+
+          {/* Agent C: AI-Generated Report */}
+          {aiReport && (
+            <Card borderColor="purple.200" borderWidth={2}>
+              <CardHeader>
+                <HStack justify="space-between">
+                  <HStack spacing={2}>
+                    <Icon as={Sparkles} color="purple.500" />
+                    <Heading size="md">AI-Generated Report (Agent C)</Heading>
+                  </HStack>
+                  <HStack spacing={2}>
+                    {aiReportMeta && (
+                      <Badge colorScheme="purple" variant="subtle">
+                        {String(aiReportMeta.word_count || '?')} words · {String(aiReportMeta.coded_references || '?')} refs
+                      </Badge>
+                    )}
+                    <Button size="xs" colorScheme="purple" variant="outline" onClick={() => {
+                      const blob = new Blob([aiReport], { type: 'text/markdown' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `${projectName.replace(/\s+/g, '_')}_ai_report.md`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}>
+                      Download MD
+                    </Button>
+                  </HStack>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <Box
+                  maxH="600px"
+                  overflowY="auto"
+                  p={4}
+                  bg="gray.50"
+                  borderRadius="md"
+                  fontSize="sm"
+                  whiteSpace="pre-wrap"
+                  fontFamily="mono"
+                  sx={{ '& h1,h2,h3': { fontWeight: 'bold', mt: 4, mb: 2 } }}
+                >
+                  {aiReport}
+                </Box>
+              </CardBody>
+            </Card>
+          )}
 
           {/* Recommended Indicators */}
           {recommendations.length > 0 && (
@@ -413,169 +503,6 @@ function Reports() {
             </Card>
           )}
 
-          {/* Zone Priority Chart */}
-          {sortedDiags.length > 0 && (
-            <Card>
-              <CardHeader>
-                <Heading size="md">Zone Priority Overview</Heading>
-              </CardHeader>
-              <CardBody>
-                <ZonePriorityChart diagnostics={sortedDiags} />
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Priority Heatmap */}
-          {sortedDiags.length > 0 && (
-            <Card>
-              <CardHeader>
-                <Heading size="md">Priority Heatmap</Heading>
-              </CardHeader>
-              <CardBody>
-                <PriorityHeatmap diagnostics={sortedDiags} layer="full" />
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Radar Profile Chart */}
-          {zoneAnalysisResult?.radar_profiles && Object.keys(zoneAnalysisResult.radar_profiles).length > 0 && (
-            <Card>
-              <CardHeader>
-                <Heading size="md">Radar Profiles</Heading>
-              </CardHeader>
-              <CardBody>
-                <RadarProfileChart radarProfiles={zoneAnalysisResult.radar_profiles} />
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Correlation Heatmap — Full Layer */}
-          {correlationData && correlationData.indicators.length > 0 && (
-            <Card>
-              <CardHeader>
-                <Heading size="md">Correlation Heatmap — Full Layer</Heading>
-              </CardHeader>
-              <CardBody>
-                <CorrelationHeatmap
-                  corr={correlationData.corr}
-                  pval={correlationData.pval}
-                  indicators={correlationData.indicators}
-                />
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Zone Statistics Overview */}
-          {zoneAnalysisResult && zoneAnalysisResult.zone_statistics.length > 0 && (
-            <Card>
-              <CardHeader>
-                <Heading size="md">Zone Statistics — Full Layer</Heading>
-              </CardHeader>
-              <CardBody p={0}>
-                <Box overflowX="auto">
-                  <Table size="sm">
-                    <Thead>
-                      <Tr>
-                        <Th>Zone</Th>
-                        <Th>Indicator</Th>
-                        <Th isNumeric>Mean</Th>
-                        <Th isNumeric>Z-score</Th>
-                        <Th isNumeric>Priority</Th>
-                        <Th>Classification</Th>
-                      </Tr>
-                    </Thead>
-                    <Tbody>
-                      {zoneAnalysisResult.zone_statistics
-                        .filter(s => s.layer === 'full')
-                        .sort((a, b) => b.priority - a.priority)
-                        .slice(0, 20)
-                        .map((s, i) => (
-                          <Tr key={i}>
-                            <Td>{s.zone_name}</Td>
-                            <Td><Badge>{s.indicator_id}</Badge></Td>
-                            <Td isNumeric>{s.mean !== null && s.mean !== undefined ? s.mean.toFixed(3) : '-'}</Td>
-                            <Td isNumeric>{s.z_score !== null && s.z_score !== undefined ? s.z_score.toFixed(2) : '-'}</Td>
-                            <Td isNumeric>
-                              <Badge colorScheme={s.priority >= 4 ? 'red' : s.priority >= 2 ? 'yellow' : 'green'}>
-                                {s.priority}
-                              </Badge>
-                            </Td>
-                            <Td>
-                              <Badge colorScheme={
-                                s.classification === 'Critical' ? 'red' :
-                                s.classification === 'Poor' ? 'orange' :
-                                s.classification === 'Moderate' ? 'yellow' : 'green'
-                              }>
-                                {s.classification}
-                              </Badge>
-                            </Td>
-                          </Tr>
-                        ))}
-                    </Tbody>
-                  </Table>
-                </Box>
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Indicator Comparison — Full Layer */}
-          {zoneAnalysisResult && zoneAnalysisResult.zone_statistics.length > 0 && (
-            <Card>
-              <CardHeader>
-                <Heading size="md">Indicator Comparison — Full Layer</Heading>
-              </CardHeader>
-              <CardBody>
-                <IndicatorComparisonChart stats={zoneAnalysisResult.zone_statistics} layer="full" />
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Design Strategies */}
-          {designStrategyResult && (
-            <Card>
-              <CardHeader>
-                <HStack justify="space-between">
-                  <Heading size="md">Design Strategies</Heading>
-                  <Badge colorScheme="purple">
-                    {designStrategyResult.metadata.total_strategies} strategies
-                  </Badge>
-                </HStack>
-              </CardHeader>
-              <CardBody>
-                <VStack align="stretch" spacing={4}>
-                  {Object.values(designStrategyResult.zones).map(zone => (
-                    <Box key={zone.zone_id} p={4} borderWidth="1px" borderRadius="md">
-                      <HStack justify="space-between" mb={2}>
-                        <Text fontWeight="bold">{zone.zone_name}</Text>
-                        <Badge colorScheme={
-                          zone.status.toLowerCase().includes('critical') ? 'red' :
-                          zone.status.toLowerCase().includes('poor') ? 'orange' : 'green'
-                        }>
-                          {zone.status}
-                        </Badge>
-                      </HStack>
-                      {zone.overall_assessment && (
-                        <Text fontSize="sm" color="gray.600" mb={2}>{zone.overall_assessment}</Text>
-                      )}
-                      <Text fontSize="sm" fontWeight="medium" mb={1}>
-                        {zone.design_strategies.length} strategies:
-                      </Text>
-                      <VStack align="stretch" spacing={1} pl={3}>
-                        {zone.design_strategies.map((s, i) => (
-                          <HStack key={i} fontSize="sm">
-                            <Badge size="sm" colorScheme="purple">{s.priority}</Badge>
-                            <Text>{s.strategy_name}</Text>
-                            <Text color="gray.500">({s.confidence})</Text>
-                          </HStack>
-                        ))}
-                      </VStack>
-                    </Box>
-                  ))}
-                </VStack>
-              </CardBody>
-            </Card>
-          )}
-
           {/* Download section */}
           {hasAnalysis && (
             <Card>
@@ -601,6 +528,7 @@ function Reports() {
               </CardBody>
             </Card>
           )}
+
         </VStack>
       )}
 

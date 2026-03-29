@@ -7,10 +7,10 @@ import type { StageStatus } from '../utils/pipelineStatus';
 const MotionBox = motion.create(Box);
 
 const STEPS = [
-  { step: 1, label: 'Vision Analysis', path: 'vision' },
-  { step: 2, label: 'Indicators', path: 'indicators' },
+  { step: 1, label: 'Setup', path: '' },
+  { step: 2, label: 'Prepare', path: 'vision' },
   { step: 3, label: 'Analysis', path: 'analysis' },
-  { step: 4, label: 'Reports', path: 'reports' },
+  { step: 4, label: 'Report', path: 'reports' },
 ];
 
 interface StepIndicatorProps {
@@ -21,7 +21,7 @@ interface StepIndicatorProps {
 
 function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorProps) {
   return (
-    <HStack spacing={0} w="full" bg="white" borderBottom="1px solid" borderColor="gray.200" px={6} py={3}>
+    <HStack spacing={0} w="full" bg="white" borderBottom="1px solid" borderColor="gray.200" px={4} py={3}>
       {STEPS.map((s, idx) => {
         const status = stageStatuses[idx];
         const isDone = status?.done ?? false;
@@ -30,12 +30,16 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
         const isLocked = !isDone && !isReady && !isActive;
         const connector = idx < STEPS.length - 1;
 
+        const linkTo = s.path
+          ? `/projects/${projectId}/${s.path}`
+          : `/projects/${projectId}`;
+
         const inner = (
           <>
             {isActive ? (
               <MotionBox
-                w={8}
-                h={8}
+                w={7}
+                h={7}
                 borderRadius="full"
                 display="flex"
                 alignItems="center"
@@ -51,8 +55,8 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
               </MotionBox>
             ) : (
               <Box
-                w={8}
-                h={8}
+                w={7}
+                h={7}
                 borderRadius="full"
                 display="flex"
                 alignItems="center"
@@ -62,11 +66,11 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
                 bg={isDone ? 'brand.500' : 'gray.200'}
                 color={isDone ? 'white' : 'gray.500'}
               >
-                {isDone ? <Check size={14} /> : s.step}
+                {isDone ? <Check size={12} /> : s.step}
               </Box>
             )}
             <Text
-              fontSize="sm"
+              fontSize="xs"
               fontWeight={isActive ? 'bold' : 'normal'}
               color={isDone ? 'brand.600' : isActive ? 'blue.600' : 'gray.500'}
               whiteSpace="nowrap"
@@ -83,7 +87,7 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
                 display="flex"
                 alignItems="center"
                 gap={2}
-                px={3}
+                px={2}
                 py={1}
                 borderRadius="md"
                 opacity={0.45}
@@ -94,11 +98,11 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
             ) : (
               <Box
                 as={Link}
-                to={`/projects/${projectId}/${s.path}`}
+                to={linkTo}
                 display="flex"
                 alignItems="center"
                 gap={2}
-                px={3}
+                px={2}
                 py={1}
                 borderRadius="md"
                 _hover={{ bg: 'gray.50' }}

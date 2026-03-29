@@ -289,7 +289,7 @@
   },
   {
     "name": "skyscraper",
-    "color": "#390C8C",
+    "color": "#8C8C8C",
     "countable": 1,
     "openness": 1
   },
@@ -384,7 +384,7 @@
     "openness": 1
   },
   {
-    "name": "coffee;table;cocktail;table",
+    "name": "coffee table",
     "color": "#00FF70",
     "countable": 0,
     "openness": 1
@@ -522,7 +522,7 @@
     "openness": 1
   },
   {
-    "name": "streetlight;street;lamp",
+    "name": "streetlight;street lamp",
     "color": "#0047FF",
     "countable": 0,
     "openness": 1
@@ -816,7 +816,7 @@
     "openness": 1
   },
   {
-    "name": "traffic;light;traffic;signal;stoplight",
+    "name": "traffic light",
     "color": "#2900FF",
     "countable": 0,
     "openness": 1
@@ -828,7 +828,7 @@
     "openness": 1
   },
   {
-    "name": "ashcan;trash;can;garbage;can;wastebin;ash;bin;ash-bin;ashbin;dustbin;trash;barrel;trash;bin",
+    "name": "trash can",
     "color": "#AD00FF",
     "countable": 0,
     "openness": 1

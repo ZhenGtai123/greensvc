@@ -115,6 +115,58 @@ async def analyze_image(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/analyze/panorama", response_model=PanoramaAnalysisResponse)
+async def analyze_image_panorama(
+    file: UploadFile = File(...),
+    request_data: str = Form(...),
+    vision_client: VisionModelClient = Depends(get_vision_client),
+    settings: Settings = Depends(get_settings_dep),
+    _user: UserResponse = Depends(get_current_user),
+):
+    """
+    Analyze an uploaded image as panorama (split into left/front/right views).
+    """
+    try:
+        request_dict = json.loads(request_data)
+        request = VisionAnalysisRequest(**request_dict)
+    except (json.JSONDecodeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=f"Invalid request data: {e}")
+
+    valid, error = vision_client.validate_parameters(
+        request.semantic_classes, request.semantic_countability, request.openness_list,
+    )
+    if not valid:
+        raise HTTPException(status_code=400, detail=error)
+
+    settings.ensure_directories()
+    temp_path = settings.temp_full_path / f"upload_{file.filename}"
+
+    try:
+        content = await file.read()
+        with open(temp_path, 'wb') as f:
+            f.write(content)
+
+        views_result = await vision_client.analyze_panorama(str(temp_path), request)
+
+        panorama_views: dict[str, PanoramaViewResult] = {}
+        for view_name, view_response in views_result.items():
+            panorama_views[view_name] = PanoramaViewResult(
+                status=view_response.status,
+                mask_paths=view_response.mask_paths if view_response.mask_paths else {},
+                statistics=view_response.statistics,
+                processing_time=view_response.processing_time,
+                error=view_response.error,
+            )
+
+        all_success = all(v.status == "success" for v in panorama_views.values())
+        return PanoramaAnalysisResponse(
+            status="success" if all_success else "partial",
+            views=panorama_views,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/analyze/path", response_model=VisionAnalysisResponse)
 async def analyze_image_by_path(
     image_path: str,

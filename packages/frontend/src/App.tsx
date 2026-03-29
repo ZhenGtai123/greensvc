@@ -151,8 +151,8 @@ function ProjectPipelineLayout() {
   });
 
   const segment = pathname.split('/').pop() || '';
-  const stepMap: Record<string, number> = { vision: 1, indicators: 2, analysis: 3, reports: 4 };
-  const currentStep = stepMap[segment] || 1;
+  const stepMap: Record<string, number> = { vision: 2, analysis: 3, reports: 4 };
+  const currentStep = stepMap[segment] || 1; // fallback 1 = Setup
 
   const stageStatuses = getStageStatuses(project ?? null, { recommendations, zoneAnalysisResult });
 
@@ -181,21 +181,14 @@ function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/projects/new" element={<ProjectWizard />} />
-                <Route path="/projects/:projectId" element={<ProjectDetail />} />
                 <Route path="/projects/:projectId/edit" element={<ProjectWizard />} />
 
-                {/* Pipeline stages — always under a project */}
-                <Route path="/projects/:projectId/vision" element={<ProjectPipelineLayout />}>
-                  <Route index element={<VisionAnalysis />} />
-                </Route>
-                <Route path="/projects/:projectId/indicators" element={<ProjectPipelineLayout />}>
-                  <Route index element={<Indicators />} />
-                </Route>
-                <Route path="/projects/:projectId/analysis" element={<ProjectPipelineLayout />}>
-                  <Route index element={<Analysis />} />
-                </Route>
-                <Route path="/projects/:projectId/reports" element={<ProjectPipelineLayout />}>
-                  <Route index element={<Reports />} />
+                {/* 4-step pipeline: Setup → Prepare → Analysis → Report */}
+                <Route path="/projects/:projectId" element={<ProjectPipelineLayout />}>
+                  <Route index element={<ProjectDetail />} />
+                  <Route path="vision" element={<VisionAnalysis />} />
+                  <Route path="analysis" element={<Analysis />} />
+                  <Route path="reports" element={<Reports />} />
                 </Route>
 
                 <Route path="/calculators" element={<Calculators />} />

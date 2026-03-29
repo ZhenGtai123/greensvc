@@ -342,16 +342,30 @@ class RecommendationService:
             )
 
             # ── 4. Agent 1: Evidence Assessor ──
+            # Limit evidence per indicator to keep prompt manageable
+            MAX_EVIDENCE_PER_INDICATOR = 5
             indicator_data = []
             for ind_id, evds in indicator_groups.items():
                 evds_clean = [
                     {k: v for k, v in e.items() if k != "_ctx"}
                     for e in evds
                 ]
+                # Prioritise: high-transferability first, then by quality tier
+                evds_sorted = sorted(
+                    evds_clean,
+                    key=lambda e: (
+                        {"high": 0, "moderate": 1, "low": 2, "unknown": 3}.get(
+                            e.get("_transferability", {}).get("overall", "unknown"), 3
+                        ),
+                        {"TIR_T1": 0, "TIR_T2": 1, "TIR_T3": 2}.get(
+                            e.get("quality", {}).get("evidence_tier_id", ""), 2
+                        ),
+                    ),
+                )
                 indicator_data.append({
                     "indicator_id": ind_id,
                     "evidence_count": len(evds_clean),
-                    "evidence": evds_clean,
+                    "evidence": evds_sorted[:MAX_EVIDENCE_PER_INDICATOR],
                 })
 
             agent1_prompt = AGENT1_PROMPT.format(
@@ -412,33 +426,45 @@ class RecommendationService:
 
     # -- Response building --------------------------------------------------
 
+    @staticmethod
+    def _as_str(val) -> str:
+        """Normalize LLM output: accept both 'CODE' and {'code': 'CODE', ...}."""
+        if isinstance(val, dict):
+            return val.get("code", val.get("id", str(val)))
+        return str(val) if val is not None else ""
+
     def _build_response(self, result: dict, evidence_count: int) -> RecommendationResponse:
+        raw_recs = result.get("recommended_indicators", [])
+        logger.info("_build_response: %d raw recommended_indicators", len(raw_recs))
+
+        _s = self._as_str
+
         recommendations: list[IndicatorRecommendation] = []
-        for item in result.get("recommended_indicators", []):
+        for item in raw_recs:
             try:
                 es_raw = item.get("evidence_summary", {})
                 ts_raw = item.get("transferability_summary", {})
 
                 rec = IndicatorRecommendation(
-                    indicator_id=item.get("indicator_id", ""),
-                    indicator_name=item.get("indicator_name", ""),
+                    indicator_id=_s(item.get("indicator_id", "")),
+                    indicator_name=_s(item.get("indicator_name", "")),
                     relevance_score=float(item.get("relevance_score", 0)),
-                    rationale=item.get("rationale", ""),
+                    rationale=_s(item.get("rationale", "")),
                     evidence_ids=es_raw.get("evidence_ids", []),
                     rank=item.get("rank", 0),
-                    relationship_direction=item.get("relationship_direction", ""),
-                    confidence=item.get("confidence", ""),
-                    strength_score=es_raw.get("strength_score", ""),
-                    dimension_id=item.get("dimension_id", ""),
-                    subdimension_id=item.get("subdimension_id", ""),
+                    relationship_direction=_s(item.get("relationship_direction", "")),
+                    confidence=_s(item.get("confidence", "")),
+                    strength_score=_s(es_raw.get("strength_score", "")),
+                    dimension_id=_s(item.get("dimension_id", "")),
+                    subdimension_id=_s(item.get("subdimension_id", "")),
                     evidence_summary=EvidenceSummary(
                         evidence_ids=es_raw.get("evidence_ids", []),
                         inferential_count=es_raw.get("inferential_count", 0),
                         descriptive_count=es_raw.get("descriptive_count", 0),
-                        strength_score=es_raw.get("strength_score", ""),
-                        strongest_tier=es_raw.get("strongest_tier", ""),
-                        best_significance=es_raw.get("best_significance", ""),
-                        dominant_direction=es_raw.get("dominant_direction", ""),
+                        strength_score=_s(es_raw.get("strength_score", "")),
+                        strongest_tier=_s(es_raw.get("strongest_tier", "")),
+                        best_significance=_s(es_raw.get("best_significance", "")),
+                        dominant_direction=_s(es_raw.get("dominant_direction", "")),
                     ) if es_raw else None,
                     transferability_summary=TransferabilitySummary(
                         high_count=ts_raw.get("high_count", 0),
@@ -449,16 +475,16 @@ class RecommendationService:
                 )
                 recommendations.append(rec)
             except Exception as e:
-                logger.warning("Failed to parse recommendation: %s", e)
+                logger.warning("Failed to parse recommendation item: %s | item=%s", e, json.dumps(item, ensure_ascii=False)[:300])
 
         relationships: list[IndicatorRelationship] = []
         for rr in result.get("indicator_relationships", []):
             try:
                 relationships.append(IndicatorRelationship(
-                    indicator_a=rr.get("indicator_a", ""),
-                    indicator_b=rr.get("indicator_b", ""),
-                    relationship_type=rr.get("relationship_type", ""),
-                    explanation=rr.get("explanation", ""),
+                    indicator_a=_s(rr.get("indicator_a", "")),
+                    indicator_b=_s(rr.get("indicator_b", "")),
+                    relationship_type=_s(rr.get("relationship_type", "")),
+                    explanation=_s(rr.get("explanation", "")),
                 ))
             except Exception as e:
                 logger.warning("Failed to parse relationship: %s", e)

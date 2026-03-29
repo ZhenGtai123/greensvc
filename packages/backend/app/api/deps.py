@@ -22,6 +22,7 @@ from app.services.llm_client import LLMClient, LLM_PROVIDERS, create_llm_client
 from app.services.zone_analyzer import ZoneAnalyzer
 from app.services.clustering_service import ClusteringService
 from app.services.design_engine import DesignEngine
+from app.services.report_service import ReportService
 
 
 # Settings dependency
@@ -40,6 +41,7 @@ _llm_client: LLMClient = None
 _zone_analyzer: ZoneAnalyzer = None
 _design_engine: DesignEngine = None
 _clustering_service: ClusteringService = None
+_report_service: ReportService = None
 
 # Runtime provider override (None = use settings default)
 _active_provider: Optional[str] = None
@@ -169,16 +171,27 @@ def get_design_engine() -> DesignEngine:
     return _design_engine
 
 
+def get_report_service() -> ReportService:
+    """Get ReportService singleton (Agent C)"""
+    global _report_service
+    if _report_service is None:
+        kb = get_knowledge_base()
+        llm = get_llm_client()
+        _report_service = ReportService(knowledge_base=kb, llm_client=llm)
+    return _report_service
+
+
 def switch_llm_provider(provider: str, model: Optional[str] = None):
     """Switch active LLM provider at runtime. Resets dependent singletons."""
     global _llm_client, _active_provider, _active_model
-    global _recommendation_service, _design_engine
+    global _recommendation_service, _design_engine, _report_service
     _active_provider = provider
     _active_model = model
     # Reset singletons that depend on LLM
     _llm_client = None
     _recommendation_service = None
     _design_engine = None
+    _report_service = None
 
 
 def get_active_provider() -> str:
@@ -191,6 +204,7 @@ def reset_services() -> None:
     global _vision_client, _metrics_manager, _metrics_calculator
     global _knowledge_base, _recommendation_service, _llm_client
     global _zone_analyzer, _design_engine, _clustering_service
+    global _report_service
     global _active_provider, _active_model
 
     _vision_client = None
@@ -202,6 +216,7 @@ def reset_services() -> None:
     _zone_analyzer = None
     _design_engine = None
     _clustering_service = None
+    _report_service = None
     _active_provider = None
     _active_model = None
 

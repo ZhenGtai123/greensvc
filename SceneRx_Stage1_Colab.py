@@ -43,11 +43,11 @@ print("✅ google-genai SDK imported")
 
 # %%
 CONFIG = {
-    "evidence_path":      "/content/drive/MyDrive/GreenSVC-AI-paper/KnowledgeBase/SVCs_P_Evidence.json",
-    "encoding_dict_path": "/content/drive/MyDrive/GreenSVC-AI-paper/KnowledgeBase/Encoding_Dictionary.json",
-    "context_path":       "/content/drive/MyDrive/GreenSVC-AI-paper/KnowledgeBase/Transferability_Context.json",
-    "user_query_path":    "/content/drive/MyDrive/GreenSVC-AI-paper/UserQueries/greensvc_query_WestLake_ThermalComfort.json",
-    "output_path":        "/content/drive/MyDrive/GreenSVC-AI-paper/Outputs",
+    "evidence_path":      "/content/drive/MyDrive/SceneRx-AI-paper/KnowledgeBase/SVCs_P_Evidence.json",
+    "encoding_dict_path": "/content/drive/MyDrive/SceneRx-AI-paper/KnowledgeBase/Encoding_Dictionary.json",
+    "context_path":       "/content/drive/MyDrive/SceneRx-AI-paper/KnowledgeBase/Transferability_Context.json",
+    "user_query_path":    "/content/drive/MyDrive/SceneRx-AI-paper/UserQueries/scenerx_query_WestLake_ThermalComfort.json",
+    "output_path":        "/content/drive/MyDrive/SceneRx-AI-paper/Outputs",
 
     "model_name":         "gemini-3.1-pro-preview",
     "temperature":        0.2,

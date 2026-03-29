@@ -156,11 +156,26 @@ export function generateReport(params: {
         if (strategy.intervention.specific_guidance) {
           sections.push(`- **Guidance:** ${strategy.intervention.specific_guidance}`);
         }
+        if (strategy.signatures && strategy.signatures.length > 0) {
+          const sigStr = strategy.signatures.slice(0, 3).map(s =>
+            `${s.operation?.name || s.operation?.id || '?'} x ${s.semantic_layer?.name || '?'} @ ${s.spatial_layer?.name || '?'} / ${s.morphological_layer?.name || '?'}`
+          ).join('; ');
+          sections.push(`- **Signatures (I-SVCs):** ${sigStr}`);
+        }
+        if (strategy.pathway?.mechanism_description) {
+          sections.push(`- **Pathway:** ${strategy.pathway.pathway_type?.name ? `(${strategy.pathway.pathway_type.name}) ` : ''}${strategy.pathway.mechanism_description}`);
+        }
         if (strategy.expected_effects.length > 0) {
           sections.push(`- **Expected effects:** ${strategy.expected_effects.map(e => `${e.indicator} ${e.direction} (${e.magnitude})`).join('; ')}`);
         }
         if (strategy.potential_tradeoffs) {
           sections.push(`- **Tradeoffs:** ${strategy.potential_tradeoffs}`);
+        }
+        if (strategy.transferability_note) {
+          sections.push(`- **Transferability:** ${strategy.transferability_note}`);
+        }
+        if (strategy.implementation_guidance) {
+          sections.push(`- **Implementation:** ${strategy.implementation_guidance}`);
         }
       }
       if (zone.implementation_sequence) {

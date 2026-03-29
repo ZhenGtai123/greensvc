@@ -21,6 +21,11 @@ import type {
   FullAnalysisResult,
   ProjectPipelineRequest,
   ProjectPipelineResult,
+  ReportRequest,
+  ReportResult,
+  ClusteringRequest,
+  ClusteringResponse,
+  MergedExportRequest,
 } from '../types';
 
 // Health & Config
@@ -108,6 +113,14 @@ export const api = {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
     },
+    analyzePanorama: (file: File, requestData: Record<string, unknown>) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('request_data', JSON.stringify(requestData));
+      return apiClient.post('/api/vision/analyze/panorama', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
     analyzeByPath: (image_path: string, request: Record<string, unknown>) =>
       apiClient.post('/api/vision/analyze/path', request, { params: { image_path } }),
     analyzeProjectImage: (projectId: string, imageId: string, request: Record<string, unknown>) =>
@@ -168,6 +181,10 @@ export const api = {
   analysis: {
     runZoneStatistics: (data: ZoneAnalysisRequest) =>
       apiClient.post<ZoneAnalysisResult>('/api/analysis/zone-statistics', data),
+    runClustering: (data: ClusteringRequest) =>
+      apiClient.post<ClusteringResponse>('/api/analysis/clustering', data),
+    exportMerged: (data: MergedExportRequest) =>
+      apiClient.post<Record<string, unknown>>('/api/analysis/export-merged', data),
     runDesignStrategies: (data: unknown) =>
       apiClient.post<DesignStrategyResult>('/api/analysis/design-strategies', data),
     runFull: (data: FullAnalysisRequest) =>
@@ -176,6 +193,8 @@ export const api = {
       apiClient.post<{ task_id: string; status: string; message: string }>('/api/analysis/run-full/async', data),
     runProjectPipeline: (data: ProjectPipelineRequest) =>
       apiClient.post<ProjectPipelineResult>('/api/analysis/project-pipeline', data),
+    generateReport: (data: ReportRequest) =>
+      apiClient.post<ReportResult>('/api/analysis/generate-report', data),
   },
 
   // Auth

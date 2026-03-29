@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams, useParams, Link } from 'react-router-dom';
 import {
   Box,
@@ -18,26 +18,31 @@ import {
   Progress,
   Alert,
   AlertIcon,
-  Tabs,
-  TabList,
-  Tab,
-  TabPanels,
-  TabPanel,
   Switch,
   FormControl,
   FormLabel,
   FormHelperText,
+  Spinner,
 } from '@chakra-ui/react';
-import { ScanSearch, Download, Eye, Archive } from 'lucide-react';
+import { ScanSearch, Download, Eye, Archive, Lightbulb, Check as CheckIcon } from 'lucide-react';
 import JSZip from 'jszip';
-import { useSemanticConfig, useProject } from '../hooks/useApi';
+import { useSemanticConfig, useProject, useRecommendIndicators } from '../hooks/useApi';
 import api from '../api';
-import type { SemanticClass, UploadedImage } from '../types';
+import type { SemanticClass, UploadedImage, IndicatorRecommendation } from '../types';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import useAppToast from '../hooks/useAppToast';
 import useAppStore from '../store/useAppStore';
+
+const DIMENSIONS = [
+  { id: 'PRF_AES', name: 'Aesthetics' },
+  { id: 'PRF_RST', name: 'Restoration' },
+  { id: 'PRF_EMO', name: 'Emotion' },
+  { id: 'PRF_THR', name: 'Thermal' },
+  { id: 'PRF_USE', name: 'Spatial Use' },
+  { id: 'PRF_SOC', name: 'Social' },
+];
 
 function VisionAnalysis() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
@@ -47,17 +52,32 @@ function VisionAnalysis() {
   const { data: semanticConfig, isLoading: configLoading } = useSemanticConfig();
   const { data: project, isLoading: projectLoading } = useProject(projectId || '');
   const toast = useAppToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Vision API health check
+  const [visionHealthy, setVisionHealthy] = useState<boolean | null>(null);
+  const [visionChecking, setVisionChecking] = useState(false);
+
+  const checkVisionHealth = useCallback(async () => {
+    setVisionChecking(true);
+    try {
+      const res = await api.testVision();
+      setVisionHealthy(res.data.healthy);
+    } catch {
+      setVisionHealthy(false);
+    }
+    setVisionChecking(false);
+  }, []);
+
+  useEffect(() => {
+    checkVisionHealth();
+  }, [checkVisionHealth]);
 
   // Form state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [holeFilling, setHoleFilling] = useState(false);
 
   // Project image selection
   const [selectedProjectImages, setSelectedProjectImages] = useState<string[]>([]);
-  const [imageSource, setImageSource] = useState<'upload' | 'project'>(projectId ? 'project' : 'upload');
 
   // Panorama mode
   const [isPanorama, setIsPanorama] = useState(false);
@@ -67,12 +87,51 @@ function VisionAnalysis() {
   const [batchProgress, setBatchProgress] = useState<{current: number; total: number} | null>(null);
 
   // Vision results persisted in store (survive navigation)
-  const { visionMaskResults: maskResults, setVisionMaskResults: setMaskResults, visionStatistics: statistics, setVisionStatistics: setStatistics } = useAppStore();;
+  const {
+    visionMaskResults: maskResults, setVisionMaskResults: setMaskResults,
+    visionStatistics: statistics, setVisionStatistics: setStatistics,
+    recommendations, setRecommendations,
+    selectedIndicators, addSelectedIndicator, removeSelectedIndicator,
+    indicatorRelationships, setIndicatorRelationships,
+    setRecommendationSummary,
+  } = useAppStore();
 
-  // Reset image source when project changes
-  useEffect(() => {
-    setImageSource(projectId ? 'project' : 'upload');
-  }, [projectId]);
+  // Indicator recommendation
+  const recommendMutation = useRecommendIndicators();
+
+  const handleRunRecommendation = useCallback(() => {
+    if (!project || !project.performance_dimensions?.length) return;
+    recommendMutation.mutate({
+      project_name: project.project_name,
+      project_location: project.project_location || '',
+      space_type_id: project.space_type_id || '',
+      koppen_zone_id: project.koppen_zone_id || '',
+      lcz_type_id: project.lcz_type_id || '',
+      age_group_id: project.age_group_id || '',
+      performance_dimensions: project.performance_dimensions,
+      design_brief: project.design_brief || '',
+    }, {
+      onSuccess: (result) => {
+        if (result.success) {
+          setRecommendations(result.recommendations);
+          setIndicatorRelationships(result.indicator_relationships || []);
+          setRecommendationSummary(result.summary || null);
+          toast({ title: `${result.recommendations.length} indicators recommended`, status: 'success' });
+        } else {
+          toast({ title: result.error || 'Recommendation failed', status: 'error' });
+        }
+      },
+    });
+  }, [project, recommendMutation, toast]);
+
+  const isIndicatorSelected = (id: string) => selectedIndicators.some(i => i.indicator_id === id);
+  const toggleIndicator = (rec: IndicatorRecommendation) => {
+    if (isIndicatorSelected(rec.indicator_id)) {
+      removeSelectedIndicator(rec.indicator_id);
+    } else {
+      addSelectedIndicator(rec);
+    }
+  };
 
   // Default: select all semantic classes once when config loads
   const classesInitialized = useRef(false);
@@ -89,17 +148,21 @@ function VisionAnalysis() {
     if (!imagesInitialized.current && project?.uploaded_images && project.uploaded_images.length > 0) {
       setSelectedProjectImages(project.uploaded_images.map(img => img.image_id));
       imagesInitialized.current = true;
+
+      // Restore mask results from project data if Zustand store is empty
+      if (maskResults.length === 0) {
+        const restored: Array<{imageId: string; maskPaths: Record<string, string>}> = [];
+        for (const img of project.uploaded_images) {
+          if (img.mask_filepaths && Object.keys(img.mask_filepaths).length > 0) {
+            restored.push({ imageId: img.image_id, maskPaths: img.mask_filepaths });
+          }
+        }
+        if (restored.length > 0) {
+          setMaskResults(restored);
+        }
+      }
     }
   }, [project]);
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      setStatistics(null);
-    }
-  };
 
   const handleSelectAll = () => {
     if (semanticConfig?.classes) {
@@ -151,24 +214,11 @@ function VisionAnalysis() {
     setMaskResults([]);
 
     try {
-      if (imageSource === 'upload' && selectedFile) {
-        const response = await api.vision.analyze(selectedFile, {
-          semantic_classes: selectedClasses,
-          semantic_countability: countability,
-          openness_list: openness,
-          enable_hole_filling: holeFilling,
-        });
-
-        if (response.data.status === 'success') {
-          setStatistics(response.data.statistics);
-          toast({ title: 'Analysis complete', status: 'success' });
-        } else {
-          toast({ title: response.data.error || 'Analysis failed', status: 'error' });
-        }
-      } else if (imageSource === 'project' && selectedProjectImages.length > 0) {
+      if (selectedProjectImages.length > 0 && projectId) {
         let processed = 0;
         const allResults: Record<string, unknown>[] = [];
         const allMasks: Array<{imageId: string; maskPaths: Record<string, string>}> = [];
+        const failedImages: string[] = [];
         const requestPayload = {
           semantic_classes: selectedClasses,
           semantic_countability: countability,
@@ -180,46 +230,46 @@ function VisionAnalysis() {
           const img = project?.uploaded_images.find(i => i.image_id === imageId);
           if (!img) continue;
 
-          if (isPanorama && projectId) {
-            // Panorama mode: call panorama endpoint, get 3 views per image
-            const response = await api.vision.analyzeProjectImagePanorama(projectId, imageId, requestPayload);
-            processed++;
-            setBatchProgress({ current: processed, total: selectedProjectImages.length });
+          try {
+            if (isPanorama && projectId) {
+              // Panorama mode: call panorama endpoint, get 3 views per image
+              const response = await api.vision.analyzeProjectImagePanorama(projectId, imageId, requestPayload);
 
-            const views = response.data.views as Record<string, {
-              status: string;
-              mask_paths: Record<string, string>;
-              statistics: Record<string, unknown>;
-            }> | undefined;
-            if (views) {
-              for (const [viewName, viewData] of Object.entries(views)) {
-                if (viewData.status === 'success') {
-                  allResults.push(viewData.statistics);
-                  if (viewData.mask_paths && Object.keys(viewData.mask_paths).length > 0) {
-                    allMasks.push({ imageId: `${imageId}_${viewName}`, maskPaths: viewData.mask_paths });
+              const views = response.data.views as Record<string, {
+                status: string;
+                mask_paths: Record<string, string>;
+                statistics: Record<string, unknown>;
+              }> | undefined;
+              if (views) {
+                for (const [viewName, viewData] of Object.entries(views)) {
+                  if (viewData.status === 'success') {
+                    allResults.push(viewData.statistics);
+                    if (viewData.mask_paths && Object.keys(viewData.mask_paths).length > 0) {
+                      allMasks.push({ imageId: `${imageId}_${viewName}`, maskPaths: viewData.mask_paths });
+                    }
                   }
                 }
               }
-            }
-          } else {
-            // Standard single-image mode
-            let response;
-            if (projectId) {
-              response = await api.vision.analyzeProjectImage(projectId, imageId, requestPayload);
             } else {
-              response = await api.vision.analyzeByPath(img.filepath, requestPayload);
-            }
+              // Standard single-image mode
+              const response = await api.vision.analyzeProjectImage(projectId, imageId, requestPayload);
 
-            processed++;
-            setBatchProgress({ current: processed, total: selectedProjectImages.length });
-
-            if (response.data.status === 'success') {
-              allResults.push(response.data.statistics);
-              if (response.data.mask_paths && Object.keys(response.data.mask_paths).length > 0) {
-                allMasks.push({ imageId, maskPaths: response.data.mask_paths });
+              if (response.data.status === 'success') {
+                allResults.push(response.data.statistics);
+                if (response.data.mask_paths && Object.keys(response.data.mask_paths).length > 0) {
+                  allMasks.push({ imageId, maskPaths: response.data.mask_paths });
+                }
+              } else {
+                failedImages.push(imageId);
               }
             }
+          } catch (err) {
+            failedImages.push(imageId);
+            console.error(`Vision analysis failed for ${imageId}:`, err);
           }
+
+          processed++;
+          setBatchProgress({ current: processed, total: selectedProjectImages.length });
         }
 
         setMaskResults(allMasks);
@@ -230,9 +280,19 @@ function VisionAnalysis() {
             total_images: selectedProjectImages.length,
             results: allResults,
           });
+        }
+
+        // Show result with failure details
+        if (failedImages.length === 0) {
           toast({
             title: `Analysis complete: ${allResults.length}/${selectedProjectImages.length} images processed`,
-            status: 'success'
+            status: 'success',
+          });
+        } else {
+          toast({
+            title: `Analysis done with ${failedImages.length} failure(s): ${failedImages.slice(0, 3).join(', ')}${failedImages.length > 3 ? '...' : ''}`,
+            status: 'warning',
+            duration: 8000,
           });
         }
       } else {
@@ -251,7 +311,7 @@ function VisionAnalysis() {
 
   return (
     <PageShell isLoading={!!isPageLoading} loadingText="Loading...">
-      <PageHeader title="Vision Analysis">
+      <PageHeader title="Prepare">
         {project && (
           <HStack>
             <Text color="gray.500">Project:</Text>
@@ -262,143 +322,80 @@ function VisionAnalysis() {
         )}
       </PageHeader>
 
-      <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-        {/* Left: Configuration */}
+      {/* Vision API status banner */}
+      {visionHealthy === false && (
+        <Alert status="error" mb={4} borderRadius="md">
+          <AlertIcon />
+          <Box flex={1}>
+            <Text fontWeight="bold">Vision API is not running</Text>
+            <Text fontSize="sm">
+              Please start AI_City_View (default: http://localhost:8000) before running analysis.
+            </Text>
+          </Box>
+          <Button size="sm" variant="outline" colorScheme="red" onClick={checkVisionHealth} isLoading={visionChecking}>
+            Retry
+          </Button>
+        </Alert>
+      )}
+
+      <SimpleGrid columns={{ base: 1, xl: 2 }} spacing={6}>
+        {/* ═══ LEFT COLUMN: Vision Analysis ═══ */}
         <VStack spacing={6} align="stretch">
-          {/* Image Source */}
+          {/* Project Images */}
           <Card>
             <CardHeader>
-              <Heading size="md">Image Source</Heading>
+              <Heading size="md">Project Images</Heading>
             </CardHeader>
             <CardBody>
-              {project ? (
-                <Tabs
-                  index={imageSource === 'project' ? 0 : 1}
-                  onChange={(idx) => setImageSource(idx === 0 ? 'project' : 'upload')}
-                >
-                  <TabList>
-                    <Tab>Project Images ({project.uploaded_images.length})</Tab>
-                    <Tab>Upload New</Tab>
-                  </TabList>
-                  <TabPanels>
-                    <TabPanel px={0}>
-                      {project.uploaded_images.length === 0 ? (
-                        <Alert status="info">
-                          <AlertIcon />
-                          No images in project. Upload images in the project page first.
-                        </Alert>
-                      ) : (
-                        <VStack align="stretch" spacing={3}>
-                          <HStack justify="space-between">
-                            <Text fontSize="sm" color="gray.600">
-                              {selectedProjectImages.length} of {project.uploaded_images.length} selected
-                            </Text>
-                            <HStack>
-                              <Button size="xs" onClick={handleSelectAllImages}>All</Button>
-                              <Button size="xs" onClick={handleSelectNoImages}>None</Button>
-                            </HStack>
-                          </HStack>
-                          <SimpleGrid columns={4} spacing={2} maxH="200px" overflowY="auto">
-                            {project.uploaded_images.map((img: UploadedImage) => (
-                              <Box
-                                key={img.image_id}
-                                position="relative"
-                                cursor="pointer"
-                                onClick={() => toggleImageSelection(img.image_id)}
-                                opacity={selectedProjectImages.includes(img.image_id) ? 1 : 0.5}
-                                border={selectedProjectImages.includes(img.image_id) ? '2px solid' : 'none'}
-                                borderColor="blue.500"
-                                borderRadius="md"
-                              >
-                                <Image
-                                  src={`/api/uploads/${projectId}/${img.image_id}_${img.filename}`}
-                                  alt={img.filename}
-                                  h="60px"
-                                  w="100%"
-                                  objectFit="cover"
-                                  borderRadius="md"
-                                  fallback={
-                                    <Box h="60px" bg="gray.200" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
-                                      <Text fontSize="xs">{img.filename}</Text>
-                                    </Box>
-                                  }
-                                />
-                              </Box>
-                            ))}
-                          </SimpleGrid>
-                        </VStack>
-                      )}
-                    </TabPanel>
-                    <TabPanel px={0}>
-                      <VStack spacing={4}>
-                        <Button
-                          w="full"
-                          colorScheme="blue"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          Select Image
-                        </Button>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          style={{ display: 'none' }}
-                          onChange={handleFileSelect}
-                        />
-                        {previewUrl && (
-                          <Image
-                            src={previewUrl}
-                            alt="Preview"
-                            maxH="150px"
-                            objectFit="contain"
-                            borderRadius="md"
-                          />
-                        )}
-                        {selectedFile && (
-                          <Text fontSize="sm" color="gray.600">
-                            {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-                          </Text>
-                        )}
-                      </VStack>
-                    </TabPanel>
-                  </TabPanels>
-                </Tabs>
+              {!project ? (
+                <Alert status="warning">
+                  <AlertIcon />
+                  <Text fontSize="sm">No project selected. Navigate from a project page to use Vision Analysis.</Text>
+                </Alert>
+              ) : project.uploaded_images.length === 0 ? (
+                <Alert status="info">
+                  <AlertIcon />
+                  No images in project. Upload images in the project page first.
+                </Alert>
               ) : (
-                <VStack spacing={4}>
-                  <Alert status="info" size="sm">
-                    <AlertIcon />
-                    <Text fontSize="sm">
-                      Select a project to use existing images, or upload directly.
-                    </Text>
-                  </Alert>
-                  <Button
-                    w="full"
-                    colorScheme="blue"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Select Image
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={handleFileSelect}
-                  />
-                  {previewUrl && (
-                    <Image
-                      src={previewUrl}
-                      alt="Preview"
-                      maxH="150px"
-                      objectFit="contain"
-                      borderRadius="md"
-                    />
-                  )}
-                  {selectedFile && (
+                <VStack align="stretch" spacing={3}>
+                  <HStack justify="space-between">
                     <Text fontSize="sm" color="gray.600">
-                      {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      {selectedProjectImages.length} of {project.uploaded_images.length} selected
                     </Text>
-                  )}
+                    <HStack>
+                      <Button size="xs" onClick={handleSelectAllImages}>All</Button>
+                      <Button size="xs" onClick={handleSelectNoImages}>None</Button>
+                    </HStack>
+                  </HStack>
+                  <SimpleGrid columns={4} spacing={2} maxH="200px" overflowY="auto">
+                    {project.uploaded_images.map((img: UploadedImage) => (
+                      <Box
+                        key={img.image_id}
+                        position="relative"
+                        cursor="pointer"
+                        onClick={() => toggleImageSelection(img.image_id)}
+                        opacity={selectedProjectImages.includes(img.image_id) ? 1 : 0.5}
+                        border={selectedProjectImages.includes(img.image_id) ? '2px solid' : 'none'}
+                        borderColor="blue.500"
+                        borderRadius="md"
+                      >
+                        <Image
+                          src={`/api/uploads/${projectId}/${img.image_id}_${img.filename}`}
+                          alt={img.filename}
+                          h="60px"
+                          w="100%"
+                          objectFit="cover"
+                          borderRadius="md"
+                          fallback={
+                            <Box h="60px" bg="gray.200" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
+                              <Text fontSize="xs">{img.filename}</Text>
+                            </Box>
+                          }
+                        />
+                      </Box>
+                    ))}
+                  </SimpleGrid>
                 </VStack>
               )}
             </CardBody>
@@ -417,24 +414,22 @@ function VisionAnalysis() {
                 >
                   Enable Hole Filling
                 </Checkbox>
-                {imageSource === 'project' && (
-                  <FormControl display="flex" alignItems="center">
-                    <Switch
-                      id="panorama-mode"
-                      isChecked={isPanorama}
-                      onChange={(e) => setIsPanorama(e.target.checked)}
-                      mr={3}
-                    />
-                    <Box>
-                      <FormLabel htmlFor="panorama-mode" mb={0} fontSize="sm">
-                        Panorama Mode
-                      </FormLabel>
-                      <FormHelperText mt={0} fontSize="xs">
-                        Splits panoramic image into 3 views (left / front / right)
-                      </FormHelperText>
-                    </Box>
-                  </FormControl>
-                )}
+                <FormControl display="flex" alignItems="center">
+                  <Switch
+                    id="panorama-mode"
+                    isChecked={isPanorama}
+                    onChange={(e) => setIsPanorama(e.target.checked)}
+                    mr={3}
+                  />
+                  <Box>
+                    <FormLabel htmlFor="panorama-mode" mb={0} fontSize="sm">
+                      Panorama Mode
+                    </FormLabel>
+                    <FormHelperText mt={0} fontSize="xs">
+                      Splits panoramic image into 3 views (left / front / right)
+                    </FormHelperText>
+                  </Box>
+                </FormControl>
               </VStack>
             </CardBody>
           </Card>
@@ -472,20 +467,14 @@ function VisionAnalysis() {
             size="lg"
             onClick={handleAnalyze}
             isLoading={analyzing}
-            isDisabled={
-              selectedClasses.length === 0 ||
-              (imageSource === 'upload' && !selectedFile) ||
-              (imageSource === 'project' && selectedProjectImages.length === 0)
-            }
+            isDisabled={selectedClasses.length === 0 || selectedProjectImages.length === 0 || visionHealthy === false}
           >
-            {imageSource === 'project' && selectedProjectImages.length > 1
+            {selectedProjectImages.length > 1
               ? `Analyze ${selectedProjectImages.length} Images`
               : 'Analyze Image'}
           </Button>
-        </VStack>
 
-        {/* Right: Results */}
-        <VStack spacing={6} align="stretch">
+          {/* ── Vision Results ── */}
           {analyzing && (
             <Alert status="info">
               <AlertIcon />
@@ -695,26 +684,120 @@ function VisionAnalysis() {
             </Card>
           )}
 
-          {!analyzing && !statistics && (
+          {!analyzing && !statistics && maskResults.length === 0 && (
             <EmptyState
               icon={ScanSearch}
               title="No results yet"
-              description={project
-                ? 'Select images from the project, choose classes, then click Analyze.'
-                : 'Select an image and classes, then click Analyze to see results.'}
+              description="Select images, choose classes, then click Analyze."
             />
           )}
         </VStack>
+
+        {/* ═══ RIGHT COLUMN: Indicator Recommendations ═══ */}
+        <VStack spacing={6} align="stretch">
+          <Card>
+            <CardHeader>
+              <HStack justify="space-between">
+                <HStack spacing={2}>
+                  <Lightbulb size={18} />
+                  <Heading size="md">Indicators</Heading>
+                </HStack>
+                <HStack spacing={2}>
+                  {recommendMutation.isPending && <Spinner size="sm" />}
+                  {selectedIndicators.length > 0 && (
+                    <Badge colorScheme="blue">{selectedIndicators.length} selected</Badge>
+                  )}
+                </HStack>
+              </HStack>
+            </CardHeader>
+            <CardBody>
+              {/* Dimensions badges */}
+              {project?.performance_dimensions && project.performance_dimensions.length > 0 && (
+                <HStack spacing={1} flexWrap="wrap" mb={3}>
+                  {project.performance_dimensions.map(d => {
+                    const dim = DIMENSIONS.find(x => x.id === d);
+                    return <Badge key={d} fontSize="2xs" colorScheme="purple">{dim?.name || d}</Badge>;
+                  })}
+                </HStack>
+              )}
+
+              {/* Run button */}
+              <Button
+                colorScheme="blue"
+                size="sm"
+                w="full"
+                onClick={handleRunRecommendation}
+                isLoading={recommendMutation.isPending}
+                loadingText="Running (may take 2-4 min)..."
+                isDisabled={!project?.performance_dimensions?.length}
+              >
+                {recommendations.length > 0 ? 'Re-run Recommendations' : 'Get Recommendations'}
+              </Button>
+
+              {recommendMutation.isPending && (
+                <Alert status="info" mt={2}>
+                  <AlertIcon />
+                  <Text fontSize="xs">LLM is analyzing {project?.performance_dimensions?.length || 0} dimensions. This typically takes 2-4 minutes.</Text>
+                </Alert>
+              )}
+
+              {/* Results */}
+              {recommendations.length > 0 ? (
+                <VStack align="stretch" spacing={2} maxH="500px" overflowY="auto">
+                  {recommendations.map((rec) => {
+                    const selected = isIndicatorSelected(rec.indicator_id);
+                    return (
+                      <Box
+                        key={rec.indicator_id}
+                        p={2}
+                        borderWidth="1px"
+                        borderRadius="md"
+                        borderColor={selected ? 'blue.400' : 'gray.200'}
+                        bg={selected ? 'blue.50' : 'white'}
+                        cursor="pointer"
+                        onClick={() => toggleIndicator(rec)}
+                        _hover={{ borderColor: 'blue.300' }}
+                      >
+                        <HStack justify="space-between">
+                          <HStack spacing={2}>
+                            <Box
+                              w={4} h={4} borderRadius="sm"
+                              bg={selected ? 'blue.500' : 'gray.200'}
+                              color="white"
+                              display="flex" alignItems="center" justifyContent="center"
+                              flexShrink={0}
+                            >
+                              {selected && <CheckIcon size={10} />}
+                            </Box>
+                            <Text fontSize="sm" fontWeight="bold">{rec.indicator_id}</Text>
+                          </HStack>
+                          <Badge colorScheme="green" fontSize="2xs">
+                            {(rec.relevance_score * 100).toFixed(0)}%
+                          </Badge>
+                        </HStack>
+                        <Text fontSize="xs" color="gray.600" noOfLines={1} pl={6}>{rec.indicator_name}</Text>
+                      </Box>
+                    );
+                  })}
+                </VStack>
+              ) : !recommendMutation.isPending ? (
+                <Text fontSize="sm" color="gray.500" textAlign="center">
+                  Click "Get Recommendations" to start
+                </Text>
+              ) : null}
+            </CardBody>
+          </Card>
+        </VStack>
       </SimpleGrid>
 
-      {/* Navigation buttons for pipeline mode */}
+      {/* Navigation buttons */}
       {routeProjectId && (
         <HStack justify="space-between" mt={6}>
           <Button as={Link} to={`/projects/${routeProjectId}`} variant="outline">
-            Back to Project
+            Back: Setup
           </Button>
-          <Button as={Link} to={`/projects/${routeProjectId}/indicators`} colorScheme="blue">
-            Next: Indicators
+          <Button as={Link} to={`/projects/${routeProjectId}/analysis`} colorScheme="blue">
+            Next: Analysis
           </Button>
         </HStack>
       )}

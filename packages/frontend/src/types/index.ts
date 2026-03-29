@@ -353,6 +353,72 @@ export interface ZoneAnalysisResult {
   layer_statistics: Record<string, Record<string, { N: number; Mean: number | null; Std: number | null; Min: number | null; Max: number | null }>>;
   radar_profiles: Record<string, Record<string, number>>;
   computation_metadata: ComputationMetadata;
+  segment_diagnostics?: ZoneDiagnostic[];
+  clustering?: ClusteringResult | null;
+}
+
+// Clustering types
+export interface ArchetypeProfile {
+  archetype_id: number;
+  archetype_label: string;
+  point_count: number;
+  centroid_values: Record<string, number>;
+  centroid_z_scores: Record<string, number>;
+}
+
+export interface SpatialSegment {
+  segment_id: number;
+  archetype_id: number;
+  archetype_label: string;
+  point_count: number;
+  point_ids: string[];
+  lat_range: number[];
+  lng_range: number[];
+  centroid_indicators: Record<string, number>;
+  centroid_z_scores: Record<string, number>;
+  silhouette_score: number;
+}
+
+export interface ClusteringResult {
+  method: string;
+  k: number;
+  silhouette_score: number;
+  spatial_smooth_k: number;
+  layer_used: string;
+  archetype_profiles: ArchetypeProfile[];
+  spatial_segments: SpatialSegment[];
+}
+
+export interface ClusteringRequest {
+  point_metrics: Record<string, unknown>[];
+  indicator_definitions: Record<string, IndicatorDefinitionInput>;
+  layer?: string;
+  max_k?: number;
+  knn_k?: number;
+}
+
+export interface ClusteringResponse {
+  clustering: ClusteringResult | null;
+  segment_diagnostics: ZoneDiagnostic[];
+  skipped: boolean;
+  reason: string;
+}
+
+export interface MergedExportRequest {
+  zone_analysis: ZoneAnalysisResult;
+  clustering?: ClusteringResult | null;
+  segment_diagnostics?: ZoneDiagnostic[];
+}
+
+export interface SignatureExpanded {
+  sig_id: string;
+  role: string;
+  subtype?: string;
+  mechanism?: string;
+  operation: { id: string; name: string; description?: string };
+  semantic_layer: { id: string; name: string; description?: string };
+  spatial_layer: { id: string; name: string; description?: string };
+  morphological_layer: { id: string; name: string; description?: string };
 }
 
 export interface DesignStrategy {
@@ -370,6 +436,12 @@ export interface DesignStrategy {
   confidence: string;
   potential_tradeoffs: string;
   supporting_ioms: string[];
+  // v5.0 — signature & evidence detail
+  signatures?: SignatureExpanded[];
+  pathway?: { pathway_type?: { id: string; name: string }; mechanism_description?: string };
+  boundary_effects?: string | null;
+  transferability_note?: string | null;
+  implementation_guidance?: string | null;
 }
 
 export interface MatchedIOM {
@@ -380,6 +452,12 @@ export interface MatchedIOM {
   score: number;
   operation: Record<string, unknown>;
   confidence_expanded: Record<string, unknown>;
+  // v5.0
+  signatures?: SignatureExpanded[];
+  scope?: { pattern?: { code: string; name: string }; signature_count?: number };
+  transferability?: { overall: string; climate_match: string; lcz_match: string; setting_match: string; user_group_match: string };
+  is_descriptive?: boolean;
+  source_citation?: string | null;
 }
 
 export interface ZoneDesignOutput {
@@ -395,7 +473,21 @@ export interface ZoneDesignOutput {
 
 export interface DesignStrategyResult {
   zones: Record<string, ZoneDesignOutput>;
-  metadata: { diagnosis_mode: string; total_zones: number; total_strategies: number };
+  metadata: { diagnosis_mode: string; total_zones: number; total_strategies: number; total_iom_matches?: number };
+}
+
+export interface ReportRequest {
+  zone_analysis: ZoneAnalysisResult;
+  design_strategies?: DesignStrategyResult | null;
+  stage1_recommendations?: Record<string, unknown>[] | null;
+  project_context?: { project?: Record<string, unknown>; context?: Record<string, unknown>; performance_query?: Record<string, unknown> };
+  format?: 'markdown' | 'pdf';
+}
+
+export interface ReportResult {
+  content: string;
+  format: string;
+  metadata: Record<string, unknown>;
 }
 
 export interface FullAnalysisResult {

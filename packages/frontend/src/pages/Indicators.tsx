@@ -5,10 +5,7 @@ import {
   Button,
   VStack,
   HStack,
-  FormControl,
-  FormLabel,
-  Input,
-  Textarea,
+  Box,
   SimpleGrid,
   Card,
   CardHeader,
@@ -30,11 +27,13 @@ import {
   Wrap,
   WrapItem,
   Progress,
-  Box,
   Divider,
   List,
   ListItem,
+  Collapse,
+  useDisclosure,
 } from '@chakra-ui/react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Lightbulb } from 'lucide-react';
 import { useKnowledgeBaseSummary, useRecommendIndicators, useProject } from '../hooks/useApi';
 import type { IndicatorRecommendation } from '../types';
@@ -65,18 +64,22 @@ function Indicators() {
 
   const activeProject = routeProject || currentProject;
 
-  // Form state
-  const [projectName, setProjectName] = useState('');
-  const [designBrief, setDesignBrief] = useState('');
+  // Advanced options toggle
+  const { isOpen: advancedOpen, onToggle: toggleAdvanced } = useDisclosure();
+  const AdvancedToggle = () => (
+    <Button size="xs" variant="ghost" onClick={toggleAdvanced} rightIcon={advancedOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}>
+      {advancedOpen ? 'Hide' : 'Customize'}
+    </Button>
+  );
+
+  // Form state — dimensions can be adjusted, rest comes from project
   const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
 
-  // Pre-fill from active project (only when project ID changes, not on every refetch)
+  // Pre-fill dimensions from project (only when project ID changes)
   const activeProjectId = activeProject?.id;
   useEffect(() => {
-    if (activeProject) {
-      setProjectName(activeProject.project_name);
-      setDesignBrief(activeProject.design_brief || '');
-      setSelectedDimensions(activeProject.performance_dimensions || []);
+    if (activeProject?.performance_dimensions) {
+      setSelectedDimensions(activeProject.performance_dimensions);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId]);
@@ -84,14 +87,15 @@ function Indicators() {
   // recommendations now from store (persisted across navigation)
 
   const handleRecommend = async () => {
-    if (!projectName || selectedDimensions.length === 0) {
-      toast({ title: 'Please enter project name and select dimensions', status: 'warning' });
+    const name = activeProject?.project_name || '';
+    if (!name || selectedDimensions.length === 0) {
+      toast({ title: 'Please select performance dimensions', status: 'warning' });
       return;
     }
 
     try {
       const result = await recommendMutation.mutateAsync({
-        project_name: projectName,
+        project_name: name,
         project_location: activeProject?.project_location || '',
         space_type_id: activeProject?.space_type_id || '',
         koppen_zone_id: activeProject?.koppen_zone_id || '',
@@ -99,7 +103,7 @@ function Indicators() {
         age_group_id: activeProject?.age_group_id || '',
         performance_dimensions: selectedDimensions,
         subdimensions: activeProject?.subdimensions || [],
-        design_brief: designBrief,
+        design_brief: activeProject?.design_brief || '',
       });
 
       if (result.success) {
@@ -153,47 +157,65 @@ function Indicators() {
               <Heading size="md">Project Context</Heading>
             </CardHeader>
             <CardBody>
-              <VStack spacing={4}>
-                <FormControl isRequired>
-                  <FormLabel>Project Name</FormLabel>
-                  <Input
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="e.g., Central Park Renovation"
-                  />
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Design Brief</FormLabel>
-                  <Textarea
-                    value={designBrief}
-                    onChange={(e) => setDesignBrief(e.target.value)}
-                    placeholder="Describe your project goals and requirements..."
-                    rows={4}
-                  />
-                </FormControl>
+              <VStack spacing={3} align="stretch">
+                <Box>
+                  <Text fontSize="sm" fontWeight="bold" color="gray.500">Project</Text>
+                  <Text>{activeProject?.project_name || 'No project selected'}</Text>
+                </Box>
+                {activeProject?.design_brief && (
+                  <Box>
+                    <Text fontSize="sm" fontWeight="bold" color="gray.500">Design Brief</Text>
+                    <Text fontSize="sm" color="gray.600">{activeProject.design_brief}</Text>
+                  </Box>
+                )}
+                {activeProject?.koppen_zone_id && (
+                  <HStack spacing={2} flexWrap="wrap">
+                    <Badge>{activeProject.koppen_zone_id}</Badge>
+                    {activeProject.space_type_id && <Badge>{activeProject.space_type_id}</Badge>}
+                    {activeProject.lcz_type_id && <Badge>{activeProject.lcz_type_id}</Badge>}
+                  </HStack>
+                )}
               </VStack>
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader>
-              <Heading size="md">Performance Dimensions</Heading>
-            </CardHeader>
-            <CardBody>
-              <CheckboxGroup
-                value={selectedDimensions}
-                onChange={(v) => setSelectedDimensions(v as string[])}
-              >
-                <VStack align="stretch" spacing={2}>
-                  {DIMENSIONS.map((dim) => (
-                    <Checkbox key={dim.id} value={dim.id}>
-                      {dim.name}
-                    </Checkbox>
-                  ))}
+            <CardHeader pb={2}>
+              <HStack justify="space-between">
+                <VStack align="start" spacing={0}>
+                  <Text fontSize="sm" fontWeight="bold" color="gray.500">Performance Dimensions</Text>
+                  <Wrap spacing={1} mt={1}>
+                    {selectedDimensions.map(id => {
+                      const dim = DIMENSIONS.find(d => d.id === id);
+                      return dim ? (
+                        <WrapItem key={id}><Badge colorScheme="blue" fontSize="xs">{dim.name}</Badge></WrapItem>
+                      ) : null;
+                    })}
+                    {selectedDimensions.length === 0 && <Text fontSize="xs" color="red.500">None selected</Text>}
+                  </Wrap>
                 </VStack>
-              </CheckboxGroup>
-            </CardBody>
+                <AdvancedToggle />
+              </HStack>
+            </CardHeader>
+            <Collapse in={advancedOpen} animateOpacity>
+              <CardBody pt={0}>
+                <Text fontSize="xs" color="gray.500" mb={2}>
+                  Pre-filled from project settings. Adjust if you want to narrow the recommendation scope.
+                </Text>
+                <CheckboxGroup
+                  value={selectedDimensions}
+                  onChange={(v) => setSelectedDimensions(v as string[])}
+                >
+                  <VStack align="stretch" spacing={2}>
+                    {DIMENSIONS.map((dim) => (
+                      <Checkbox key={dim.id} value={dim.id} size="sm">
+                        {dim.name}
+                      </Checkbox>
+                    ))}
+                  </VStack>
+                </CheckboxGroup>
+              </CardBody>
+            </Collapse>
           </Card>
 
           <Button
@@ -201,7 +223,7 @@ function Indicators() {
             size="lg"
             onClick={handleRecommend}
             isLoading={recommendMutation.isPending}
-            isDisabled={!projectName || selectedDimensions.length === 0}
+            isDisabled={!activeProject?.project_name || selectedDimensions.length === 0}
           >
             Get Recommendations
           </Button>

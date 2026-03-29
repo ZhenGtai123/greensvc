@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
-import type { ProjectCreate, ZoneAnalysisRequest, FullAnalysisRequest, ProjectPipelineRequest } from '../types';
+import type { ProjectCreate, ZoneAnalysisRequest, FullAnalysisRequest, ProjectPipelineRequest, ReportRequest, ClusteringRequest, MergedExportRequest } from '../types';
 
 // Query keys
 export const queryKeys = {
@@ -146,6 +146,20 @@ export function useRunZoneAnalysis() {
   });
 }
 
+export function useRunClustering() {
+  return useMutation({
+    mutationFn: (data: ClusteringRequest) =>
+      api.analysis.runClustering(data).then(r => r.data),
+  });
+}
+
+export function useExportMerged() {
+  return useMutation({
+    mutationFn: (data: MergedExportRequest) =>
+      api.analysis.exportMerged(data).then(r => r.data),
+  });
+}
+
 export function useRunDesignStrategies() {
   return useMutation({
     mutationFn: (data: unknown) =>
@@ -168,6 +182,13 @@ export function useRunProjectPipeline() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
     },
+  });
+}
+
+export function useGenerateReport() {
+  return useMutation({
+    mutationFn: (data: ReportRequest) =>
+      api.analysis.generateReport(data).then(r => r.data),
   });
 }
 
@@ -197,5 +218,29 @@ export function useRecommendIndicators() {
       lcz_type_id?: string;
       age_group_id?: string;
     }) => api.indicators.recommend(request).then((r) => r.data),
+  });
+}
+
+// Auth mutations
+export function useLogin() {
+  return useMutation({
+    mutationFn: ({ username, password }: { username: string; password: string }) =>
+      api.auth.login(username, password).then(r => r.data),
+  });
+}
+
+export function useRegister() {
+  return useMutation({
+    mutationFn: (data: { email: string; username: string; password: string; full_name?: string }) =>
+      api.auth.register(data).then(r => r.data),
+  });
+}
+
+export function useCurrentUser(enabled = false) {
+  return useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => api.auth.me().then(r => r.data),
+    enabled,
+    retry: false,
   });
 }

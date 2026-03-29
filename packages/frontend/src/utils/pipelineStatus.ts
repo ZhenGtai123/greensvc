@@ -7,7 +7,7 @@ export interface StageStatus {
 
 /**
  * Single source of truth for pipeline stage completion status.
- * Used by both PipelineCard (ProjectDetail) and StepIndicator (pipeline pages).
+ * 4-step pipeline: Setup → Prepare → Analysis → Report
  */
 export function getStageStatuses(
   project: Project | null,
@@ -18,10 +18,10 @@ export function getStageStatuses(
 ): StageStatus[] {
   if (!project) {
     return [
-      { done: false, ready: false },
-      { done: false, ready: false },
-      { done: false, ready: false },
-      { done: false, ready: false },
+      { done: false, ready: true },   // Setup
+      { done: false, ready: false },   // Prepare
+      { done: false, ready: false },   // Analysis
+      { done: false, ready: false },   // Report
     ];
   }
 
@@ -34,17 +34,20 @@ export function getStageStatuses(
   const hasRecommendations = store.recommendations.length > 0;
   const hasZoneAnalysis = store.zoneAnalysisResult !== null;
 
-  // Vision: done when masks exist, ready when project has images AND zones
-  const vision: StageStatus = { done: hasMasks, ready: hasImages && hasZones };
+  // Step 1: Setup — done when project has images AND zones
+  const setup: StageStatus = { done: hasImages && hasZones, ready: true };
 
-  // Indicators: done when recommendations produced, always ready (can use KB without vision)
-  const indicators: StageStatus = { done: hasRecommendations, ready: true };
+  // Step 2: Prepare (Vision + Indicators) — done when masks exist AND recommendations done
+  const prepare: StageStatus = {
+    done: hasMasks && hasRecommendations,
+    ready: hasImages && hasZones,
+  };
 
-  // Analysis: done when zone analysis exists, ready when vision + indicators done
+  // Step 3: Analysis — done when zone analysis exists, ready when prepare done
   const analysis: StageStatus = { done: hasZoneAnalysis, ready: hasMasks && hasRecommendations };
 
-  // Reports: never "done" (view-only summary), ready when analysis done
-  const reports: StageStatus = { done: false, ready: hasZoneAnalysis };
+  // Step 4: Report — never "done" (view-only), ready when analysis done
+  const report: StageStatus = { done: false, ready: hasZoneAnalysis };
 
-  return [vision, indicators, analysis, reports];
+  return [setup, prepare, analysis, report];
 }

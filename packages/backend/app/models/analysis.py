@@ -187,6 +187,12 @@ class MatchedIOM(BaseModel):
     predicted_effect: dict = Field(default_factory=dict)
     confidence_expanded: dict = Field(default_factory=dict)
     source_indicator: dict = Field(default_factory=dict)
+    # v5.0 — signature-based matching
+    signatures: list[dict] = Field(default_factory=list)
+    scope: dict = Field(default_factory=dict)
+    transferability: dict = Field(default_factory=dict)
+    is_descriptive: bool = False
+    source_citation: Optional[str] = None
 
 
 class DesignStrategy(BaseModel):
@@ -200,6 +206,12 @@ class DesignStrategy(BaseModel):
     confidence: str = ""
     potential_tradeoffs: str = ""
     supporting_ioms: list[str] = Field(default_factory=list)
+    # v5.0 — signature & evidence detail
+    signatures: list[dict] = Field(default_factory=list)
+    pathway: dict = Field(default_factory=dict)
+    boundary_effects: Optional[str] = None
+    transferability_note: Optional[str] = None
+    implementation_guidance: Optional[str] = None
 
 
 class ZoneDesignOutput(BaseModel):
@@ -227,6 +239,26 @@ class DesignStrategyRequest(BaseModel):
 class DesignStrategyResult(BaseModel):
     """Complete result of Stage 3 design strategy generation."""
     zones: dict[str, ZoneDesignOutput] = Field(default_factory=dict)
+    metadata: dict = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Agent C  --  Report Generation
+# ---------------------------------------------------------------------------
+
+class ReportRequest(BaseModel):
+    """Request for comprehensive report generation (Agent C)."""
+    zone_analysis: ZoneAnalysisResult
+    design_strategies: Optional[DesignStrategyResult] = None
+    stage1_recommendations: Optional[list[dict]] = None
+    project_context: ProjectContext = Field(default_factory=ProjectContext)
+    format: str = "markdown"  # markdown | pdf
+
+
+class ReportResult(BaseModel):
+    """Generated report output."""
+    content: str = ""
+    format: str = "markdown"
     metadata: dict = Field(default_factory=dict)
 
 

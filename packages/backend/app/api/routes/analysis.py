@@ -22,6 +22,8 @@ from app.models.analysis import (
     ProjectPipelineResult,
     ProjectPipelineProgress,
     IndicatorDefinitionInput,
+    ReportRequest,
+    ReportResult,
 )
 from app.services.zone_analyzer import ZoneAnalyzer
 from app.services.design_engine import DesignEngine
@@ -29,7 +31,8 @@ from app.services.clustering_service import ClusteringService
 from app.services.metrics_calculator import MetricsCalculator
 from app.services.metrics_manager import MetricsManager
 from app.services.metrics_aggregator import MetricsAggregator
-from app.api.deps import get_zone_analyzer, get_design_engine, get_clustering_service, get_metrics_calculator, get_metrics_manager, get_current_user
+from app.api.deps import get_zone_analyzer, get_design_engine, get_clustering_service, get_metrics_calculator, get_metrics_manager, get_current_user, get_report_service
+from app.services.report_service import ReportService
 from app.models.user import UserResponse
 from app.api.routes.projects import get_projects_store
 
@@ -168,6 +171,24 @@ async def generate_design_strategies(
         return await engine.generate_design_strategies(request)
     except Exception as e:
         logger.error("Design strategy generation failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Agent C: Report Generation
+# ---------------------------------------------------------------------------
+
+@router.post("/generate-report", response_model=ReportResult)
+async def generate_report(
+    request: ReportRequest,
+    report_service: ReportService = Depends(get_report_service),
+    _user: UserResponse = Depends(get_current_user),
+):
+    """Generate comprehensive evidence-based design strategy report (Agent C)."""
+    try:
+        return await report_service.generate_report(request)
+    except Exception as e:
+        logger.error("Report generation failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

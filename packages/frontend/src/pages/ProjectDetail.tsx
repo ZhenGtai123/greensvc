@@ -51,16 +51,18 @@ function imageUrl(projectId: string, img: UploadedImage): string {
 // ---------------------------------------------------------------------------
 // Pipeline progress card — shows sequential stage status
 // ---------------------------------------------------------------------------
+// Pipeline stages shown in progress card (skip Setup — user is already on this page)
 const STAGES = [
-  { key: 'vision', label: 'Vision Analysis', desc: 'Segment images with AI vision model' },
-  { key: 'indicators', label: 'Indicators', desc: 'Get indicator recommendations' },
+  { key: 'vision', label: 'Prepare', desc: 'Vision segmentation + indicator recommendation' },
   { key: 'analysis', label: 'Analysis', desc: 'Run zone statistics & design strategies' },
-  { key: 'reports', label: 'Reports', desc: 'Calculate metrics & generate reports' },
+  { key: 'reports', label: 'Report', desc: 'Generate AI report & export' },
 ] as const;
 
 function PipelineCard({ projectId, project }: { projectId: string; project: Project }) {
   const { recommendations, zoneAnalysisResult } = useAppStore();
-  const statuses = getStageStatuses(project, { recommendations, zoneAnalysisResult });
+  const allStatuses = getStageStatuses(project, { recommendations, zoneAnalysisResult });
+  // Skip index 0 (Setup) — PipelineCard starts from Vision (index 1)
+  const statuses = allStatuses.slice(1);
   const nextIdx = statuses.findIndex((s) => !s.done && s.ready);
 
   return (
@@ -111,7 +113,7 @@ function PipelineCard({ projectId, project }: { projectId: string; project: Proj
                 {done ? (
                   <Button
                     as={Link}
-                    to={`/projects/${projectId}/${stage.key}`}
+                    to={stage.key ? `/projects/${projectId}/${stage.key}` : `/projects/${projectId}`}
                     size="xs"
                     variant="ghost"
                     colorScheme="green"
@@ -122,7 +124,7 @@ function PipelineCard({ projectId, project }: { projectId: string; project: Proj
                 ) : isNext ? (
                   <Button
                     as={Link}
-                    to={`/projects/${projectId}/${stage.key}`}
+                    to={stage.key ? `/projects/${projectId}/${stage.key}` : `/projects/${projectId}`}
                     size="xs"
                     colorScheme="blue"
                     flexShrink={0}
@@ -655,6 +657,13 @@ function ProjectDetail() {
           </TabPanel>
         </TabPanels>
       </Tabs>
+
+      {/* Pipeline navigation */}
+      <HStack justify="flex-end" mt={6}>
+        <Button as={Link} to={`/projects/${projectId}/vision`} colorScheme="blue">
+          Next: Prepare
+        </Button>
+      </HStack>
     </PageShell>
   );
 }

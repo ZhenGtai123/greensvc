@@ -1,0 +1,401 @@
+"""
+Report Service — Agent C (v5.0)
+Synthesises Stages 1-3 into a comprehensive evidence-based design strategy report.
+Uses LLM to generate a professional markdown report with I->SVCs->P traceability.
+"""
+
+import json
+import logging
+import re
+import time
+from datetime import datetime
+from typing import Optional
+
+from app.models.analysis import (
+    ReportRequest,
+    ReportResult,
+    ZoneAnalysisResult,
+    DesignStrategyResult,
+    ProjectContext,
+)
+from app.services.knowledge_base import KnowledgeBase
+from app.services.llm_client import LLMClient
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Report prompt template
+# ---------------------------------------------------------------------------
+
+REPORT_PROMPT = """\
+# SceneRx-AI — Agent C: Evidence-Based Design Strategy Report
+
+## Identity
+You are a senior landscape performance consultant producing a formal
+evidence-based design strategy report. Your audience is a multidisciplinary
+review panel comprising landscape architects, urban planners, heritage
+conservation officers, and municipal decision-makers. The report must meet
+the rigour of a peer-reviewed design evaluation while remaining actionable.
+
+## Analytical Framework
+This report follows the I-SVCs-P chain-reasoning framework:
+- **I (Design Intervention)**: Physical modifications to landscape elements
+- **SVCs (Spatial-Visual Characteristics)**: Measurable visual indicators
+  quantified from eye-level imagery
+- **P (Human-Centred Performance)**: Multidimensional outcomes across six
+  domains (PRF_AES, PRF_RST, PRF_EMO, PRF_THR, PRF_USE, PRF_SOC)
+
+## Citation Protocol (MANDATORY)
+Every factual claim MUST include inline coded references in parentheses.
+The reader must be able to trace any statement back to the knowledge base.
+
+| Entity | Format | Example |
+|--------|--------|---------|
+| Indicator | (IND_XXX) | (IND_GVI) |
+| Performance dimension | (PRF_XXX) | (PRF_THR) |
+| Evidence record | (SVCs_P_Author_Year_N) | (SVCs_P_Zhao2024_1) |
+| IOM operation | (I_SVCs_Author_Year_N) | (I_SVCs_Lei2024_2) |
+| Signature ID | (SIG_XXX_XXX_XXX_XXX) | (SIG_ADD_VEG_FG_SIZ) |
+| Operation type | (ACT_XXX) | (ACT_ADD) |
+| Semantic layer | (OBJ_XXX) | (OBJ_VEG) |
+| Spatial layer | (TER_XXX) | (TER_FG) |
+| Morphological attribute | (VAR_XXX) | (VAR_SIZ) |
+| Pathway type | (PTH_XXX) | (PTH_CMP) |
+| Confidence grade | (GRD_X) | (GRD_B) |
+| Climate zone | (KPN_XXX) | (KPN_CFA) |
+
+When citing a design strategy, chain the full I-SVCs-P reasoning:
+"[Intervention]: (ACT_ADD) (OBJ_VEG) at (TER_FG) modifying (VAR_SIZ)
+-> [SVC effect]: increase (IND_GVI) by enhancing visible vegetation proportion
+-> [Performance outcome]: improve (PRF_AES) via composition pathway (PTH_CMP),
+supported by (SVCs_P_Jing2024_2), (GRD_B)."
+
+## Quality Differentiation Protocol
+When presenting evidence, always qualify its strength:
+- "Strong inferential evidence (GRD_A)" — high confidence
+- "Moderate evidence (GRD_B)" — reasonable confidence, local validation advised
+- "Descriptive evidence only" — establishes association but not causal direction
+- "Low transferability" — effect sizes may differ locally
+
+## Report Structure
+
+### 1. Executive Summary (300-400 words, 4 paragraphs)
+P1: Project identity (name, climate, setting, target dimensions)
+P2: Key diagnostic findings (N points, K archetypes, dominant pattern, worst deficit)
+P3: Top 3 recommendations with full I->SVCs->P chain
+P4: Principal caveat
+
+### 2. Indicator Selection and Evidence Base
+One subsection per indicator covering: identity, SVC matrix position, performance
+linkage, evidence strength, transferability, relationships, target direction.
+End with cross-indicator synthesis paragraph.
+
+### 3. Spatial Diagnosis and Archetype Analysis
+3.1 Project-level overview (N points, clustering method, silhouette)
+3.2 Per-archetype profiles (indicator table, SVC pattern, priority problems)
+3.3 Cross-archetype comparison
+
+### 4. Design Strategies
+Per spatial unit, ordered by priority:
+4.X.1 Integrated diagnosis
+4.X.2 Strategy table (3-5 strategies each with: target indicators, 4-axis
+      signature, causal pathway, evidence basis, expected effects, trade-offs,
+      implementation guidance, supporting IOMs)
+4.X.3 Intra-unit synergies
+
+### 5. Implementation Roadmap
+5.1 Phasing (minimum 3 phases with timeframes)
+5.2 Cross-unit coordination
+5.3 Monitoring framework (indicator, target delta-z, interval, success criterion)
+
+### 6. Evidence Quality Assessment and Limitations
+6.1 Evidence strength profile table
+6.2 Transferability assessment table (climate, LCZ, setting, user group)
+6.3 Knowledge gaps
+6.4 Methodological caveats
+
+## Input Data
+
+### Project Context
+{project_context}
+
+### Stage 1: Indicator Selection Results
+{stage1_data}
+
+### Stage 2: Spatial Analysis Results
+{stage2_data}
+
+### Stage 3: Design Strategy Results
+{stage3_data}
+
+### Encoding Dictionary Reference
+{encoding_ref}
+
+## Final Instructions
+1. Write the complete report following the structure above precisely.
+2. Use markdown formatting: ## for main sections, ### for subsections.
+3. Every factual claim must include at least one coded reference in parentheses.
+4. Maintain a formal, analytical tone throughout.
+5. When data is missing, state this explicitly rather than inventing content.
+6. The report should be self-contained.
+"""
+
+
+# ---------------------------------------------------------------------------
+# Report Service
+# ---------------------------------------------------------------------------
+
+class ReportService:
+    """Agent C: comprehensive report synthesis across Stages 1-3."""
+
+    def __init__(self, knowledge_base: KnowledgeBase, llm_client: LLMClient):
+        self.kb = knowledge_base
+        self.llm = llm_client
+
+    async def generate_report(self, request: ReportRequest) -> ReportResult:
+        """Generate comprehensive evidence-based design strategy report."""
+        t0 = time.time()
+
+        # Prepare compact data summaries
+        project_context = json.dumps(
+            request.project_context.model_dump(), ensure_ascii=False, indent=2
+        )
+        stage1_data = self._prepare_stage1(request.stage1_recommendations)
+        stage2_data = self._prepare_stage2(request.zone_analysis)
+        stage3_data = self._prepare_stage3(request.design_strategies)
+        encoding_ref = json.dumps(
+            self.kb.get_codebook_subset(max_chars=20000), ensure_ascii=False, indent=2
+        )
+
+        # Build final prompt
+        prompt = REPORT_PROMPT.format(
+            project_context=project_context,
+            stage1_data=stage1_data,
+            stage2_data=stage2_data,
+            stage3_data=stage3_data,
+            encoding_ref=encoding_ref,
+        )
+
+        logger.info("Agent C: report prompt ~%d chars (~%d tokens)", len(prompt), len(prompt) // 4)
+
+        # Call LLM
+        report_text = await self.llm.generate(prompt)
+        elapsed = time.time() - t0
+
+        # Quality metrics
+        coded_refs = re.findall(r'\([A-Z]{2,5}_[A-Za-z0-9_]+\)', report_text)
+        sections = re.findall(r'^#{1,3} ', report_text, re.MULTILINE)
+        chain_refs = report_text.count('->')
+
+        metadata = {
+            "version": "5.0",
+            "generated_at": datetime.now().isoformat(),
+            "model": "current",
+            "elapsed_seconds": round(elapsed, 1),
+            "word_count": len(report_text.split()),
+            "char_count": len(report_text),
+            "coded_references": len(coded_refs),
+            "unique_references": len(set(coded_refs)),
+            "section_count": len(sections),
+            "chain_reasoning_count": chain_refs,
+            "sections_present": {
+                "executive_summary": "Executive Summary" in report_text or "## 1" in report_text,
+                "indicator_selection": "Indicator Selection" in report_text or "## 2" in report_text,
+                "spatial_diagnosis": "Spatial Diagnosis" in report_text or "## 3" in report_text,
+                "design_strategies": "Design Strategies" in report_text or "## 4" in report_text,
+                "implementation": "Implementation" in report_text or "## 5" in report_text,
+                "limitations": "Limitation" in report_text or "## 6" in report_text,
+            },
+        }
+
+        logger.info(
+            "Agent C: report generated — %d words, %d refs, %.1fs",
+            metadata["word_count"], metadata["coded_references"], elapsed,
+        )
+
+        return ReportResult(
+            content=report_text,
+            format=request.format,
+            metadata=metadata,
+        )
+
+    # ------------------------------------------------------------------
+    # Data preparation helpers
+    # ------------------------------------------------------------------
+
+    def _prepare_stage1(self, recommendations: Optional[list[dict]]) -> str:
+        """Compact Stage 1 indicator recommendations for prompt."""
+        if not recommendations:
+            return "Stage 1 results not available."
+
+        compact = []
+        for rec in recommendations[:15]:
+            compact.append({
+                "rank": rec.get("rank"),
+                "indicator_id": rec.get("indicator_id", rec.get("indicator", {}).get("id", "")),
+                "indicator_name": rec.get("indicator_name", rec.get("indicator", {}).get("name", "")),
+                "performance_link": rec.get("performance_link", {}),
+                "evidence_summary": rec.get("evidence_summary", {}),
+                "transferability_summary": rec.get("transferability_summary", {}),
+                "target_direction": rec.get("target_direction", {}),
+                "rationale": (rec.get("rationale", "") or "")[:300],
+            })
+        return json.dumps(compact, ensure_ascii=False, indent=2)
+
+    def _prepare_stage2(self, zone_analysis: ZoneAnalysisResult) -> str:
+        """Compact Stage 2 zone analysis for prompt."""
+        meta = zone_analysis.computation_metadata
+        summary: dict = {
+            "has_clustering": meta.has_clustering if meta else False,
+            "n_indicators": meta.n_indicators if meta else 0,
+            "n_zones": meta.n_zones if meta else 0,
+            "n_segments": meta.n_segments if meta else 0,
+        }
+
+        # Indicator definitions (compact)
+        ind_defs = {}
+        for ind_id, d in (zone_analysis.indicator_definitions or {}).items():
+            ind_defs[ind_id] = {
+                "name": d.name,
+                "target_direction": d.target_direction,
+                "unit": d.unit,
+            }
+        summary["indicator_definitions"] = ind_defs
+
+        # Diagnosis units
+        units = zone_analysis.segment_diagnostics or zone_analysis.zone_diagnostics or []
+        summary["diagnosis_units"] = []
+        for u in units:
+            unit_data = {
+                "id": u.zone_id,
+                "name": u.zone_name,
+                "status": u.status,
+                "rank": u.rank,
+                "composite_zscore": round(u.composite_zscore, 2) if u.composite_zscore else 0,
+                "indicator_status": {},
+                "problems": [],
+            }
+            for ind_id, data in (u.indicator_status or {}).items():
+                if isinstance(data, dict):
+                    full = data.get("full", data)
+                    unit_data["indicator_status"][ind_id] = {
+                        "mean": full.get("mean"),
+                        "z_score": full.get("z_score"),
+                        "classification": full.get("classification"),
+                    }
+            for p in (u.problems_by_layer or {}).get("full", []):
+                if isinstance(p, dict):
+                    unit_data["problems"].append({
+                        "indicator_id": p.get("indicator_id"),
+                        "z_score": p.get("z_score"),
+                        "priority": p.get("priority"),
+                    })
+                else:
+                    unit_data["problems"].append({"data": str(p)})
+            summary["diagnosis_units"].append(unit_data)
+
+        # Clustering info
+        if zone_analysis.clustering:
+            c = zone_analysis.clustering
+            summary["clustering"] = {
+                "k": c.k,
+                "silhouette_score": c.silhouette_score,
+                "archetypes": [
+                    {
+                        "id": a.archetype_id,
+                        "label": a.archetype_label,
+                        "point_count": a.point_count,
+                        "centroid_z_scores": a.centroid_z_scores,
+                    }
+                    for a in (c.archetype_profiles or [])
+                ],
+            }
+
+        # Layer statistics (compact)
+        if zone_analysis.layer_statistics:
+            ls_compact = {}
+            for ind_id, stats in zone_analysis.layer_statistics.items():
+                ls_compact[ind_id] = {
+                    layer: {"Mean": round(s.get("Mean", 0), 4), "Std": round(s.get("Std", 0), 4)}
+                    for layer, s in stats.items()
+                    if isinstance(s, dict) and "Mean" in s
+                }
+            summary["layer_statistics"] = ls_compact
+
+        # Significant correlations
+        sig_pairs = []
+        corr = zone_analysis.correlation_by_layer or {}
+        pval = zone_analysis.pvalue_by_layer or {}
+        if "full" in corr:
+            corr_full = corr["full"]
+            pval_full = pval.get("full", {})
+            for ind1 in corr_full:
+                for ind2 in corr_full.get(ind1, {}):
+                    if ind1 < ind2:
+                        r = corr_full[ind1].get(ind2)
+                        p = pval_full.get(ind1, {}).get(ind2, 1.0)
+                        if r is not None and abs(r) > 0.3:
+                            sig_pairs.append({
+                                "pair": f"{ind1} <-> {ind2}",
+                                "r": round(r, 3),
+                                "p": round(p, 4) if isinstance(p, (int, float)) else p,
+                            })
+            summary["significant_correlations"] = sorted(sig_pairs, key=lambda x: -abs(x["r"]))
+
+        return json.dumps(summary, ensure_ascii=False, indent=2)
+
+    def _prepare_stage3(self, design_result: Optional[DesignStrategyResult]) -> str:
+        """Compact Stage 3 design strategies for prompt."""
+        if not design_result:
+            return "Stage 3 results not available."
+
+        summary = {}
+        for uid, zone in design_result.zones.items():
+            unit_data = {
+                "unit_name": zone.zone_name,
+                "status": zone.status,
+                "overall_assessment": zone.overall_assessment,
+                "n_iom_matches": len(zone.matched_ioms),
+                "top_ioms": [],
+                "design_strategies": [],
+            }
+            # Top 5 IOMs
+            for m in zone.matched_ioms[:5]:
+                unit_data["top_ioms"].append({
+                    "iom_id": m.iom_id,
+                    "indicator": m.indicator_id,
+                    "direction": m.direction,
+                    "score": m.score,
+                    "operation_description": m.operation.get("description", "")[:200],
+                    "confidence": m.confidence_expanded.get("grade", ""),
+                    "transferability": m.transferability.get("overall", "unknown"),
+                    "is_descriptive": m.is_descriptive,
+                    "signatures": [
+                        {
+                            "sig_id": s.get("sig_id", ""),
+                            "operation": s.get("operation", {}).get("id", ""),
+                            "semantic": s.get("semantic_layer", {}).get("id", ""),
+                            "spatial": s.get("spatial_layer", {}).get("id", ""),
+                            "morphological": s.get("morphological_layer", {}).get("id", ""),
+                        }
+                        for s in m.signatures[:3]
+                    ],
+                })
+            # All strategies
+            for s in zone.design_strategies:
+                unit_data["design_strategies"].append({
+                    "priority": s.priority,
+                    "strategy_name": s.strategy_name,
+                    "target_indicators": s.target_indicators,
+                    "signatures": s.signatures[:3],
+                    "pathway": s.pathway,
+                    "confidence": s.confidence,
+                    "transferability_note": s.transferability_note,
+                    "expected_effects": s.expected_effects,
+                    "supporting_ioms": s.supporting_ioms,
+                    "implementation_guidance": s.implementation_guidance,
+                })
+            summary[uid] = unit_data
+
+        return json.dumps(summary, ensure_ascii=False, indent=2)

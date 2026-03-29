@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Box,
@@ -18,10 +18,8 @@ import {
   Tr,
   Th,
   Td,
-  Textarea,
   Alert,
   AlertIcon,
-  /* useToast — replaced by useAppToast */
   Spinner,
   Divider,
   Switch,
@@ -31,9 +29,9 @@ import {
   NumberInputField,
   Tabs,
   TabList,
-  TabPanels,
   Tab,
   TabPanel,
+  TabPanels,
   Accordion,
   AccordionItem,
   AccordionButton,
@@ -44,30 +42,22 @@ import {
   Wrap,
   WrapItem,
   Tooltip,
-  Select,
-  Checkbox,
-  CheckboxGroup,
 } from '@chakra-ui/react';
 import {
-  useRunZoneAnalysis,
   useRunDesignStrategies,
-  useRunFullAnalysis,
   useRunProjectPipeline,
-  useProjects,
+  useRunClustering,
   useCalculators,
 } from '../hooks/useApi';
 import type {
-  ZoneAnalysisRequest,
-  FullAnalysisRequest,
   ZoneAnalysisResult,
   DesignStrategyResult,
-  IndicatorLayerValue,
-  IndicatorDefinitionInput,
   EnrichedZoneStat,
   ZoneDiagnostic,
   ZoneDesignOutput,
   ProjectPipelineResult,
   ProjectPipelineProgress,
+  ClusteringResponse,
 } from '../types';
 import { generateReport } from '../utils/generateReport';
 import useAppStore from '../store/useAppStore';
@@ -151,17 +141,6 @@ function Analysis() {
     pipelineResult: storePipelineResult, setPipelineResult: setStorePipelineResult,
   } = useAppStore();
 
-  // Input mode tab
-  const [inputMode, setInputMode] = useState(0);
-
-  // Manual JSON input state
-  const [inputJson, setInputJson] = useState('');
-  const [parsedData, setParsedData] = useState<ZoneAnalysisRequest | null>(null);
-  const [parseError, setParseError] = useState<string | null>(null);
-
-  // Pipeline state
-  const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [selectedIndicatorIds, setSelectedIndicatorIds] = useState<string[]>([]);
   // Pipeline results from store (persist across navigation)
   const pipelineResult = storePipelineResult;
   const setPipelineResult = (r: ProjectPipelineResult | null) => setStorePipelineResult(r);
@@ -180,30 +159,15 @@ function Analysis() {
   const [selectedLayer, setSelectedLayer] = useState(0);
 
   // Queries
-  const { data: projects } = useProjects();
   const { data: calculators } = useCalculators();
 
-  // Auto-select project and switch to pipeline tab from route
-  useEffect(() => {
-    if (routeProjectId) {
-      setSelectedProjectId(routeProjectId);
-      setInputMode(0); // Switch to Project Pipeline tab
-    }
-  }, [routeProjectId]);
-
-  // Initialize indicator selection from store once (set by Indicators page)
-  const indicatorsSynced = useRef(false);
-  useEffect(() => {
-    if (indicatorsSynced.current) return;
-    if (selectedIndicators.length > 0 && calculators && calculators.length > 0) {
-      const validIds = selectedIndicators
-        .map(i => i.indicator_id)
-        .filter(id => calculators.some(c => c.id === id));
-      if (validIds.length > 0) {
-        setSelectedIndicatorIds(validIds);
-        indicatorsSynced.current = true;
-      }
-    }
+  // Derive project and indicator IDs from route and store
+  const selectedProjectId = routeProjectId || '';
+  const selectedIndicatorIds = useMemo(() => {
+    if (!calculators || calculators.length === 0) return [];
+    return selectedIndicators
+      .map(i => i.indicator_id)
+      .filter(id => calculators.some(c => c.id === id));
   }, [selectedIndicators, calculators]);
 
   // Mutations
@@ -211,6 +175,8 @@ function Analysis() {
   const designStrategies = useRunDesignStrategies();
   const fullAnalysis = useRunFullAnalysis();
   const projectPipeline = useRunProjectPipeline();
+  const clusteringMutation = useRunClustering();
+  const [clusteringResult, setClusteringResult] = useState<ClusteringResponse | null>(null);
 
   // Selected project info
   const selectedProject = useMemo(() => {
@@ -225,78 +191,6 @@ function Analysis() {
     const zones = selectedProject.spatial_zones.length;
     return { totalImages, assignedImages, zones };
   }, [selectedProject]);
-
-  // Parse summary
-  const parsedSummary = useMemo(() => {
-    if (!parsedData) return null;
-    const zones = new Set(parsedData.zone_statistics.map(s => s.zone_id));
-    const indicators = new Set(parsedData.zone_statistics.map(s => s.indicator_id));
-    const layers = new Set(parsedData.zone_statistics.map(s => s.layer));
-    return { zones: zones.size, indicators: indicators.size, layers: layers.size };
-  }, [parsedData]);
-
-  // Parse JSON input
-  const handleParseJson = useCallback(() => {
-    setParseError(null);
-    setParsedData(null);
-
-    if (!inputJson.trim()) return;
-
-    try {
-      const json = JSON.parse(inputJson);
-
-      if (json.indicator_definitions && json.zone_statistics) {
-        const zoneStats = Array.isArray(json.zone_statistics)
-          ? json.zone_statistics
-          : Object.values(json.zone_statistics);
-        setParsedData({
-          indicator_definitions: json.indicator_definitions,
-          zone_statistics: zoneStats as IndicatorLayerValue[],
-        });
-        return;
-      }
-
-      if (Array.isArray(json) || (json.zone_statistics && Array.isArray(json.zone_statistics))) {
-        const arr: Record<string, unknown>[] = Array.isArray(json) ? json : json.zone_statistics;
-
-        if (arr.length > 0 && ('Indicator' in arr[0] || 'indicator_id' in arr[0])) {
-          const indicatorDefs: Record<string, IndicatorDefinitionInput> = {};
-          const zoneStats: IndicatorLayerValue[] = arr.map((row: Record<string, unknown>) => {
-            const indicatorId = ((row.Indicator ?? row.indicator_id) as string) || '';
-            const indicatorName = ((row.indicator_name ?? row.Indicator) as string) || indicatorId;
-            if (!indicatorDefs[indicatorId]) {
-              indicatorDefs[indicatorId] = {
-                id: indicatorId,
-                name: indicatorName,
-                unit: ((row.unit ?? row.Unit) as string) || '',
-                target_direction: ((row.target_direction ?? row.TargetDirection) as string) || 'INCREASE',
-              };
-            }
-            return {
-              zone_id: ((row.Zone ?? row.zone_id) as string) || '',
-              zone_name: ((row.zone_name ?? row.Zone) as string) || '',
-              indicator_id: indicatorId,
-              layer: ((row.Layer ?? row.layer) as string) || 'full',
-              n_images: (row.n_images ?? row.N ?? undefined) as number | undefined,
-              mean: (row.Mean ?? row.mean ?? null) as number | null,
-              std: (row.Std ?? row.std ?? null) as number | null,
-              min: (row.Min ?? row.min ?? null) as number | null,
-              max: (row.Max ?? row.max ?? null) as number | null,
-              unit: ((row.unit ?? row.Unit) as string) || '',
-              area_sqm: (row.area_sqm ?? row.Area ?? 0) as number,
-            };
-          });
-
-          setParsedData({ indicator_definitions: indicatorDefs, zone_statistics: zoneStats });
-          return;
-        }
-      }
-
-      setParseError('Unrecognized JSON format. Expected { indicator_definitions, zone_statistics } or flat array with Indicator/Zone/Layer/Mean fields.');
-    } catch (e) {
-      setParseError(`Invalid JSON: ${(e as Error).message}`);
-    }
-  }, [inputJson]);
 
   // Run project pipeline
   const handleRunPipeline = useCallback(async () => {
@@ -321,47 +215,7 @@ function Analysis() {
     }
   }, [selectedProjectId, selectedIndicatorIds, useLlm, zscoreModerate, zscoreSignificant, zscoreCritical, projectPipeline, toast]);
 
-  // Run Stage 2.5 only
-  const handleRunStage25 = useCallback(async () => {
-    if (!parsedData) return;
-    try {
-      const result = await zoneAnalysis.mutateAsync({
-        ...parsedData,
-        zscore_moderate: zscoreModerate,
-        zscore_significant: zscoreSignificant,
-        zscore_critical: zscoreCritical,
-      });
-      setZoneResult(result);
-      setDesignResult(null);
-      toast({ title: 'Stage 2.5 analysis complete', status: 'success', duration: 3000 });
-    } catch (err: unknown) {
-      const msg = extractErrorMessage(err, 'Analysis failed');
-      toast({ title: msg, status: 'error' });
-    }
-  }, [parsedData, zscoreModerate, zscoreSignificant, zscoreCritical, zoneAnalysis, toast]);
-
-  // Run full pipeline
-  const handleRunFull = useCallback(async () => {
-    if (!parsedData) return;
-    try {
-      const request: FullAnalysisRequest = {
-        ...parsedData,
-        zscore_moderate: zscoreModerate,
-        zscore_significant: zscoreSignificant,
-        zscore_critical: zscoreCritical,
-        use_llm: useLlm,
-      };
-      const result = await fullAnalysis.mutateAsync(request);
-      setZoneResult(result.zone_analysis);
-      setDesignResult(result.design_strategies);
-      toast({ title: 'Full pipeline complete', status: 'success', duration: 3000 });
-    } catch (err: unknown) {
-      const msg = extractErrorMessage(err, 'Full pipeline failed');
-      toast({ title: msg, status: 'error' });
-    }
-  }, [parsedData, zscoreModerate, zscoreSignificant, zscoreCritical, useLlm, fullAnalysis, toast]);
-
-  // Generate strategies from existing Stage 2.5 result
+  // Generate strategies from existing zone analysis result
   const handleGenerateStrategies = useCallback(async () => {
     if (!zoneResult) return;
     try {
@@ -376,6 +230,46 @@ function Analysis() {
       toast({ title: msg, status: 'error' });
     }
   }, [zoneResult, useLlm, designStrategies, toast]);
+
+  // Run clustering on zone analysis results
+  const handleRunClustering = useCallback(async () => {
+    if (!zoneResult) return;
+    try {
+      // Build point_metrics from zone_statistics (each row is a point)
+      const pointMetrics = zoneResult.zone_statistics
+        .filter(s => s.layer === 'full')
+        .map(s => ({
+          zone_id: s.zone_id,
+          zone_name: s.zone_name,
+          indicator_id: s.indicator_id,
+          value: s.mean,
+        }));
+      const result = await clusteringMutation.mutateAsync({
+        point_metrics: pointMetrics,
+        indicator_definitions: zoneResult.indicator_definitions,
+        layer: 'full',
+      });
+      setClusteringResult(result);
+      if (result.skipped) {
+        toast({ title: `Clustering skipped: ${result.reason}`, status: 'info' });
+      } else if (result.clustering) {
+        // Merge segment_diagnostics into zone result
+        const updated = {
+          ...zoneResult,
+          clustering: result.clustering,
+          segment_diagnostics: result.segment_diagnostics,
+        };
+        setZoneResult(updated);
+        toast({
+          title: `Clustering complete: ${result.clustering.k} archetypes (silhouette: ${result.clustering.silhouette_score.toFixed(2)})`,
+          status: 'success',
+        });
+      }
+    } catch (err: unknown) {
+      const msg = extractErrorMessage(err, 'Clustering failed');
+      toast({ title: msg, status: 'error' });
+    }
+  }, [zoneResult, clusteringMutation, toast]);
 
   // Download Markdown report
   const handleDownloadReport = useCallback(() => {
@@ -435,18 +329,7 @@ function Analysis() {
     return { indicators, corr, pval };
   }, [zoneResult, selectedLayer]);
 
-  const isRunning = zoneAnalysis.isPending || fullAnalysis.isPending || designStrategies.isPending || projectPipeline.isPending;
-
-  // Indicator selection helpers
-  const handleSelectAllIndicators = useCallback(() => {
-    if (calculators) {
-      setSelectedIndicatorIds(calculators.map(c => c.id));
-    }
-  }, [calculators]);
-
-  const handleClearIndicators = useCallback(() => {
-    setSelectedIndicatorIds([]);
-  }, []);
+  const isRunning = designStrategies.isPending || projectPipeline.isPending;
 
   return (
     <PageShell>
@@ -466,179 +349,43 @@ function Analysis() {
       {/* Input Section with Tabs */}
       <Card mb={6}>
         <CardHeader>
-          <Heading size="md">Input Data</Heading>
+          <Heading size="md">Pipeline Configuration</Heading>
         </CardHeader>
         <CardBody>
-          <Tabs variant="enclosed" index={inputMode} onChange={setInputMode} colorScheme="green" mb={4}>
-            <TabList>
-              <Tab>Project Pipeline</Tab>
-              <Tab>Manual JSON</Tab>
-            </TabList>
+          {/* Project info (read-only) */}
+          <Text fontWeight="bold" mb={3}>
+            Project: {selectedProject?.project_name || routeProjectId || 'No project'}
+          </Text>
 
-            <TabPanels>
-              {/* Tab 1: Project Pipeline */}
-              <TabPanel px={0}>
-                <VStack spacing={4} align="stretch">
-                  {/* Project selector */}
-                  <FormControl>
-                    <FormLabel fontSize="sm">Project</FormLabel>
-                    {routeProjectId ? (
-                      <Text fontWeight="bold" py={2}>
-                        {selectedProject?.project_name || routeProjectId}
-                      </Text>
-                    ) : (
-                      <Select
-                        placeholder="Select a project..."
-                        value={selectedProjectId}
-                        onChange={e => setSelectedProjectId(e.target.value)}
-                      >
-                        {projects?.map(p => {
-                          const zones = p.spatial_zones.length;
-                          const imgs = p.uploaded_images.length;
-                          return (
-                            <option key={p.id} value={p.id}>
-                              {p.project_name} ({zones} zones, {imgs} images)
-                            </option>
-                          );
-                        })}
-                      </Select>
-                    )}
-                  </FormControl>
+          {projectSummary && (
+            <Alert status={projectSummary.assignedImages > 0 ? 'info' : 'warning'} mb={4}>
+              <AlertIcon />
+              {projectSummary.assignedImages} of {projectSummary.totalImages} images assigned to {projectSummary.zones} zones
+            </Alert>
+          )}
 
-                  {/* Project summary */}
-                  {projectSummary && (
-                    <Alert status={projectSummary.assignedImages > 0 ? 'info' : 'warning'}>
-                      <AlertIcon />
-                      {projectSummary.assignedImages} of {projectSummary.totalImages} images assigned to {projectSummary.zones} zones
-                      {projectSummary.assignedImages === 0 && ' — assign images to zones before running the pipeline'}
-                    </Alert>
-                  )}
-
-                  {/* Calculator selection */}
-                  <FormControl>
-                    <HStack justify="space-between" mb={2}>
-                      <FormLabel fontSize="sm" mb={0}>Indicators</FormLabel>
-                      <HStack spacing={2}>
-                        <Button size="xs" variant="ghost" onClick={handleSelectAllIndicators}>
-                          Select All
-                        </Button>
-                        <Button size="xs" variant="ghost" onClick={handleClearIndicators}>
-                          Clear All
-                        </Button>
-                      </HStack>
-                    </HStack>
-                    <CheckboxGroup value={selectedIndicatorIds} onChange={vals => setSelectedIndicatorIds(vals as string[])}>
-                      <VStack align="stretch" maxH="200px" overflowY="auto" spacing={1} p={2} borderWidth="1px" borderRadius="md">
-                        {calculators?.map(c => (
-                          <Checkbox key={c.id} value={c.id} size="sm">
-                            <Text fontSize="sm">
-                              {c.name} <Text as="span" color="gray.500">({c.id})</Text>
-                            </Text>
-                          </Checkbox>
-                        ))}
-                        {(!calculators || calculators.length === 0) && (
-                          <Text fontSize="sm" color="gray.500">No calculators available</Text>
-                        )}
-                      </VStack>
-                    </CheckboxGroup>
-                  </FormControl>
-
-                  {/* Run button */}
-                  <Button
-                    colorScheme="green"
-                    onClick={handleRunPipeline}
-                    isLoading={projectPipeline.isPending}
-                    isDisabled={!selectedProjectId || selectedIndicatorIds.length === 0 || isRunning}
-                  >
-                    Run Project Pipeline
-                  </Button>
-
-                  {/* Pipeline result summary */}
-                  {pipelineResult && (
-                    <Card variant="outline">
-                      <CardBody>
-                        <VStack spacing={3} align="stretch">
-                          <Heading size="sm">Pipeline Result: {pipelineResult.project_name}</Heading>
-                          <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
-                            <Box>
-                              <Text fontSize="xs" color="gray.500">Images Processed</Text>
-                              <Text fontWeight="bold">{pipelineResult.zone_assigned_images} / {pipelineResult.total_images}</Text>
-                            </Box>
-                            <Box>
-                              <Text fontSize="xs" color="gray.500">Calculations OK</Text>
-                              <Text fontWeight="bold" color="green.600">{pipelineResult.calculations_succeeded}</Text>
-                            </Box>
-                            <Box>
-                              <Text fontSize="xs" color="gray.500">Calculations Failed</Text>
-                              <Text fontWeight="bold" color={pipelineResult.calculations_failed > 0 ? 'red.600' : undefined}>
-                                {pipelineResult.calculations_failed}
-                              </Text>
-                            </Box>
-                            <Box>
-                              <Text fontSize="xs" color="gray.500">Zone Statistics</Text>
-                              <Text fontWeight="bold">{pipelineResult.zone_statistics_count}</Text>
-                            </Box>
-                          </SimpleGrid>
-
-                          <Divider />
-
-                          {/* Step progress */}
-                          <Wrap spacing={2}>
-                            {pipelineResult.steps.map((step: ProjectPipelineProgress, idx: number) => (
-                              <WrapItem key={idx}>
-                                <Tooltip label={step.detail}>
-                                  <Badge colorScheme={STEP_STATUS_COLORS[step.status] || 'gray'} variant="subtle" px={2} py={1}>
-                                    {step.step}: {step.status}
-                                  </Badge>
-                                </Tooltip>
-                              </WrapItem>
-                            ))}
-                          </Wrap>
-                        </VStack>
-                      </CardBody>
-                    </Card>
-                  )}
-                </VStack>
-              </TabPanel>
-
-              {/* Tab 2: Manual JSON */}
-              <TabPanel px={0}>
-                <VStack spacing={4} align="stretch">
-                  <Textarea
-                    placeholder="Paste zone statistics JSON here..."
-                    value={inputJson}
-                    onChange={(e) => setInputJson(e.target.value)}
-                    fontFamily="mono"
-                    fontSize="sm"
-                    rows={10}
-                    resize="vertical"
-                  />
-
-                  <Button size="sm" onClick={handleParseJson} isDisabled={!inputJson.trim()}>
-                    Parse JSON
-                  </Button>
-
-                  {parseError && (
-                    <Alert status="error">
-                      <AlertIcon />
-                      {parseError}
-                    </Alert>
-                  )}
-
-                  {parsedSummary && (
-                    <Alert status="success">
-                      <AlertIcon />
-                      Loaded: {parsedSummary.zones} zones x {parsedSummary.indicators} indicators x {parsedSummary.layers} layers
-                    </Alert>
-                  )}
-                </VStack>
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
+          {/* Selected indicators (from Indicators step, read-only) */}
+          <Box mb={4}>
+            <Text fontSize="sm" fontWeight="bold" mb={2}>
+              Selected Indicators ({selectedIndicatorIds.length})
+            </Text>
+            <Wrap>
+              {selectedIndicatorIds.map(id => (
+                <WrapItem key={id}>
+                  <Tag size="sm" colorScheme="blue"><TagLabel>{id}</TagLabel></Tag>
+                </WrapItem>
+              ))}
+            </Wrap>
+            {selectedIndicatorIds.length === 0 && (
+              <Text fontSize="sm" color="orange.500">
+                No indicators selected. Go back to the Indicators step to select indicators.
+              </Text>
+            )}
+          </Box>
 
           <Divider mb={4} />
 
-          {/* Shared configuration row */}
+          {/* Analysis parameters */}
           <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide" mb={2}>
             Analysis Parameters
           </Text>
@@ -706,27 +453,56 @@ function Analysis() {
             </FormControl>
           </SimpleGrid>
 
-          {/* Manual mode action buttons */}
-          {inputMode === 1 && (
-            <HStack spacing={4}>
-              <Button
-                colorScheme="green"
-                variant="outline"
-                onClick={handleRunStage25}
-                isLoading={zoneAnalysis.isPending}
-                isDisabled={!parsedData || isRunning}
-              >
-                Run Stage 2.5 Only
-              </Button>
-              <Button
-                colorScheme="green"
-                onClick={handleRunFull}
-                isLoading={fullAnalysis.isPending}
-                isDisabled={!parsedData || isRunning}
-              >
-                Run Full Pipeline
-              </Button>
-            </HStack>
+          {/* Run pipeline button */}
+          <Button
+            colorScheme="green"
+            onClick={handleRunPipeline}
+            isLoading={projectPipeline.isPending}
+            isDisabled={!selectedProjectId || selectedIndicatorIds.length === 0 || isRunning}
+            mt={4}
+          >
+            Run Pipeline
+          </Button>
+
+          {/* Pipeline result summary */}
+          {pipelineResult && (
+            <Card variant="outline" mt={4}>
+              <CardBody>
+                <VStack spacing={3} align="stretch">
+                  <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                    <Box>
+                      <Text fontSize="xs" color="gray.500">Images</Text>
+                      <Text fontWeight="bold">{pipelineResult.zone_assigned_images} / {pipelineResult.total_images}</Text>
+                    </Box>
+                    <Box>
+                      <Text fontSize="xs" color="gray.500">Calculations OK</Text>
+                      <Text fontWeight="bold" color="green.600">{pipelineResult.calculations_succeeded}</Text>
+                    </Box>
+                    <Box>
+                      <Text fontSize="xs" color="gray.500">Failed</Text>
+                      <Text fontWeight="bold" color={pipelineResult.calculations_failed > 0 ? 'red.600' : undefined}>
+                        {pipelineResult.calculations_failed}
+                      </Text>
+                    </Box>
+                    <Box>
+                      <Text fontSize="xs" color="gray.500">Zone Stats</Text>
+                      <Text fontWeight="bold">{pipelineResult.zone_statistics_count}</Text>
+                    </Box>
+                  </SimpleGrid>
+                  <Wrap spacing={2}>
+                    {pipelineResult.steps.map((step: ProjectPipelineProgress, idx: number) => (
+                      <WrapItem key={idx}>
+                        <Tooltip label={step.detail}>
+                          <Badge colorScheme={STEP_STATUS_COLORS[step.status] || 'gray'} variant="subtle" px={2} py={1}>
+                            {step.step}: {step.status}
+                          </Badge>
+                        </Tooltip>
+                      </WrapItem>
+                    ))}
+                  </Wrap>
+                </VStack>
+              </CardBody>
+            </Card>
           )}
         </CardBody>
       </Card>
@@ -1021,6 +797,55 @@ function Analysis() {
             </Card>
           )}
 
+          {/* Clustering (optional step before Stage 3) */}
+          <Card mb={6} variant="outline">
+            <CardBody>
+              <HStack justify="space-between" flexWrap="wrap" gap={2}>
+                <VStack align="start" spacing={0}>
+                  <Text fontWeight="bold" fontSize="sm">SVC Archetype Clustering</Text>
+                  <Text fontSize="xs" color="gray.500">
+                    Discover spatial archetypes via KMeans clustering (requires 20+ points)
+                  </Text>
+                </VStack>
+                <HStack>
+                  {clusteringResult?.clustering && (
+                    <Badge colorScheme="green">
+                      k={clusteringResult.clustering.k} · silhouette={clusteringResult.clustering.silhouette_score.toFixed(2)}
+                    </Badge>
+                  )}
+                  {clusteringResult?.skipped && (
+                    <Badge colorScheme="yellow">{clusteringResult.reason}</Badge>
+                  )}
+                  <Button
+                    size="sm"
+                    colorScheme="teal"
+                    variant="outline"
+                    onClick={handleRunClustering}
+                    isLoading={clusteringMutation.isPending}
+                    isDisabled={isRunning}
+                  >
+                    {clusteringResult?.clustering ? 'Re-run Clustering' : 'Run Clustering'}
+                  </Button>
+                </HStack>
+              </HStack>
+              {clusteringResult?.clustering && clusteringResult.clustering.archetype_profiles.length > 0 && (
+                <Box mt={3}>
+                  <Wrap spacing={2}>
+                    {clusteringResult.clustering.archetype_profiles.map(a => (
+                      <WrapItem key={a.archetype_id}>
+                        <Tag size="sm" colorScheme="teal" variant="subtle">
+                          <TagLabel>
+                            Archetype {a.archetype_id}: {a.archetype_label} ({a.point_count} pts)
+                          </TagLabel>
+                        </Tag>
+                      </WrapItem>
+                    ))}
+                  </Wrap>
+                </Box>
+              )}
+            </CardBody>
+          </Card>
+
           {/* Generate Strategies button (if no design results yet) */}
           {!designResult && (
             <HStack mb={6}>
@@ -1031,7 +856,7 @@ function Analysis() {
                 isLoading={designStrategies.isPending}
                 isDisabled={isRunning}
               >
-                Generate Design Strategies (Stage 3)
+                Generate Design Strategies
               </Button>
             </HStack>
           )}
@@ -1079,12 +904,25 @@ function Analysis() {
                                 <Badge colorScheme="purple">P{strategy.priority}</Badge>
                                 <Text fontWeight="bold" fontSize="sm">{strategy.strategy_name}</Text>
                               </HStack>
-                              <Badge colorScheme={
-                                strategy.confidence === 'High' ? 'green' :
-                                strategy.confidence === 'Medium' ? 'yellow' : 'gray'
-                              }>
-                                {strategy.confidence}
-                              </Badge>
+                              <HStack spacing={1}>
+                                {strategy.transferability_note && (
+                                  <Badge colorScheme={
+                                    strategy.transferability_note.includes('high') ? 'green' :
+                                    strategy.transferability_note.includes('moderate') ? 'yellow' :
+                                    strategy.transferability_note.includes('low') ? 'red' : 'gray'
+                                  } variant="subtle" fontSize="2xs">
+                                    {strategy.transferability_note.length > 30
+                                      ? strategy.transferability_note.slice(0, 30) + '...'
+                                      : strategy.transferability_note}
+                                  </Badge>
+                                )}
+                                <Badge colorScheme={
+                                  strategy.confidence === 'High' ? 'green' :
+                                  strategy.confidence === 'Medium' ? 'yellow' : 'gray'
+                                }>
+                                  {strategy.confidence}
+                                </Badge>
+                              </HStack>
                             </HStack>
 
                             {/* Target indicators */}
@@ -1118,6 +956,36 @@ function Analysis() {
                               )}
                             </Box>
 
+                            {/* Signatures (v5.0) */}
+                            {strategy.signatures && strategy.signatures.length > 0 && (
+                              <Box>
+                                <Text fontSize="xs" fontWeight="bold" mb={1}>Signatures (I-SVCs)</Text>
+                                <Wrap>
+                                  {strategy.signatures.slice(0, 4).map((sig, si) => (
+                                    <WrapItem key={si}>
+                                      <Tag size="sm" colorScheme="teal" variant="subtle">
+                                        <TagLabel>
+                                          {sig.operation?.name || sig.operation?.id || '?'} x{' '}
+                                          {sig.semantic_layer?.name || '?'} @{' '}
+                                          {sig.spatial_layer?.name || '?'} /{' '}
+                                          {sig.morphological_layer?.name || '?'}
+                                        </TagLabel>
+                                      </Tag>
+                                    </WrapItem>
+                                  ))}
+                                </Wrap>
+                              </Box>
+                            )}
+
+                            {/* Pathway (v5.0) */}
+                            {strategy.pathway?.mechanism_description && (
+                              <Text fontSize="xs" color="blue.600" fontStyle="italic">
+                                <Text as="span" fontWeight="bold">Pathway:</Text>{' '}
+                                {strategy.pathway.pathway_type?.name ? `(${strategy.pathway.pathway_type.name}) ` : ''}
+                                {strategy.pathway.mechanism_description}
+                              </Text>
+                            )}
+
                             {/* Expected effects */}
                             {strategy.expected_effects.length > 0 && (
                               <Box>
@@ -1139,6 +1007,21 @@ function Analysis() {
                               <Text fontSize="xs" color="orange.600">
                                 <Text as="span" fontWeight="bold">Tradeoffs:</Text> {strategy.potential_tradeoffs}
                               </Text>
+                            )}
+
+                            {/* Boundary effects (v5.0) */}
+                            {strategy.boundary_effects && (
+                              <Text fontSize="xs" color="purple.600">
+                                <Text as="span" fontWeight="bold">Boundary Effects:</Text> {strategy.boundary_effects}
+                              </Text>
+                            )}
+
+                            {/* Implementation guidance (v5.0) */}
+                            {strategy.implementation_guidance && (
+                              <Box bg="green.50" p={2} borderRadius="md">
+                                <Text fontSize="xs" fontWeight="bold" color="green.700" mb={1}>Implementation Guidance</Text>
+                                <Text fontSize="xs" color="green.800">{strategy.implementation_guidance}</Text>
+                              </Box>
                             )}
 
                             {/* Supporting IOMs */}
@@ -1197,8 +1080,8 @@ function Analysis() {
       {/* Navigation buttons for pipeline mode */}
       {routeProjectId && (
         <HStack justify="space-between" mt={6}>
-          <Button as={Link} to={`/projects/${routeProjectId}/indicators`} variant="outline">
-            Back: Indicators
+          <Button as={Link} to={`/projects/${routeProjectId}/vision`} variant="outline">
+            Back: Prepare
           </Button>
           <Button as={Link} to={`/projects/${routeProjectId}/reports`} colorScheme="blue">
             Next: Reports
