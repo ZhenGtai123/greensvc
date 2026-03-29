@@ -1,5 +1,8 @@
 """Configuration endpoints"""
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.config import Settings
@@ -16,6 +19,8 @@ from app.api.deps import (
 from app.services.vision_client import VisionModelClient
 from app.services.gemini_client import RecommendationService
 from app.services.llm_client import LLMClient, LLM_PROVIDERS
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -124,6 +129,36 @@ async def update_llm_provider(
     }
 
 
+@router.put("/llm-api-key")
+async def update_llm_api_key(
+    provider: str,
+    api_key: str,
+    settings: Settings = Depends(get_settings_dep),
+):
+    """Update API key for a provider at runtime (not persisted to .env file)."""
+    if provider not in LLM_PROVIDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown provider: {provider}. Available: {list(LLM_PROVIDERS.keys())}",
+        )
+    # Update the settings object in memory
+    key_attr = {
+        "gemini": "google_api_key",
+        "openai": "openai_api_key",
+        "anthropic": "anthropic_api_key",
+        "deepseek": "deepseek_api_key",
+    }.get(provider)
+    if key_attr:
+        setattr(settings, key_attr, api_key)
+    # Reset LLM singletons so new key takes effect
+    deps_switch_provider(provider)
+    return {
+        "message": f"API key updated for {LLM_PROVIDERS[provider]['name']}",
+        "provider": provider,
+        "configured": bool(api_key),
+    }
+
+
 @router.put("/vision-url")
 async def update_vision_url(
     url: str,
@@ -135,3 +170,55 @@ async def update_vision_url(
         "current_url": settings.vision_api_url,
         "requested_url": url,
     }
+
+
+def _fetch_gemini_models_sync(api_key: str) -> list[dict]:
+    """Fetch available Gemini models from the API (blocking)."""
+    from google import genai
+
+    client = genai.Client(api_key=api_key)
+    models = []
+    for m in client.models.list():
+        name = m.name or ""
+        # Only include generateContent-capable models
+        methods = getattr(m, "supported_generation_methods", None) or []
+        if "generateContent" not in methods:
+            continue
+        # Strip "models/" prefix for the id
+        model_id = name.removeprefix("models/")
+        display = getattr(m, "display_name", "") or model_id
+        models.append({"id": model_id, "label": display})
+    # Sort: gemini-3 first, then gemini-2.5, then rest; within group alphabetical
+    models.sort(key=lambda x: x["id"])
+    return models
+
+
+@router.get("/models/{provider}")
+async def list_provider_models(
+    provider: str,
+    settings: Settings = Depends(get_settings_dep),
+):
+    """List available models for a given provider by querying its API."""
+    if provider not in LLM_PROVIDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown provider: {provider}. Available: {list(LLM_PROVIDERS.keys())}",
+        )
+
+    api_key = _get_api_key_for_provider(provider, settings)
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No API key configured for {provider}.",
+        )
+
+    try:
+        if provider == "gemini":
+            models = await asyncio.to_thread(_fetch_gemini_models_sync, api_key)
+            return models
+    except Exception as e:
+        logger.error("Failed to fetch models for %s: %s", provider, e)
+        raise HTTPException(status_code=502, detail=f"Failed to fetch models from {provider}: {e}")
+
+    # Other providers: return empty list (frontend uses hardcoded fallback)
+    return []

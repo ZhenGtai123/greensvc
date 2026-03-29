@@ -23,6 +23,16 @@ import {
   FormLabel,
   FormHelperText,
   Spinner,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
+  Divider,
+  List,
+  ListItem,
+  Wrap,
+  WrapItem,
 } from '@chakra-ui/react';
 import { ScanSearch, Download, Eye, Archive, Lightbulb, Check as CheckIcon } from 'lucide-react';
 import JSZip from 'jszip';
@@ -93,7 +103,7 @@ function VisionAnalysis() {
     recommendations, setRecommendations,
     selectedIndicators, addSelectedIndicator, removeSelectedIndicator,
     indicatorRelationships, setIndicatorRelationships,
-    setRecommendationSummary,
+    recommendationSummary, setRecommendationSummary,
   } = useAppStore();
 
   // Indicator recommendation
@@ -120,6 +130,10 @@ function VisionAnalysis() {
         } else {
           toast({ title: result.error || 'Recommendation failed', status: 'error' });
         }
+      },
+      onError: (err) => {
+        const msg = err instanceof Error ? err.message : 'Recommendation request failed';
+        toast({ title: msg, status: 'error' });
       },
     });
   }, [project, recommendMutation, toast]);
@@ -741,44 +755,139 @@ function VisionAnalysis() {
                 </Alert>
               )}
 
-              {/* Results */}
+              {/* Results — accordion with details */}
               {recommendations.length > 0 ? (
-                <VStack align="stretch" spacing={2} maxH="500px" overflowY="auto">
-                  {recommendations.map((rec) => {
-                    const selected = isIndicatorSelected(rec.indicator_id);
-                    return (
-                      <Box
-                        key={rec.indicator_id}
-                        p={2}
-                        borderWidth="1px"
-                        borderRadius="md"
-                        borderColor={selected ? 'blue.400' : 'gray.200'}
-                        bg={selected ? 'blue.50' : 'white'}
-                        cursor="pointer"
-                        onClick={() => toggleIndicator(rec)}
-                        _hover={{ borderColor: 'blue.300' }}
-                      >
-                        <HStack justify="space-between">
-                          <HStack spacing={2}>
-                            <Box
-                              w={4} h={4} borderRadius="sm"
-                              bg={selected ? 'blue.500' : 'gray.200'}
-                              color="white"
-                              display="flex" alignItems="center" justifyContent="center"
-                              flexShrink={0}
-                            >
-                              {selected && <CheckIcon size={10} />}
-                            </Box>
-                            <Text fontSize="sm" fontWeight="bold">{rec.indicator_id}</Text>
+                <VStack align="stretch" spacing={3}>
+                  <Accordion allowMultiple>
+                    {recommendations.map((rec) => {
+                      const selected = isIndicatorSelected(rec.indicator_id);
+                      return (
+                        <AccordionItem key={rec.indicator_id} borderColor={selected ? 'blue.300' : 'gray.200'}>
+                          <AccordionButton py={2}>
+                            <HStack flex="1" justify="space-between" pr={2}>
+                              <HStack spacing={2}>
+                                <Checkbox
+                                  isChecked={selected}
+                                  onChange={() => toggleIndicator(rec)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  size="sm"
+                                />
+                                <Badge colorScheme="blue" fontSize="xs">{rec.indicator_id}</Badge>
+                                <Text fontSize="sm" fontWeight="bold" noOfLines={1}>{rec.indicator_name}</Text>
+                              </HStack>
+                              <HStack spacing={1}>
+                                <Progress value={rec.relevance_score * 100} size="xs" w="40px" colorScheme="green" />
+                                <Text fontSize="xs">{(rec.relevance_score * 100).toFixed(0)}%</Text>
+                              </HStack>
+                            </HStack>
+                            <AccordionIcon />
+                          </AccordionButton>
+                          <AccordionPanel pb={3} px={3}>
+                            <VStack align="stretch" spacing={2}>
+                              <Text fontSize="xs">{rec.rationale}</Text>
+                              <Wrap spacing={1}>
+                                {rec.rank > 0 && <WrapItem><Badge colorScheme="purple" fontSize="2xs">#{rec.rank}</Badge></WrapItem>}
+                                <WrapItem>
+                                  <Badge colorScheme={rec.relationship_direction === 'positive' || rec.relationship_direction === 'INCREASE' ? 'green' : 'orange'} fontSize="2xs">
+                                    {rec.relationship_direction}
+                                  </Badge>
+                                </WrapItem>
+                                {rec.strength_score && (
+                                  <WrapItem>
+                                    <Badge colorScheme={rec.strength_score === 'A' ? 'green' : rec.strength_score === 'B' ? 'blue' : 'gray'} fontSize="2xs">
+                                      Strength {rec.strength_score}
+                                    </Badge>
+                                  </WrapItem>
+                                )}
+                                <WrapItem>
+                                  <Badge colorScheme={rec.confidence === 'high' ? 'green' : 'yellow'} fontSize="2xs">
+                                    {rec.confidence} conf.
+                                  </Badge>
+                                </WrapItem>
+                                {rec.transferability_summary && (
+                                  <WrapItem>
+                                    <Badge colorScheme="teal" variant="outline" fontSize="2xs">
+                                      {rec.transferability_summary.high_count}H/{rec.transferability_summary.moderate_count}M/{rec.transferability_summary.low_count}L
+                                    </Badge>
+                                  </WrapItem>
+                                )}
+                              </Wrap>
+                              {/* Evidence */}
+                              {rec.evidence_citations && rec.evidence_citations.length > 0 ? (
+                                <Box>
+                                  <Text fontSize="2xs" fontWeight="bold" color="gray.500" mb={1}>Evidence:</Text>
+                                  {rec.evidence_citations.slice(0, 3).map((cit) => (
+                                    <HStack key={cit.evidence_id} fontSize="2xs" color="gray.500" spacing={1}>
+                                      <Badge size="sm" variant="outline" fontSize="2xs">{cit.evidence_id}</Badge>
+                                      <Text noOfLines={1} flex={1}>{cit.citation}{cit.year ? ` (${cit.year})` : ''}</Text>
+                                    </HStack>
+                                  ))}
+                                  {rec.evidence_citations.length > 3 && (
+                                    <Text fontSize="2xs" color="gray.400">+{rec.evidence_citations.length - 3} more</Text>
+                                  )}
+                                </Box>
+                              ) : rec.evidence_ids?.length > 0 ? (
+                                <Text fontSize="2xs" color="gray.400">
+                                  Evidence: {rec.evidence_ids.slice(0, 3).join(', ')}{rec.evidence_ids.length > 3 ? ` +${rec.evidence_ids.length - 3}` : ''}
+                                </Text>
+                              ) : null}
+                            </VStack>
+                          </AccordionPanel>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
+
+                  {/* Relationships */}
+                  {indicatorRelationships.length > 0 && (
+                    <Box>
+                      <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={1}>Relationships</Text>
+                      <VStack align="stretch" spacing={1}>
+                        {indicatorRelationships.map((rel, i) => (
+                          <HStack key={i} fontSize="xs" spacing={1}>
+                            <Badge fontSize="2xs">{rel.indicator_a}</Badge>
+                            <Badge fontSize="2xs" colorScheme={rel.relationship_type === 'synergistic' ? 'green' : rel.relationship_type === 'inverse' ? 'red' : 'gray'}>
+                              {rel.relationship_type}
+                            </Badge>
+                            <Badge fontSize="2xs">{rel.indicator_b}</Badge>
                           </HStack>
-                          <Badge colorScheme="green" fontSize="2xs">
-                            {(rec.relevance_score * 100).toFixed(0)}%
-                          </Badge>
-                        </HStack>
-                        <Text fontSize="xs" color="gray.600" noOfLines={1} pl={6}>{rec.indicator_name}</Text>
-                      </Box>
-                    );
-                  })}
+                        ))}
+                      </VStack>
+                    </Box>
+                  )}
+
+                  {/* Summary */}
+                  {recommendationSummary && (
+                    <Box>
+                      <Divider mb={2} />
+                      {recommendationSummary.key_findings?.length > 0 && (
+                        <Box mb={2}>
+                          <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={1}>Key Findings</Text>
+                          <List spacing={0}>
+                            {recommendationSummary.key_findings.map((f: string, i: number) => (
+                              <ListItem key={i} fontSize="xs" display="flex" alignItems="start">
+                                <Box as="span" color="green.500" mr={1} flexShrink={0}>&#x2713;</Box>
+                                {f}
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Box>
+                      )}
+                      {recommendationSummary.evidence_gaps?.length > 0 && (
+                        <Box>
+                          <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={1}>Evidence Gaps</Text>
+                          <List spacing={0}>
+                            {recommendationSummary.evidence_gaps.map((g: string, i: number) => (
+                              <ListItem key={i} fontSize="xs" display="flex" alignItems="start">
+                                <Box as="span" color="orange.500" mr={1} flexShrink={0}>&#x26A0;</Box>
+                                {g}
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
                 </VStack>
               ) : !recommendMutation.isPending ? (
                 <Text fontSize="sm" color="gray.500" textAlign="center">

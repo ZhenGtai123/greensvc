@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Heading,
@@ -15,17 +15,43 @@ import {
   Badge,
   /* useToast — replaced by useAppToast */
   Divider,
-  Code,
   Select,
+  Input,
+  Code,
 } from '@chakra-ui/react';
 import { Server, Eye, Brain, Database } from 'lucide-react';
-import { useConfig, useHealth, useKnowledgeBaseSummary, useLLMProviders, queryKeys } from '../hooks/useApi';
+import { useConfig, useHealth, useKnowledgeBaseSummary, useLLMProviders, useProviderModels, queryKeys } from '../hooks/useApi';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../api';
 import type { LLMProviderInfo } from '../types';
 import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
+
+// Fallback model lists (used when dynamic fetch is unavailable)
+const FALLBACK_MODELS: Record<string, { id: string; label: string }[]> = {
+  gemini: [
+    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+    { id: 'gemini-2.5-flash-preview-05-20', label: 'Gemini 2.5 Flash Preview' },
+    { id: 'gemini-2.5-pro-preview-06-05', label: 'Gemini 2.5 Pro Preview' },
+  ],
+  openai: [
+    { id: 'gpt-4o', label: 'GPT-4o (default)' },
+    { id: 'gpt-4o-mini', label: 'GPT-4o Mini (cheaper)' },
+    { id: 'gpt-4.1', label: 'GPT-4.1 (latest)' },
+    { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini (fast)' },
+    { id: 'gpt-4.1-nano', label: 'GPT-4.1 Nano (cheapest)' },
+  ],
+  anthropic: [
+    { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (default)' },
+    { id: 'claude-opus-4-20250514', label: 'Claude Opus 4 (strongest)' },
+    { id: 'claude-haiku-4-20250514', label: 'Claude Haiku 4 (fast)' },
+  ],
+  deepseek: [
+    { id: 'deepseek-chat', label: 'DeepSeek Chat (default)' },
+    { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner (R1)' },
+  ],
+};
 
 function Settings() {
   const { data: config, isLoading: configLoading } = useConfig();
@@ -35,13 +61,25 @@ function Settings() {
   const queryClient = useQueryClient();
   const toast = useAppToast();
 
+  const activeProviderId = llmProviders?.find((p: LLMProviderInfo) => p.active)?.id;
+  const { data: dynamicModels, isLoading: modelsLoading } = useProviderModels(activeProviderId);
+
   const [visionHealthy, setVisionHealthy] = useState<boolean | null>(null);
   const [llmStatus, setLlmStatus] = useState<{ configured: boolean; provider: string; model: string | null } | null>(null);
   const [testingVision, setTestingVision] = useState(false);
   const [testingLLM, setTestingLLM] = useState(false);
   const [switchingProvider, setSwitchingProvider] = useState(false);
+  const [customModel, setCustomModel] = useState('');
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [savingKey, setSavingKey] = useState(false);
 
   const activeProvider = llmProviders?.find((p: LLMProviderInfo) => p.active);
+
+  useEffect(() => {
+    if (activeProvider?.current_model) {
+      setCustomModel(activeProvider.current_model);
+    }
+  }, [activeProvider?.current_model]);
 
   const testVisionConnection = async () => {
     setTestingVision(true);
@@ -77,10 +115,10 @@ function Settings() {
     setTestingLLM(false);
   };
 
-  const handleSwitchProvider = async (providerId: string) => {
+  const handleSwitchProvider = async (providerId: string, model?: string) => {
     setSwitchingProvider(true);
     try {
-      const response = await api.switchLLMProvider(providerId);
+      const response = await api.switchLLMProvider(providerId, model || undefined);
       toast({
         title: `Switched to ${response.data.provider}`,
         description: `Model: ${response.data.model}`,
@@ -94,6 +132,22 @@ function Settings() {
       toast({ title: detail, status: 'error' });
     }
     setSwitchingProvider(false);
+  };
+
+  const handleUpdateApiKey = async () => {
+    if (!activeProvider || !apiKeyInput.trim()) return;
+    setSavingKey(true);
+    try {
+      await api.updateLLMApiKey(activeProvider.id, apiKeyInput.trim());
+      toast({ title: `API key updated for ${activeProvider.name}`, status: 'success' });
+      setApiKeyInput('');
+      queryClient.invalidateQueries({ queryKey: queryKeys.llmProviders });
+      setLlmStatus(null);
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail || 'Failed to update API key';
+      toast({ title: detail, status: 'error' });
+    }
+    setSavingKey(false);
   };
 
   return (
@@ -174,34 +228,121 @@ function Settings() {
           </CardHeader>
           <CardBody>
             <VStack align="stretch" spacing={4}>
+              {/* Provider selector */}
               <FormControl>
-                <FormLabel>Active Provider</FormLabel>
+                <FormLabel fontSize="sm">Provider</FormLabel>
                 <Select
                   value={activeProvider?.id || ''}
                   onChange={(e) => handleSwitchProvider(e.target.value)}
                   isDisabled={switchingProvider || providersLoading}
+                  size="sm"
                 >
                   {llmProviders?.map((p: LLMProviderInfo) => (
-                    <option key={p.id} value={p.id} disabled={!p.configured}>
-                      {p.name} {!p.configured ? '(no API key)' : ''}
+                    <option key={p.id} value={p.id}>
+                      {p.name} {!p.configured ? '(no key)' : ''}
                     </option>
                   ))}
                 </Select>
               </FormControl>
 
+              {/* Model selector */}
+              {activeProvider && (() => {
+                const modelList = (dynamicModels && dynamicModels.length > 0)
+                  ? dynamicModels
+                  : (FALLBACK_MODELS[activeProvider.id] || []);
+                return (
+                  <FormControl>
+                    <FormLabel fontSize="sm">
+                      Model {modelsLoading && <Text as="span" fontSize="xs" color="gray.400">(loading...)</Text>}
+                    </FormLabel>
+                    <HStack>
+                      <Select
+                        value={customModel}
+                        onChange={(e) => setCustomModel(e.target.value)}
+                        size="sm"
+                        fontFamily="mono"
+                        fontSize="sm"
+                      >
+                        {modelList.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} — {m.label}</option>
+                        ))}
+                        {/* Allow current model even if not in fetched list */}
+                        {customModel && !modelList.some(m => m.id === customModel) && (
+                          <option value={customModel}>{customModel} (current)</option>
+                        )}
+                      </Select>
+                      <Button
+                        size="sm"
+                        colorScheme="blue"
+                        onClick={() => handleSwitchProvider(activeProvider.id, customModel)}
+                        isLoading={switchingProvider}
+                        isDisabled={customModel === activeProvider.current_model}
+                        flexShrink={0}
+                      >
+                        Apply
+                      </Button>
+                    </HStack>
+                  </FormControl>
+                );
+              })()}
+
+              <Divider />
+
+              {/* API Key */}
               {activeProvider && (
                 <FormControl>
-                  <FormLabel>Model</FormLabel>
-                  <Code p={2} borderRadius="md" w="full">
-                    {activeProvider.current_model}
-                  </Code>
+                  <FormLabel fontSize="sm">API Key ({activeProvider.name})</FormLabel>
+                  <HStack>
+                    <Input
+                      type="password"
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      placeholder={activeProvider.configured ? '••••••••  (configured)' : 'Enter API key...'}
+                      size="sm"
+                      fontFamily="mono"
+                    />
+                    <Button
+                      size="sm"
+                      colorScheme="green"
+                      onClick={handleUpdateApiKey}
+                      isLoading={savingKey}
+                      isDisabled={!apiKeyInput.trim()}
+                      flexShrink={0}
+                    >
+                      Save
+                    </Button>
+                  </HStack>
+                  <Text fontSize="xs" color="gray.500" mt={1}>
+                    Runtime only — not saved to .env file.
+                  </Text>
                 </FormControl>
+              )}
+
+              {/* Test Connection */}
+              {activeProvider && (
+                <HStack>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={testLLMConnection}
+                    isLoading={testingLLM}
+                    w="full"
+                  >
+                    Test Connection
+                  </Button>
+                  {llmStatus && (
+                    <Badge colorScheme={llmStatus.configured ? 'green' : 'red'} flexShrink={0}>
+                      {llmStatus.configured ? `OK — ${llmStatus.model}` : 'Failed'}
+                    </Badge>
+                  )}
+                </HStack>
               )}
 
               <Divider />
 
-              <Text fontSize="sm" fontWeight="semibold" color="gray.500">
-                Available Providers
+              {/* Provider status list */}
+              <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase">
+                Providers
               </Text>
               {llmProviders?.map((p: LLMProviderInfo) => (
                 <HStack key={p.id} justify="space-between">
@@ -210,7 +351,7 @@ function Settings() {
                     {p.active && <Badge colorScheme="blue" fontSize="xs">Active</Badge>}
                   </HStack>
                   <Badge colorScheme={p.configured ? 'green' : 'gray'} fontSize="xs">
-                    {p.configured ? 'Configured' : 'Not configured'}
+                    {p.configured ? p.current_model : 'No key'}
                   </Badge>
                 </HStack>
               ))}

@@ -41,6 +41,10 @@ export const api = {
   getLLMProviders: () => apiClient.get<LLMProviderInfo[]>('/api/config/llm-providers'),
   switchLLMProvider: (provider: string, model?: string) =>
     apiClient.put('/api/config/llm-provider', null, { params: { provider, model } }),
+  updateLLMApiKey: (provider: string, api_key: string) =>
+    apiClient.put('/api/config/llm-api-key', null, { params: { provider, api_key } }),
+  getProviderModels: (provider: string) =>
+    apiClient.get<{ id: string; label: string }[]>(`/api/config/models/${provider}`),
 
   // Projects
   projects: {

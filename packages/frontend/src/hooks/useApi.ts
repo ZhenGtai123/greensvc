@@ -13,6 +13,7 @@ export const queryKeys = {
   calculator: (id: string) => ['calculator', id],
   semanticConfig: ['semanticConfig'],
   knowledgeBase: ['knowledgeBase'],
+  providerModels: (provider: string) => ['provider-models', provider],
   task: (id: string) => ['task', id],
 };
 
@@ -37,6 +38,16 @@ export function useLLMProviders() {
   return useQuery({
     queryKey: queryKeys.llmProviders,
     queryFn: () => api.getLLMProviders().then((r) => r.data),
+  });
+}
+
+// Provider models hook
+export function useProviderModels(provider: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.providerModels(provider || ''),
+    queryFn: () => api.getProviderModels(provider!).then((r) => r.data),
+    enabled: !!provider,
+    staleTime: 5 * 60 * 1000, // cache 5 min
   });
 }
 
