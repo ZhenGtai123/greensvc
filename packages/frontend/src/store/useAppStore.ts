@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Project, CalculatorInfo, IndicatorRecommendation, IndicatorRelationship, RecommendationSummary, SemanticClass, ZoneAnalysisResult, DesignStrategyResult, ProjectPipelineResult } from '../types';
+import type { Project, IndicatorRecommendation, IndicatorRelationship, RecommendationSummary, ZoneAnalysisResult, DesignStrategyResult, ProjectPipelineResult } from '../types';
 
 export interface VisionMaskResult {
   imageId: string;
@@ -47,22 +47,9 @@ interface AppState {
 
   clearPipelineResults: () => void;
 
-  // Calculators
-  calculators: CalculatorInfo[];
-  setCalculators: (calculators: CalculatorInfo[]) => void;
-
-  // Semantic config
-  semanticClasses: SemanticClass[];
-  setSemanticClasses: (classes: SemanticClass[]) => void;
-
   // UI State
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
-
-  // Active tasks
-  activeTasks: string[];
-  addActiveTask: (taskId: string) => void;
-  removeActiveTask: (taskId: string) => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set) => ({
@@ -125,28 +112,9 @@ export const useAppStore = create<AppState>()(persist((set) => ({
     aiReportMeta: null,
   }),
 
-  // Calculators
-  calculators: [],
-  setCalculators: (calculators) => set({ calculators }),
-
-  // Semantic config
-  semanticClasses: [],
-  setSemanticClasses: (classes) => set({ semanticClasses: classes }),
-
   // UI State
   sidebarOpen: true,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
-
-  // Active tasks
-  activeTasks: [],
-  addActiveTask: (taskId) =>
-    set((state) => ({
-      activeTasks: [...state.activeTasks, taskId],
-    })),
-  removeActiveTask: (taskId) =>
-    set((state) => ({
-      activeTasks: state.activeTasks.filter((id) => id !== taskId),
-    })),
 }), {
   name: 'scenerx-store',
   partialize: (state) => ({

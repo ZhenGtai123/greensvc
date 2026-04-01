@@ -321,6 +321,11 @@ async def run_project_pipeline(
     calc_fail = 0
     calc_cached = 0
 
+    # Always clear previous results so every pipeline run produces fresh calculations
+    for img in assigned_images:
+        img.metrics_results.clear()
+    calculator.clear_cache()
+
     for img in assigned_images:
         # Prefer semantic_map mask over raw photo
         image_path = img.mask_filepaths.get("semantic_map", img.filepath)

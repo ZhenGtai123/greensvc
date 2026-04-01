@@ -12,7 +12,6 @@ import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Calculators from './pages/Calculators';
 import VisionAnalysis from './pages/VisionAnalysis';
-import Indicators from './pages/Indicators';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import ProjectWizard from './pages/ProjectWizard';
@@ -151,14 +150,27 @@ function ProjectPipelineLayout() {
   });
 
   const segment = pathname.split('/').pop() || '';
-  const stepMap: Record<string, number> = { vision: 2, analysis: 3, reports: 4 };
-  const currentStep = stepMap[segment] || 1; // fallback 1 = Setup
+  // 5-step: Project(1) → Images(2) → Prepare(3) → Analysis(4) → Report(5)
+  const stepMap: Record<string, number> = { edit: 1, vision: 3, analysis: 4, reports: 5 };
+  const currentStep = stepMap[segment] || 2; // fallback 2 = Images
 
   const stageStatuses = getStageStatuses(project ?? null, { recommendations, zoneAnalysisResult });
 
   return (
     <>
       <StepIndicator currentStep={currentStep} projectId={projectId || ''} stageStatuses={stageStatuses} />
+      <Outlet />
+    </>
+  );
+}
+
+/** Layout for /projects/new — shows StepIndicator at step 1 with no project loaded */
+function NewProjectLayout() {
+  const stageStatuses = getStageStatuses(null, { recommendations: [], zoneAnalysisResult: null });
+
+  return (
+    <>
+      <StepIndicator currentStep={1} projectId="" stageStatuses={stageStatuses} />
       <Outlet />
     </>
   );
@@ -180,12 +192,16 @@ function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />
-                <Route path="/projects/new" element={<ProjectWizard />} />
-                <Route path="/projects/:projectId/edit" element={<ProjectWizard />} />
 
-                {/* 4-step pipeline: Setup → Prepare → Analysis → Report */}
+                {/* New project — step 1 of pipeline */}
+                <Route path="/projects/new" element={<NewProjectLayout />}>
+                  <Route index element={<ProjectWizard />} />
+                </Route>
+
+                {/* 5-step pipeline: Project → Images → Prepare → Analysis → Report */}
                 <Route path="/projects/:projectId" element={<ProjectPipelineLayout />}>
                   <Route index element={<ProjectDetail />} />
+                  <Route path="edit" element={<ProjectWizard />} />
                   <Route path="vision" element={<VisionAnalysis />} />
                   <Route path="analysis" element={<Analysis />} />
                   <Route path="reports" element={<Reports />} />

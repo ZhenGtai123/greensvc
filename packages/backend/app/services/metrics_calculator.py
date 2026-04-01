@@ -4,6 +4,8 @@ Executes indicator calculations using calculator modules
 """
 
 import os
+import io
+import sys
 import json
 import logging
 import importlib.util
@@ -77,8 +79,14 @@ class MetricsCalculator:
             # Inject semantic_colors before execution
             module.semantic_colors = self.semantic_colors
 
-            # Execute module
-            spec.loader.exec_module(module)
+            # Execute module — redirect stdout to avoid Windows GBK encoding
+            # crashes from emoji characters in calculator print() statements
+            old_stdout = sys.stdout
+            sys.stdout = io.StringIO()
+            try:
+                spec.loader.exec_module(module)
+            finally:
+                sys.stdout = old_stdout
 
             # Validate required components
             if not hasattr(module, 'INDICATOR'):
@@ -201,7 +209,14 @@ class MetricsCalculator:
                 )
 
             # Count target pixels within the masked region
-            if isinstance(target_rgb, (list, tuple)) and len(target_rgb) == 3 and isinstance(target_rgb[0], (int, float)):
+            # TARGET_RGB can be:
+            #   - dict {(r,g,b): class_name, ...} (from calculator modules)
+            #   - list/tuple of RGB tuples
+            #   - single RGB tuple (r,g,b)
+            if isinstance(target_rgb, dict):
+                # Dict keyed by RGB tuples — extract keys
+                target_colors = [tuple(int(c) for c in rgb) for rgb in target_rgb.keys()]
+            elif isinstance(target_rgb, (list, tuple)) and len(target_rgb) == 3 and isinstance(target_rgb[0], (int, float)):
                 # Single target color
                 target_colors = [tuple(int(c) for c in target_rgb)]
             elif isinstance(target_rgb, (list, tuple)):

@@ -16,7 +16,6 @@ import {
   Td,
   IconButton,
   useDisclosure,
-  /* useToast — replaced by useAppToast */
   Badge,
   HStack,
   Card,

@@ -3,9 +3,12 @@
 import os
 import uuid
 import shutil
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 
@@ -233,7 +236,10 @@ async def upload_images(
     for file in files:
         # Generate unique image ID
         image_id = f"img_{uuid.uuid4().hex[:8]}"
-        filename = f"{image_id}_{file.filename}"
+        # Strip directory part from filename (folder uploads send relative path)
+        raw_name = file.filename or "unknown.jpg"
+        safe_name = raw_name.replace('\\', '/').rsplit('/', 1)[-1]
+        filename = f"{image_id}_{safe_name}"
         filepath = upload_dir / filename
 
         # Save file
@@ -270,10 +276,10 @@ async def upload_images(
         except Exception:
             pass  # Not an image with EXIF or Pillow issue — skip silently
 
-        # Create image record
+        # Create image record (use safe_name, not file.filename which may contain path)
         image = UploadedImage(
             image_id=image_id,
-            filename=file.filename,
+            filename=safe_name,
             filepath=str(filepath),
             zone_id=zone_id,
             has_gps=has_gps,

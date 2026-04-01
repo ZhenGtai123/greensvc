@@ -2,10 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Box,
-  Flex,
   Heading,
   Button,
-  VStack,
   HStack,
   SimpleGrid,
   Card,
@@ -13,19 +11,10 @@ import {
   CardBody,
   Text,
   Badge,
-  Circle,
-  /* useToast — replaced by useAppToast */
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  Image,
   IconButton,
   Tag,
   Wrap,
   WrapItem,
-  Divider,
   Alert,
   AlertIcon,
   Progress,
@@ -33,12 +22,11 @@ import {
   Select,
   Spinner,
 } from '@chakra-ui/react';
-import { ArrowLeft, Upload, X, Undo2, Check, ImageIcon, MapPin } from 'lucide-react';
+import { Upload, FolderUp, X, Undo2, ImageIcon, MapPin } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
 import useAppStore from '../store/useAppStore';
 import useAppToast from '../hooks/useAppToast';
-import { getStageStatuses } from '../utils/pipelineStatus';
 import type { Project, UploadedImage } from '../types';
 import PageShell from '../components/PageShell';
 import EmptyState from '../components/EmptyState';
@@ -48,105 +36,13 @@ function imageUrl(projectId: string, img: UploadedImage): string {
   return `/api/uploads/${projectId}/${img.image_id}_${img.filename}`;
 }
 
-// ---------------------------------------------------------------------------
-// Pipeline progress card — shows sequential stage status
-// ---------------------------------------------------------------------------
-// Pipeline stages shown in progress card (skip Setup — user is already on this page)
-const STAGES = [
-  { key: 'vision', label: 'Prepare', desc: 'Vision segmentation + indicator recommendation' },
-  { key: 'analysis', label: 'Analysis', desc: 'Run zone statistics & design strategies' },
-  { key: 'reports', label: 'Report', desc: 'Generate AI report & export' },
-] as const;
-
-function PipelineCard({ projectId, project }: { projectId: string; project: Project }) {
-  const { recommendations, zoneAnalysisResult } = useAppStore();
-  const allStatuses = getStageStatuses(project, { recommendations, zoneAnalysisResult });
-  // Skip index 0 (Setup) — PipelineCard starts from Vision (index 1)
-  const statuses = allStatuses.slice(1);
-  const nextIdx = statuses.findIndex((s) => !s.done && s.ready);
-
-  return (
-    <Card>
-      <CardHeader pb={2}>
-        <Heading size="sm">Analysis Pipeline</Heading>
-      </CardHeader>
-      <CardBody pt={0}>
-        <VStack spacing={0} align="stretch">
-          {STAGES.map((stage, i) => {
-            const { done, ready } = statuses[i];
-            const isNext = i === nextIdx;
-            const locked = !done && !ready;
-
-            return (
-              <Flex
-                key={stage.key}
-                align="center"
-                py={3}
-                borderTop={i > 0 ? '1px solid' : 'none'}
-                borderColor="gray.100"
-                opacity={locked ? 0.45 : 1}
-              >
-                <Circle
-                  size="28px"
-                  bg={done ? 'brand.500' : isNext ? 'blue.500' : 'gray.200'}
-                  color={done || isNext ? 'white' : 'gray.500'}
-                  fontSize="xs"
-                  fontWeight="bold"
-                  mr={3}
-                  flexShrink={0}
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  {done ? <Check size={14} /> : i + 1}
-                </Circle>
-
-                <Box flex={1} minW={0}>
-                  <Text fontSize="sm" fontWeight="600" color={locked ? 'gray.400' : 'gray.700'}>
-                    {stage.label}
-                  </Text>
-                  <Text fontSize="xs" color="gray.400" noOfLines={1}>
-                    {stage.desc}
-                  </Text>
-                </Box>
-
-                {done ? (
-                  <Button
-                    as={Link}
-                    to={stage.key ? `/projects/${projectId}/${stage.key}` : `/projects/${projectId}`}
-                    size="xs"
-                    variant="ghost"
-                    colorScheme="green"
-                    flexShrink={0}
-                  >
-                    View
-                  </Button>
-                ) : isNext ? (
-                  <Button
-                    as={Link}
-                    to={stage.key ? `/projects/${projectId}/${stage.key}` : `/projects/${projectId}`}
-                    size="xs"
-                    colorScheme="blue"
-                    flexShrink={0}
-                  >
-                    Start
-                  </Button>
-                ) : null}
-              </Flex>
-            );
-          })}
-        </VStack>
-      </CardBody>
-    </Card>
-  );
-}
-
 function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const toast = useAppToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const { setCurrentProject, clearPipelineResults } = useAppStore();
 
   const [uploading, setUploading] = useState(false);
@@ -154,6 +50,16 @@ function ProjectDetail() {
   const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(new Set());
   const [targetZoneId, setTargetZoneId] = useState('');
   const [batchAssigning, setBatchAssigning] = useState(false);
+  const [zoneUploading, setZoneUploading] = useState<string | null>(null);
+  const [zoneUploadProgress, setZoneUploadProgress] = useState(0);
+  const zoneFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const lastClickedIndex = useRef<number>(-1);
+
+  // Pagination for large image sets
+  const ZONE_PAGE_SIZE = 48;
+  const UNGROUPED_PAGE_SIZE = 100;
+  const [zoneVisibleCount, setZoneVisibleCount] = useState<Record<string, number>>({});
+  const [ungroupedVisibleCount, setUngroupedVisibleCount] = useState(UNGROUPED_PAGE_SIZE);
 
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['project', projectId],
@@ -202,6 +108,118 @@ function ProjectDetail() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !projectId || !project) return;
+
+    const zones = project.spatial_zones;
+    const fileArray = Array.from(files).filter(f => /\.(jpe?g|png|webp|bmp|tiff?)$/i.test(f.name));
+    if (fileArray.length === 0) {
+      toast({ title: 'No image files found in folder', status: 'warning' });
+      return;
+    }
+
+    // Group files by their immediate subfolder name
+    // webkitRelativePath = "rootFolder/subfolder/file.jpg" or "rootFolder/file.jpg"
+    const grouped = new Map<string, File[]>(); // zone_id → files
+    const ungroupedFiles: File[] = [];
+
+    for (const file of fileArray) {
+      const parts = file.webkitRelativePath.split('/');
+      // parts: [rootFolder, ...subfolders, filename]
+      // Use the first subfolder (parts[1]) if it's not the filename itself
+      const folderName = parts.length > 2 ? parts[1] : null;
+
+      if (folderName) {
+        // Try to match folder name to a zone (case-insensitive)
+        const folderLower = folderName.toLowerCase();
+        const matchedZone = zones.find(z => {
+          const zl = z.zone_name.toLowerCase();
+          return zl === folderLower
+            || zl.replace(/\s+/g, '_') === folderLower
+            || zl.replace(/\s+/g, '-') === folderLower
+            || z.zone_id.toLowerCase() === folderLower;
+        });
+        if (matchedZone) {
+          const list = grouped.get(matchedZone.zone_id) || [];
+          list.push(file);
+          grouped.set(matchedZone.zone_id, list);
+        } else {
+          ungroupedFiles.push(file);
+        }
+      } else {
+        ungroupedFiles.push(file);
+      }
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+    let totalUploaded = 0;
+    const totalFiles = fileArray.length;
+
+    try {
+      // Upload zone-matched files with zone_id
+      for (const [zoneId, zoneFiles] of grouped) {
+        const chunkSize = 10;
+        for (let i = 0; i < zoneFiles.length; i += chunkSize) {
+          const chunk = zoneFiles.slice(i, i + chunkSize);
+          await api.projects.uploadImages(projectId, chunk, zoneId);
+          totalUploaded += chunk.length;
+          setUploadProgress(Math.round((totalUploaded / totalFiles) * 100));
+        }
+      }
+
+      // Upload unmatched files without zone_id
+      if (ungroupedFiles.length > 0) {
+        const chunkSize = 10;
+        for (let i = 0; i < ungroupedFiles.length; i += chunkSize) {
+          const chunk = ungroupedFiles.slice(i, i + chunkSize);
+          await api.projects.uploadImages(projectId, chunk);
+          totalUploaded += chunk.length;
+          setUploadProgress(Math.round((totalUploaded / totalFiles) * 100));
+        }
+      }
+
+      const assignedCount = totalFiles - ungroupedFiles.length;
+      const zoneCounts = Array.from(grouped.entries())
+        .map(([zid, fs]) => {
+          const zname = zones.find(z => z.zone_id === zid)?.zone_name || zid;
+          return `${zname}: ${fs.length}`;
+        }).join(', ');
+
+      if (assignedCount > 0 && ungroupedFiles.length > 0) {
+        toast({
+          title: `${totalFiles} images uploaded — ${assignedCount} auto-assigned`,
+          description: `${zoneCounts}. ${ungroupedFiles.length} unmatched (ungrouped).`,
+          status: 'success',
+          duration: 6000,
+        });
+      } else if (assignedCount > 0) {
+        toast({
+          title: `${totalFiles} images uploaded & auto-assigned`,
+          description: zoneCounts,
+          status: 'success',
+          duration: 5000,
+        });
+      } else {
+        toast({
+          title: `${totalFiles} images uploaded (no folder-zone matches)`,
+          description: 'Subfolder names did not match any zone names. Assign manually.',
+          status: 'info',
+          duration: 5000,
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+    } catch {
+      toast({ title: 'Failed to upload folder', status: 'error' });
+    }
+
+    setUploading(false);
+    setUploadProgress(0);
+    if (folderInputRef.current) folderInputRef.current.value = '';
+  };
+
   const handleBatchAssign = async () => {
     if (!targetZoneId || selectedImageIds.size === 0) return;
     setBatchAssigning(true);
@@ -233,13 +251,61 @@ function ProjectDetail() {
     }
   };
 
-  const toggleImageSelection = (imageId: string) => {
-    setSelectedImageIds(prev => {
-      const next = new Set(prev);
-      if (next.has(imageId)) next.delete(imageId);
-      else next.add(imageId);
-      return next;
-    });
+  const handleZoneUpload = async (zoneId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !projectId) return;
+
+    setZoneUploading(zoneId);
+    setZoneUploadProgress(0);
+
+    try {
+      const fileArray = Array.from(files);
+      const chunkSize = 10;
+      let uploaded = 0;
+
+      for (let i = 0; i < fileArray.length; i += chunkSize) {
+        const chunk = fileArray.slice(i, i + chunkSize);
+        await api.projects.uploadImages(projectId, chunk, zoneId);
+        uploaded += chunk.length;
+        setZoneUploadProgress(Math.round((uploaded / fileArray.length) * 100));
+      }
+
+      toast({ title: `${fileArray.length} image(s) uploaded to zone`, status: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+    } catch {
+      toast({ title: 'Failed to upload images', status: 'error' });
+    }
+
+    setZoneUploading(null);
+    setZoneUploadProgress(0);
+    const ref = zoneFileInputRefs.current[zoneId];
+    if (ref) ref.value = '';
+  };
+
+  const handleImageClick = (imageId: string, index: number, e: React.MouseEvent) => {
+    const ungrouped = project?.uploaded_images.filter(img => !img.zone_id) || [];
+
+    if (e.shiftKey && lastClickedIndex.current >= 0) {
+      // Shift+Click: select range between last click and current
+      const start = Math.min(lastClickedIndex.current, index);
+      const end = Math.max(lastClickedIndex.current, index);
+      setSelectedImageIds(prev => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) {
+          next.add(ungrouped[i].image_id);
+        }
+        return next;
+      });
+    } else {
+      // Normal click: toggle single image
+      setSelectedImageIds(prev => {
+        const next = new Set(prev);
+        if (next.has(imageId)) next.delete(imageId);
+        else next.add(imageId);
+        return next;
+      });
+    }
+    lastClickedIndex.current = index;
   };
 
   const deleteImageMutation = useMutation({
@@ -272,355 +338,220 @@ function ProjectDetail() {
   const getZoneImages = (zoneId: string) =>
     project.uploaded_images.filter(img => img.zone_id === zoneId);
 
+  const assignedCount = project.uploaded_images.filter(i => i.zone_id).length;
+  const hasZones = project.spatial_zones.length > 0;
+  const hasImages = project.uploaded_images.length > 0;
+  const isReady = hasZones && hasImages && assignedCount > 0;
+
   return (
     <PageShell>
       {/* Header */}
-      <HStack justify="space-between" mb={6}>
+      <HStack justify="space-between" mb={4}>
         <Box>
-          <HStack>
-            <Button variant="ghost" size="sm" as={Link} to="/projects" leftIcon={<ArrowLeft size={16} />}>
-              Back
-            </Button>
-            <Heading size="lg">{project.project_name}</Heading>
-            <Badge colorScheme="blue">{project.id}</Badge>
-          </HStack>
-          <Text color="gray.500" mt={1}>
+          <Heading size="lg">{project.project_name}</Heading>
+          <Text color="gray.500" fontSize="sm" mt={1}>
             {project.project_location || 'No location'} &bull; {project.site_scale || 'No scale'}
+            {project.koppen_zone_id && ` \u2022 ${project.koppen_zone_id}`}
           </Text>
         </Box>
-        <Button variant="outline" as={Link} to={`/projects/${projectId}/edit`}>
+        <Button variant="outline" size="sm" as={Link} to={`/projects/${projectId}/edit`}>
           Edit Project
         </Button>
       </HStack>
 
-      <Tabs>
-        <TabList>
-          <Tab>Overview</Tab>
-          <Tab>Zones ({project.spatial_zones.length})</Tab>
-          <Tab>Images ({project.uploaded_images.length})</Tab>
-        </TabList>
-
-        <TabPanels>
-          {/* Overview Tab */}
-          <TabPanel>
-            <PipelineCard projectId={projectId!} project={project} />
-
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mt={6}>
-              <Card>
-                <CardHeader>
-                  <Heading size="md">Project Information</Heading>
-                </CardHeader>
-                <CardBody>
-                  <VStack align="stretch" spacing={3}>
-                    <HStack justify="space-between">
-                      <Text color="gray.500">Phase</Text>
-                      <Text fontWeight="bold">{project.project_phase || '-'}</Text>
-                    </HStack>
-                    <Divider />
-                    <HStack justify="space-between">
-                      <Text color="gray.500">Climate Zone</Text>
-                      <Badge>{project.koppen_zone_id || '-'}</Badge>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text color="gray.500">Space Type</Text>
-                      <Badge>{project.space_type_id || '-'}</Badge>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text color="gray.500">LCZ Type</Text>
-                      <Badge>{project.lcz_type_id || '-'}</Badge>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text color="gray.500">Country</Text>
-                      <Badge>{project.country_id || '-'}</Badge>
-                    </HStack>
-                  </VStack>
-                </CardBody>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <Heading size="md">Performance Goals</Heading>
-                </CardHeader>
-                <CardBody>
-                  <Text mb={3} color="gray.600" fontSize="sm">
-                    {project.design_brief || 'No design brief provided'}
-                  </Text>
-                  <Divider mb={3} />
-                  <Text fontWeight="bold" mb={2}>Dimensions:</Text>
-                  <Wrap>
-                    {project.performance_dimensions.length > 0 ? (
-                      project.performance_dimensions.map(dim => (
-                        <WrapItem key={dim}>
-                          <Tag colorScheme="blue">{dim}</Tag>
-                        </WrapItem>
-                      ))
-                    ) : (
-                      <Text color="gray.400">No dimensions selected</Text>
-                    )}
-                  </Wrap>
-                </CardBody>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <Heading size="md">Statistics</Heading>
-                </CardHeader>
-                <CardBody>
-                  <SimpleGrid columns={3} spacing={4}>
-                    <Box textAlign="center">
-                      <Text fontSize="3xl" fontWeight="bold" color="blue.500">
-                        {project.spatial_zones.length}
-                      </Text>
-                      <Text fontSize="sm" color="gray.500">Zones</Text>
-                    </Box>
-                    <Box textAlign="center">
-                      <Text fontSize="3xl" fontWeight="bold" color="brand.500">
-                        {project.uploaded_images.length}
-                      </Text>
-                      <Text fontSize="sm" color="gray.500">Images</Text>
-                    </Box>
-                    <Box textAlign="center">
-                      <Text fontSize="3xl" fontWeight="bold" color="purple.500">
-                        {project.uploaded_images.filter(i => i.zone_id).length}
-                      </Text>
-                      <Text fontSize="sm" color="gray.500">Grouped</Text>
-                    </Box>
-                  </SimpleGrid>
-                </CardBody>
-              </Card>
-            </SimpleGrid>
-          </TabPanel>
-
-          {/* Zones Tab */}
-          <TabPanel>
-            {project.spatial_zones.length === 0 ? (
-              <EmptyState icon={MapPin} title="No zones defined" description="No zones defined for this project." />
-            ) : (
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                {project.spatial_zones.map(zone => {
-                  const zoneImages = getZoneImages(zone.zone_id);
-                  return (
-                    <Card key={zone.zone_id}>
-                      <CardHeader>
-                        <HStack justify="space-between">
-                          <Heading size="sm">{zone.zone_name}</Heading>
-                          <Badge>{zone.status}</Badge>
-                        </HStack>
-                      </CardHeader>
-                      <CardBody>
-                        <Wrap mb={2}>
-                          {zone.zone_types.map(type => (
-                            <WrapItem key={type}>
-                              <Tag size="sm">{type}</Tag>
-                            </WrapItem>
-                          ))}
-                        </Wrap>
-                        {zone.area && (
-                          <Text fontSize="sm" color="gray.500">
-                            Area: {zone.area} m²
-                          </Text>
-                        )}
-                        <Text fontSize="sm" color="gray.500" mt={1}>
-                          {zone.description || 'No description'}
-                        </Text>
-                        <Divider my={2} />
-                        <Text fontSize="sm">
-                          <strong>{zoneImages.length}</strong> images
-                        </Text>
-                        {zoneImages.length > 0 && (
-                          <HStack mt={2} spacing={1} overflowX="auto">
-                            {zoneImages.slice(0, 4).map(img => (
-                              <Image
-                                key={img.image_id}
-                                src={imageUrl(project.id, img)}
-                                alt={img.filename}
-                                boxSize="40px"
-                                objectFit="cover"
-                                borderRadius="sm"
-                                fallback={<Box boxSize="40px" bg="gray.200" borderRadius="sm" />}
-                              />
-                            ))}
-                            {zoneImages.length > 4 && (
-                              <Badge>+{zoneImages.length - 4}</Badge>
-                            )}
-                          </HStack>
-                        )}
-                      </CardBody>
-                    </Card>
-                  );
-                })}
-              </SimpleGrid>
+      {/* Compact summary */}
+      <HStack spacing={6} mb={4} px={1}>
+        <HStack spacing={1}>
+          <Text fontSize="sm" color="gray.500">Zones:</Text>
+          <Badge colorScheme={hasZones ? 'blue' : 'red'}>{project.spatial_zones.length}</Badge>
+        </HStack>
+        <HStack spacing={1}>
+          <Text fontSize="sm" color="gray.500">Images:</Text>
+          <Badge colorScheme={hasImages ? 'green' : 'gray'}>{project.uploaded_images.length}</Badge>
+        </HStack>
+        <HStack spacing={1}>
+          <Text fontSize="sm" color="gray.500">Assigned:</Text>
+          <Badge colorScheme={assignedCount > 0 ? 'purple' : 'gray'}>{assignedCount}</Badge>
+        </HStack>
+        {project.performance_dimensions.length > 0 && (
+          <Wrap spacing={1}>
+            {project.performance_dimensions.slice(0, 3).map(dim => (
+              <WrapItem key={dim}><Tag size="sm" colorScheme="blue">{dim}</Tag></WrapItem>
+            ))}
+            {project.performance_dimensions.length > 3 && (
+              <WrapItem><Tag size="sm">+{project.performance_dimensions.length - 3}</Tag></WrapItem>
             )}
-          </TabPanel>
+          </Wrap>
+        )}
+      </HStack>
 
-          {/* Images Tab */}
-          <TabPanel>
-            {/* Upload Area */}
-            <Card mb={4}>
-              <CardBody>
-                <Box
-                  p={6}
-                  border="2px dashed"
-                  borderColor="gray.300"
-                  borderRadius="lg"
-                  textAlign="center"
-                  cursor="pointer"
-                  bg="gray.50"
-                  _hover={{ borderColor: 'brand.400', bg: 'brand.50' }}
-                  transition="all 0.2s ease"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {uploading ? (
-                    <VStack>
-                      <Spinner />
-                      <Text>Uploading... {uploadProgress}%</Text>
-                      <Progress value={uploadProgress} w="200px" />
-                    </VStack>
+      {/* Guidance alerts */}
+      {!hasZones && (
+        <Alert status="warning" mb={4} borderRadius="md">
+          <AlertIcon />
+          <Text fontSize="sm">
+            No zones defined.{' '}
+            <Button as={Link} to={`/projects/${projectId}/edit`} variant="link" colorScheme="orange" size="sm">
+              Edit project
+            </Button>
+            {' '}to add spatial zones first.
+          </Text>
+        </Alert>
+      )}
+
+      {/* Upload progress */}
+      {uploading && (
+        <Card mb={4}>
+          <CardBody>
+            <Box p={4} textAlign="center">
+              <Spinner size="sm" mr={2} />
+              <Text as="span" fontSize="sm">Uploading... {uploadProgress}%</Text>
+              <Progress value={uploadProgress} mt={2} size="sm" colorScheme="green" borderRadius="full" />
+            </Box>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Bulk Upload */}
+      {!uploading && hasZones && (
+        <Card mb={4}>
+          <CardBody py={3}>
+            <HStack spacing={4}>
+              <Box
+                flex={1}
+                p={3}
+                border="2px dashed"
+                borderColor="gray.200"
+                borderRadius="lg"
+                textAlign="center"
+                cursor="pointer"
+                bg="gray.50"
+                _hover={{ borderColor: 'gray.400', bg: 'gray.100' }}
+                transition="all 0.2s ease"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <HStack justify="center" spacing={2}>
+                  <Upload size={18} />
+                  <Text fontWeight="bold" fontSize="sm">Upload Files</Text>
+                </HStack>
+                <Text fontSize="xs" color="gray.500">Upload to ungrouped, assign later</Text>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleFileSelect}
+                />
+              </Box>
+              <Box
+                flex={1}
+                p={3}
+                border="2px dashed"
+                borderColor="purple.200"
+                borderRadius="lg"
+                textAlign="center"
+                cursor="pointer"
+                bg="purple.50"
+                _hover={{ borderColor: 'purple.400', bg: 'purple.100' }}
+                transition="all 0.2s ease"
+                onClick={() => folderInputRef.current?.click()}
+              >
+                <HStack justify="center" spacing={2}>
+                  <FolderUp size={18} />
+                  <Text fontWeight="bold" fontSize="sm">Upload Folder</Text>
+                </HStack>
+                <Text fontSize="xs" color="gray.500">Auto-assign by subfolder name</Text>
+                <input
+                  ref={folderInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleFolderSelect}
+                  {...{ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>}
+                />
+              </Box>
+            </HStack>
+            <Box mt={3} px={1}>
+              <Text fontSize="xs" color="gray.500" lineHeight="tall">
+                <strong>Folder upload</strong>: Organize images in subfolders named after your zones.
+                Matching is case-insensitive, spaces can be underscores or hyphens
+                (e.g., zone "Park Entrance" matches folder <code>park_entrance</code> or <code>Park-Entrance</code>).
+                Unmatched subfolders go to Ungrouped.
+              </Text>
+              <Text fontSize="xs" color="gray.500" mt={1}>
+                <strong>File upload</strong>: Images go to Ungrouped. Use Shift+Click to select a range, then batch-assign to a zone.
+              </Text>
+              <Text fontSize="xs" color="gray.500" mt={1}>
+                <strong>Zone upload</strong>: Click the Upload button on each zone card below to add images directly.
+              </Text>
+            </Box>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Zone cards with images */}
+      {project.spatial_zones.map(zone => {
+        const zoneImages = getZoneImages(zone.zone_id);
+        const isThisZoneUploading = zoneUploading === zone.zone_id;
+        return (
+          <Card key={zone.zone_id} mb={3}>
+            <CardHeader py={3}>
+              <HStack justify="space-between">
+                <HStack spacing={2}>
+                  <Heading size="sm">{zone.zone_name}</Heading>
+                  <Badge>{zoneImages.length} images</Badge>
+                  {zone.zone_types.length > 0 && (
+                    <Wrap spacing={1}>
+                      {zone.zone_types.slice(0, 2).map(t => (
+                        <WrapItem key={t}><Tag size="sm" variant="subtle">{t}</Tag></WrapItem>
+                      ))}
+                    </Wrap>
+                  )}
+                </HStack>
+                <HStack spacing={2}>
+                  {isThisZoneUploading ? (
+                    <HStack spacing={2}>
+                      <Spinner size="xs" />
+                      <Text fontSize="xs" color="gray.500">{zoneUploadProgress}%</Text>
+                    </HStack>
                   ) : (
-                    <>
-                      <Box color="gray.400" mb={2}>
-                        <Upload size={32} />
-                      </Box>
-                      <Text fontWeight="bold">Click to upload images</Text>
-                      <Text fontSize="sm" color="gray.500">
-                        Supports batch upload - JPG/PNG
-                      </Text>
-                    </>
+                    <Button
+                      size="xs"
+                      leftIcon={<Upload size={12} />}
+                      variant="outline"
+                      onClick={() => zoneFileInputRefs.current[zone.zone_id]?.click()}
+                      isDisabled={zoneUploading !== null}
+                    >
+                      Upload
+                    </Button>
                   )}
                   <input
-                    ref={fileInputRef}
+                    ref={(el) => { zoneFileInputRefs.current[zone.zone_id] = el; }}
                     type="file"
                     multiple
                     accept="image/*"
                     style={{ display: 'none' }}
-                    onChange={handleFileSelect}
+                    onChange={(e) => handleZoneUpload(zone.zone_id, e)}
                   />
-                </Box>
-              </CardBody>
-            </Card>
-
-            {/* Ungrouped Images */}
-            {ungroupedImages.length > 0 && (
-              <Card mb={4}>
-                <CardHeader>
-                  <Heading size="sm">Ungrouped Images ({ungroupedImages.length})</Heading>
-                </CardHeader>
-                <CardBody>
-                  {project.spatial_zones.length > 0 && (
-                    <HStack mb={3} spacing={3}>
-                      <Checkbox
-                        isChecked={selectedImageIds.size === ungroupedImages.length && ungroupedImages.length > 0}
-                        isIndeterminate={selectedImageIds.size > 0 && selectedImageIds.size < ungroupedImages.length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedImageIds(new Set(ungroupedImages.map(img => img.image_id)));
-                          } else {
-                            setSelectedImageIds(new Set());
-                          }
-                        }}
-                      >
-                        Select All
-                      </Checkbox>
-                      <Select
-                        placeholder="Select zone..."
-                        size="sm"
-                        maxW="200px"
-                        value={targetZoneId}
-                        onChange={(e) => setTargetZoneId(e.target.value)}
-                      >
-                        {project.spatial_zones.map(zone => (
-                          <option key={zone.zone_id} value={zone.zone_id}>
-                            {zone.zone_name}
-                          </option>
-                        ))}
-                      </Select>
-                      <Button
-                        size="sm"
-                        colorScheme="blue"
-                        isDisabled={!targetZoneId || selectedImageIds.size === 0}
-                        isLoading={batchAssigning}
-                        onClick={handleBatchAssign}
-                      >
-                        Assign ({selectedImageIds.size})
-                      </Button>
-                    </HStack>
-                  )}
-                  <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={2}>
-                    {ungroupedImages.map(img => (
-                      <Box key={img.image_id} position="relative">
-                        <Image
-                          src={imageUrl(project.id, img)}
-                          alt={img.filename}
-                          h="80px"
-                          w="100%"
-                          objectFit="cover"
-                          borderRadius="md"
-                          cursor="pointer"
-                          border={selectedImageIds.has(img.image_id) ? '2px solid' : '2px solid transparent'}
-                          borderColor={selectedImageIds.has(img.image_id) ? 'blue.400' : 'transparent'}
-                          onClick={() => toggleImageSelection(img.image_id)}
-                          fallback={
-                            <Box h="80px" bg="gray.200" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
-                              <Text fontSize="xs">{img.filename}</Text>
-                            </Box>
-                          }
-                        />
-                        {project.spatial_zones.length > 0 && (
-                          <Checkbox
-                            position="absolute"
-                            top={1}
-                            left={1}
-                            bg="whiteAlpha.800"
-                            borderRadius="sm"
-                            isChecked={selectedImageIds.has(img.image_id)}
-                            onChange={() => toggleImageSelection(img.image_id)}
-                          />
-                        )}
-                        <IconButton
-                          aria-label="Delete"
-                          icon={<X size={12} />}
-                          size="xs"
-                          position="absolute"
-                          top={1}
-                          right={1}
-                          colorScheme="red"
-                          onClick={(e) => { e.stopPropagation(); deleteImageMutation.mutate(img.image_id); }}
-                        />
-                      </Box>
-                    ))}
-                  </SimpleGrid>
-                </CardBody>
-              </Card>
-            )}
-
-            {/* Images by Zone */}
-            {project.spatial_zones.map(zone => {
-              const zoneImages = getZoneImages(zone.zone_id);
-              if (zoneImages.length === 0) return null;
-              return (
-                <Card key={zone.zone_id} mb={4}>
-                  <CardHeader>
-                    <HStack justify="space-between">
-                      <Heading size="sm">{zone.zone_name}</Heading>
-                      <Badge>{zoneImages.length} images</Badge>
-                    </HStack>
-                  </CardHeader>
-                  <CardBody>
+                </HStack>
+              </HStack>
+            </CardHeader>
+            <CardBody pt={0}>
+              {zoneImages.length > 0 ? (
+                <>
+                  <Box maxH="300px" overflowY="auto" borderRadius="md">
                     <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={2}>
-                      {zoneImages.map(img => (
-                        <Box key={img.image_id} position="relative">
-                          <Image
-                            src={imageUrl(project.id, img)}
-                            alt={img.filename}
+                      {zoneImages.slice(0, zoneVisibleCount[zone.zone_id] || ZONE_PAGE_SIZE).map(img => (
+                        <Box key={img.image_id} position="relative" role="group">
+                          <Box
                             h="80px"
                             w="100%"
-                            objectFit="cover"
                             borderRadius="md"
-                            fallback={
-                              <Box h="80px" bg="gray.200" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
-                                <Text fontSize="xs">{img.filename}</Text>
-                              </Box>
-                            }
+                            bg="gray.200"
+                            backgroundImage={`url(${imageUrl(project.id, img)})`}
+                            backgroundSize="cover"
+                            backgroundPosition="center"
                           />
                           <IconButton
                             aria-label="Unassign from zone"
@@ -631,6 +562,8 @@ function ProjectDetail() {
                             left={1}
                             colorScheme="yellow"
                             title="Move back to ungrouped"
+                            opacity={0}
+                            _groupHover={{ opacity: 1 }}
                             onClick={() => handleUnassign(img.image_id)}
                           />
                           <IconButton
@@ -641,29 +574,173 @@ function ProjectDetail() {
                             top={1}
                             right={1}
                             colorScheme="red"
+                            opacity={0}
+                            _groupHover={{ opacity: 1 }}
                             onClick={() => deleteImageMutation.mutate(img.image_id)}
                           />
                         </Box>
                       ))}
                     </SimpleGrid>
-                  </CardBody>
-                </Card>
-              );
-            })}
+                  </Box>
+                  {zoneImages.length > (zoneVisibleCount[zone.zone_id] || ZONE_PAGE_SIZE) && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      mt={2}
+                      w="full"
+                      onClick={() => setZoneVisibleCount(prev => ({
+                        ...prev,
+                        [zone.zone_id]: (prev[zone.zone_id] || ZONE_PAGE_SIZE) + ZONE_PAGE_SIZE,
+                      }))}
+                    >
+                      Show more ({zoneImages.length - (zoneVisibleCount[zone.zone_id] || ZONE_PAGE_SIZE)} remaining)
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <Text fontSize="sm" color="gray.400" textAlign="center" py={2}>
+                  No images — click Upload to add
+                </Text>
+              )}
+            </CardBody>
+          </Card>
+        );
+      })}
 
-            {project.uploaded_images.length === 0 && (
-              <EmptyState icon={ImageIcon} title="No images uploaded" description="Click above to upload images." />
+      {/* Empty state */}
+      {!hasZones && !hasImages && (
+        <EmptyState icon={MapPin} title="No zones defined" description="Edit the project to add spatial zones, then upload images here." />
+      )}
+
+      {/* Ungrouped Images */}
+      {ungroupedImages.length > 0 && (
+        <Card mb={4}>
+          <CardHeader py={3}>
+            <Heading size="sm">Ungrouped Images ({ungroupedImages.length})</Heading>
+          </CardHeader>
+          <CardBody pt={0}>
+            {hasZones && (
+              <HStack spacing={3} flexWrap="wrap" mb={3}>
+                <Checkbox
+                  isChecked={selectedImageIds.size === ungroupedImages.length && ungroupedImages.length > 0}
+                  isIndeterminate={selectedImageIds.size > 0 && selectedImageIds.size < ungroupedImages.length}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedImageIds(new Set(ungroupedImages.map(img => img.image_id)));
+                    } else {
+                      setSelectedImageIds(new Set());
+                    }
+                  }}
+                >
+                  Select All
+                </Checkbox>
+                <Select
+                  placeholder="Select zone..."
+                  size="sm"
+                  maxW="200px"
+                  value={targetZoneId}
+                  onChange={(e) => setTargetZoneId(e.target.value)}
+                >
+                  {project.spatial_zones.map(zone => (
+                    <option key={zone.zone_id} value={zone.zone_id}>
+                      {zone.zone_name}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  size="sm"
+                  colorScheme="blue"
+                  isDisabled={!targetZoneId || selectedImageIds.size === 0}
+                  isLoading={batchAssigning}
+                  onClick={handleBatchAssign}
+                >
+                  Assign ({selectedImageIds.size})
+                </Button>
+              </HStack>
             )}
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
+            {ungroupedImages.length > 16 && (
+              <Text fontSize="xs" color="gray.400" mb={1}>
+                Tip: Click to select, Shift+Click to select a range
+              </Text>
+            )}
+            <Box maxH="400px" overflowY="auto" borderRadius="md">
+              <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={2}>
+                {ungroupedImages.slice(0, ungroupedVisibleCount).map((img, idx) => (
+                  <Box key={img.image_id} position="relative" role="group">
+                    <Box
+                      h="80px"
+                      w="100%"
+                      borderRadius="md"
+                      bg="gray.200"
+                      cursor="pointer"
+                      border={selectedImageIds.has(img.image_id) ? '2px solid' : '2px solid transparent'}
+                      borderColor={selectedImageIds.has(img.image_id) ? 'blue.400' : 'transparent'}
+                      backgroundImage={`url(${imageUrl(project.id, img)})`}
+                      backgroundSize="cover"
+                      backgroundPosition="center"
+                      onClick={(e) => handleImageClick(img.image_id, idx, e)}
+                    />
+                    {hasZones && (
+                      <Checkbox
+                        position="absolute"
+                        top={1}
+                        left={1}
+                        bg="whiteAlpha.800"
+                        borderRadius="sm"
+                        isChecked={selectedImageIds.has(img.image_id)}
+                        onChange={(e) => handleImageClick(img.image_id, idx, e as unknown as React.MouseEvent)}
+                      />
+                    )}
+                    <IconButton
+                      aria-label="Delete"
+                      icon={<X size={12} />}
+                      size="xs"
+                      position="absolute"
+                      top={1}
+                      right={1}
+                      colorScheme="red"
+                      opacity={0}
+                      _groupHover={{ opacity: 1 }}
+                      onClick={(e) => { e.stopPropagation(); deleteImageMutation.mutate(img.image_id); }}
+                    />
+                  </Box>
+                ))}
+              </SimpleGrid>
+            </Box>
+            {ungroupedImages.length > ungroupedVisibleCount && (
+              <Button
+                size="sm"
+                variant="ghost"
+                mt={2}
+                w="full"
+                onClick={() => setUngroupedVisibleCount(prev => prev + UNGROUPED_PAGE_SIZE)}
+              >
+                Show more ({ungroupedImages.length - ungroupedVisibleCount} remaining)
+              </Button>
+            )}
+          </CardBody>
+        </Card>
+      )}
 
-      {/* Pipeline navigation */}
-      <HStack justify="flex-end" mt={6}>
-        <Button as={Link} to={`/projects/${projectId}/vision`} colorScheme="blue">
+      {/* Navigation */}
+      <HStack justify="space-between" mt={6}>
+        <Button as={Link} to={`/projects/${projectId}/edit`} variant="outline">
+          Back: Project
+        </Button>
+        <Button
+          as={Link}
+          to={`/projects/${projectId}/vision`}
+          colorScheme="blue"
+          isDisabled={!isReady}
+        >
           Next: Prepare
         </Button>
       </HStack>
+      {!isReady && hasZones && (
+        <Text fontSize="xs" color="gray.400" textAlign="right" mt={1}>
+          Upload images and assign to zones to continue
+        </Text>
+      )}
     </PageShell>
   );
 }

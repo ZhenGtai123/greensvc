@@ -58,3 +58,6 @@ celerybeat.pid
 # Database
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
+*.db-journal

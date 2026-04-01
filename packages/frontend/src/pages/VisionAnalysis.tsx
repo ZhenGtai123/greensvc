@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useParams, Link } from 'react-router-dom';
 import {
   Box,
@@ -322,6 +322,25 @@ function VisionAnalysis() {
   };
 
   const isPageLoading = configLoading || (projectId && projectLoading);
+
+  // Readiness check: how many zone-assigned images have semantic_map masks
+  const readiness = useMemo(() => {
+    if (!project) return null;
+    const assigned = project.uploaded_images.filter(img => img.zone_id);
+    const withSemantic = assigned.filter(img => img.mask_filepaths?.semantic_map);
+    const withFMB = assigned.filter(img =>
+      img.mask_filepaths?.foreground_map &&
+      img.mask_filepaths?.middleground_map &&
+      img.mask_filepaths?.background_map
+    );
+    return {
+      totalImages: project.uploaded_images.length,
+      assignedCount: assigned.length,
+      semanticCount: withSemantic.length,
+      fmbCount: withFMB.length,
+      ready: withSemantic.length > 0,
+    };
+  }, [project]);
 
   return (
     <PageShell isLoading={!!isPageLoading} loadingText="Loading...">
@@ -899,13 +918,48 @@ function VisionAnalysis() {
         </VStack>
       </SimpleGrid>
 
+      {/* Readiness Check */}
+      {readiness && routeProjectId && (
+        <Box mt={6}>
+          {readiness.assignedCount === 0 && (
+            <Alert status="warning" mb={3} borderRadius="md">
+              <AlertIcon />
+              No images assigned to zones. Go to Images step to assign images to zones before analysis.
+            </Alert>
+          )}
+          {readiness.assignedCount > 0 && readiness.semanticCount === 0 && (
+            <Alert status="error" mb={3} borderRadius="md">
+              <AlertIcon />
+              None of the zone-assigned images have been analyzed. Run Vision Analysis above before proceeding.
+            </Alert>
+          )}
+          {readiness.semanticCount > 0 && readiness.semanticCount < readiness.assignedCount && (
+            <Alert status="warning" mb={3} borderRadius="md">
+              <AlertIcon />
+              Only {readiness.semanticCount} of {readiness.assignedCount} zone-assigned images have been analyzed. Unanalyzed images will be skipped in the pipeline.
+            </Alert>
+          )}
+          {readiness.semanticCount > 0 && readiness.fmbCount < readiness.semanticCount && (
+            <Alert status="info" mb={3} borderRadius="md">
+              <AlertIcon />
+              {readiness.fmbCount} of {readiness.semanticCount} analyzed images have FMB layer masks. Images without FMB masks will only have full-layer analysis.
+            </Alert>
+          )}
+        </Box>
+      )}
+
       {/* Navigation buttons */}
       {routeProjectId && (
-        <HStack justify="space-between" mt={6}>
+        <HStack justify="space-between" mt={readiness && routeProjectId ? 3 : 6}>
           <Button as={Link} to={`/projects/${routeProjectId}`} variant="outline">
-            Back: Setup
+            Back: Images
           </Button>
-          <Button as={Link} to={`/projects/${routeProjectId}/analysis`} colorScheme="blue">
+          <Button
+            as={Link}
+            to={`/projects/${routeProjectId}/analysis`}
+            colorScheme="blue"
+            isDisabled={!readiness?.ready}
+          >
             Next: Analysis
           </Button>
         </HStack>

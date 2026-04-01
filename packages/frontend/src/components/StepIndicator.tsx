@@ -7,10 +7,11 @@ import type { StageStatus } from '../utils/pipelineStatus';
 const MotionBox = motion.create(Box);
 
 const STEPS = [
-  { step: 1, label: 'Setup', path: '' },
-  { step: 2, label: 'Prepare', path: 'vision' },
-  { step: 3, label: 'Analysis', path: 'analysis' },
-  { step: 4, label: 'Report', path: 'reports' },
+  { step: 1, label: 'Project', path: 'edit' },
+  { step: 2, label: 'Images', path: '' },
+  { step: 3, label: 'Prepare', path: 'vision' },
+  { step: 4, label: 'Analysis', path: 'analysis' },
+  { step: 5, label: 'Report', path: 'reports' },
 ];
 
 interface StepIndicatorProps {
@@ -20,6 +21,8 @@ interface StepIndicatorProps {
 }
 
 function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorProps) {
+  const isNewProject = !projectId;
+
   return (
     <HStack spacing={0} w="full" bg="white" borderBottom="1px solid" borderColor="gray.200" px={4} py={3}>
       {STEPS.map((s, idx) => {
@@ -30,9 +33,15 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
         const isLocked = !isDone && !isReady && !isActive;
         const connector = idx < STEPS.length - 1;
 
-        const linkTo = s.path
-          ? `/projects/${projectId}/${s.path}`
-          : `/projects/${projectId}`;
+        // Build link path
+        let linkTo: string;
+        if (isNewProject) {
+          linkTo = s.step === 1 ? '/projects/new' : '#';
+        } else if (s.path) {
+          linkTo = `/projects/${projectId}/${s.path}`;
+        } else {
+          linkTo = `/projects/${projectId}`;
+        }
 
         const inner = (
           <>
@@ -82,7 +91,7 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
 
         return (
           <HStack key={s.step} flex={1} spacing={0}>
-            {isLocked ? (
+            {isLocked || (isNewProject && s.step > 1) ? (
               <Box
                 display="flex"
                 alignItems="center"

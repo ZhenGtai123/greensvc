@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Heading,
@@ -17,7 +17,6 @@ import {
   Text,
   Badge,
   Checkbox,
-  /* useToast — replaced by useAppToast */
   IconButton,
   Tag,
   TagLabel,
@@ -25,7 +24,6 @@ import {
   WrapItem,
   Collapse,
   useDisclosure,
-  Image,
 } from '@chakra-ui/react';
 import {
   ClipboardList,
@@ -33,7 +31,6 @@ import {
   Target,
   Map,
   Link2,
-  ImagePlus,
   X,
   Eye,
   Footprints,
@@ -194,14 +191,6 @@ interface SpatialRelation {
   direction: 'single' | 'double';
 }
 
-interface UploadedImage {
-  id: string;
-  name: string;
-  url: string;
-  file: File;
-  zoneId: string | null;
-}
-
 // ============ Component ============
 
 function ProjectWizard() {
@@ -210,7 +199,6 @@ function ProjectWizard() {
   const navigate = useNavigate();
   const toast = useAppToast();
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { isOpen: isRelationsOpen, onToggle: toggleRelations } = useDisclosure();
 
   // Loading state for edit mode
@@ -240,19 +228,6 @@ function ProjectWizard() {
   // Spatial Relations
   const [relations, setRelations] = useState<SpatialRelation[]>([]);
   const [relationTypes] = useState(DEFAULT_RELATION_TYPES);
-
-  // Images - new images to upload (File objects)
-  const [images, setImages] = useState<UploadedImage[]>([]);
-  // Existing images from server (when editing)
-  const [existingImages, setExistingImages] = useState<Array<{
-    image_id: string;
-    filename: string;
-    filepath: string;
-    zone_id: string | null;
-  }>>([]);
-  const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
-  const [draggedExistingImageId, setDraggedExistingImageId] = useState<string | null>(null);
-  const originalZoneMap = useRef<Record<string, string | null>>({});
 
   // Saving
   const [saving, setSaving] = useState(false);
@@ -295,13 +270,6 @@ function ProjectWizard() {
           }));
           setRelations(loadedRelations);
 
-          const imgs = project.uploaded_images || [];
-          setExistingImages(imgs);
-          const zoneMap: Record<string, string | null> = {};
-          for (const img of imgs) {
-            zoneMap[img.image_id] = img.zone_id ?? null;
-          }
-          originalZoneMap.current = zoneMap;
         })
         .catch((error) => {
           console.error('Failed to load project:', error);
@@ -333,7 +301,6 @@ function ProjectWizard() {
   const removeZone = (id: string) => {
     setZones(prev => prev.filter(z => z.id !== id));
     setRelations(prev => prev.filter(r => r.fromZone !== id && r.toZone !== id));
-    setImages(prev => prev.map(img => img.zoneId === id ? { ...img, zoneId: null } : img));
   };
 
   const toggleZoneType = (zoneId: string, typeId: string) => {
@@ -367,48 +334,6 @@ function ProjectWizard() {
 
   const removeRelation = (id: string) => {
     setRelations(relations.filter(r => r.id !== id));
-  };
-
-  // ============ Image Functions ============
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    const newImages: UploadedImage[] = Array.from(files).map(file => ({
-      id: `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: file.name,
-      url: URL.createObjectURL(file),
-      file,
-      zoneId: null,
-    }));
-
-    setImages([...images, ...newImages]);
-    toast({
-      title: `${files.length} image(s) uploaded`,
-      status: 'success',
-      duration: 2000,
-    });
-  };
-
-  const handleDrop = useCallback((e: React.DragEvent, targetZoneId: string | null) => {
-    e.preventDefault();
-    if (!draggedImageId) return;
-
-    setImages(prev => prev.map(img =>
-      img.id === draggedImageId ? { ...img, zoneId: targetZoneId } : img
-    ));
-    setDraggedImageId(null);
-  }, [draggedImageId]);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const removeImage = (id: string) => {
-    const img = images.find(i => i.id === id);
-    if (img) URL.revokeObjectURL(img.url);
-    setImages(images.filter(i => i.id !== id));
   };
 
   // ============ Save Function ============
@@ -455,32 +380,9 @@ function ProjectWizard() {
         await api.projects.update(projectId, projectData);
         savedProjectId = projectId;
 
-        const changedAssignments = existingImages
-          .filter(img => (img.zone_id ?? null) !== (originalZoneMap.current[img.image_id] ?? null))
-          .map(img => ({ image_id: img.image_id, zone_id: img.zone_id }));
-        if (changedAssignments.length > 0) {
-          await api.projects.batchAssignZones(projectId, changedAssignments);
-        }
       } else {
         const response = await api.projects.create(projectData);
         savedProjectId = response.data.id;
-      }
-
-      if (images.length > 0) {
-        const imagesByZone: Record<string, File[]> = {};
-
-        for (const img of images) {
-          const zoneKey = img.zoneId || '__ungrouped__';
-          if (!imagesByZone[zoneKey]) {
-            imagesByZone[zoneKey] = [];
-          }
-          imagesByZone[zoneKey].push(img.file);
-        }
-
-        for (const [zoneKey, files] of Object.entries(imagesByZone)) {
-          const zoneId = zoneKey === '__ungrouped__' ? undefined : zoneKey;
-          await api.projects.uploadImages(savedProjectId, files, zoneId);
-        }
       }
 
       queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -501,42 +403,13 @@ function ProjectWizard() {
     setSaving(false);
   };
 
-  // ============ Render Helpers ============
-
-  const ungroupedImages = images.filter(img => !img.zoneId);
-  const getZoneImages = (zoneId: string) => images.filter(img => img.zoneId === zoneId);
-
-  const ungroupedExistingImages = existingImages.filter(img => !img.zone_id);
-  const getZoneExistingImages = (zoneId: string) => existingImages.filter(img => img.zone_id === zoneId);
-
-  const handleExistingImageDrop = useCallback((e: React.DragEvent, targetZoneId: string | null) => {
-    e.preventDefault();
-    if (!draggedExistingImageId) return;
-
-    setExistingImages(prev => prev.map(img =>
-      img.image_id === draggedExistingImageId ? { ...img, zone_id: targetZoneId } : img
-    ));
-    setDraggedExistingImageId(null);
-  }, [draggedExistingImageId]);
-
-  const handleDeleteExistingImage = async (imageId: string) => {
-    if (!projectId) return;
-    try {
-      await api.projects.deleteImage(projectId, imageId);
-      setExistingImages(prev => prev.filter(img => img.image_id !== imageId));
-      toast({ title: 'Image deleted', status: 'success' });
-    } catch {
-      toast({ title: 'Failed to delete image', status: 'error' });
-    }
-  };
-
   return (
     <PageShell isLoading={loading} loadingText="Loading project...">
       {/* Header */}
-      <Box textAlign="center" mb={8}>
+      <Box textAlign="center" mb={6}>
         <Heading size="lg">{isEditMode ? 'Edit Project' : 'Create New Project'}</Heading>
-        <Text color="gray.600" mt={2}>
-          {isEditMode ? 'Update project details, zones, and images' : 'Define project context, performance goals, and spatial zones'}
+        <Text color="gray.600" mt={1} fontSize="sm">
+          Define project context, performance goals, and spatial zones
         </Text>
       </Box>
 
@@ -906,229 +779,13 @@ function ProjectWizard() {
           </Collapse>
         </Card>
 
-        {/* Section 6: Image Upload */}
-        <Card>
-          <CardHeader>
-            <SectionTitle icon={ImagePlus} title="Image Upload & Grouping" subtitle="Upload site photos and group them by zones" />
-          </CardHeader>
-          <CardBody>
-            {/* Upload Area */}
-            <Box
-              p={6}
-              border="2px dashed"
-              borderColor="gray.300"
-              borderRadius="lg"
-              textAlign="center"
-              cursor="pointer"
-              bg="gray.50"
-              _hover={{ borderColor: 'brand.400', bg: 'brand.50' }}
-              transition="all 0.2s ease"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Box color="gray.400" mb={2} display="flex" justifyContent="center">
-                <ImagePlus size={32} />
-              </Box>
-              <Text fontWeight="bold">Drag images here or click to select</Text>
-              <Text fontSize="sm" color="gray.500">Supports batch upload - JPG/PNG</Text>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleFileSelect}
-              />
-            </Box>
-
-            {/* Stats */}
-            <SimpleGrid columns={3} spacing={4} mt={4}>
-              <Box textAlign="center" p={3} bg="white" borderWidth={1} borderRadius="lg">
-                <Text fontSize="2xl" fontWeight="bold">{images.length + existingImages.length}</Text>
-                <Text fontSize="sm" color="gray.500">Total Images</Text>
-              </Box>
-              <Box textAlign="center" p={3} bg="white" borderWidth={1} borderRadius="lg">
-                <Text fontSize="2xl" fontWeight="bold">{images.filter(i => i.zoneId).length + existingImages.filter(i => i.zone_id).length}</Text>
-                <Text fontSize="sm" color="gray.500">Grouped</Text>
-              </Box>
-              <Box textAlign="center" p={3} bg="white" borderWidth={1} borderRadius="lg">
-                <Text fontSize="2xl" fontWeight="bold">{zones.length}</Text>
-                <Text fontSize="sm" color="gray.500">Zones</Text>
-              </Box>
-            </SimpleGrid>
-
-            {/* Ungrouped Images (both new and existing) */}
-            {(ungroupedImages.length > 0 || ungroupedExistingImages.length > 0) && (
-              <Box mt={4}>
-                <Text fontWeight="bold" mb={2}>Ungrouped Images ({ungroupedImages.length + ungroupedExistingImages.length})</Text>
-                <Box
-                  p={3}
-                  borderWidth={2}
-                  borderStyle="dashed"
-                  borderColor="gray.200"
-                  borderRadius="lg"
-                  minH="100px"
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => {
-                    handleDrop(e, null);
-                    handleExistingImageDrop(e, null);
-                  }}
-                >
-                  <SimpleGrid columns={{ base: 4, md: 8 }} spacing={2}>
-                    {ungroupedExistingImages.map(img => (
-                      <Box
-                        key={img.image_id}
-                        position="relative"
-                        borderRadius="md"
-                        overflow="hidden"
-                        cursor="grab"
-                        draggable
-                        onDragStart={() => setDraggedExistingImageId(img.image_id)}
-                        onDragEnd={() => setDraggedExistingImageId(null)}
-                        opacity={draggedExistingImageId === img.image_id ? 0.5 : 1}
-                        border="2px solid"
-                        borderColor="blue.200"
-                      >
-                        <Image
-                          src={`/api/uploads/${projectId}/${img.image_id}_${img.filename}`}
-                          alt={img.filename}
-                          h="60px"
-                          w="100%"
-                          objectFit="cover"
-                          fallback={<Box h="60px" bg="gray.200" display="flex" alignItems="center" justifyContent="center"><Text fontSize="xs">img</Text></Box>}
-                        />
-                        <IconButton
-                          aria-label="Remove"
-                          icon={<X size={10} />}
-                          size="xs"
-                          position="absolute"
-                          top={1}
-                          right={1}
-                          colorScheme="red"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteExistingImage(img.image_id); }}
-                        />
-                      </Box>
-                    ))}
-                    {ungroupedImages.map(img => (
-                      <Box
-                        key={img.id}
-                        position="relative"
-                        borderRadius="md"
-                        overflow="hidden"
-                        cursor="grab"
-                        draggable
-                        onDragStart={() => setDraggedImageId(img.id)}
-                        onDragEnd={() => setDraggedImageId(null)}
-                        opacity={draggedImageId === img.id ? 0.5 : 1}
-                      >
-                        <Image src={img.url} alt={img.name} h="60px" w="100%" objectFit="cover" />
-                        <IconButton
-                          aria-label="Remove"
-                          icon={<X size={10} />}
-                          size="xs"
-                          position="absolute"
-                          top={1}
-                          right={1}
-                          onClick={(e) => { e.stopPropagation(); removeImage(img.id); }}
-                        />
-                      </Box>
-                    ))}
-                  </SimpleGrid>
-                </Box>
-              </Box>
-            )}
-
-            {/* Zone Groups */}
-            {zones.length > 0 && (
-              <Box mt={4}>
-                <Text fontWeight="bold" mb={2}>Zone Groups (Drag images here)</Text>
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                  {zones.map(zone => {
-                    const zoneImages = getZoneImages(zone.id);
-                    const zoneExistingImages = getZoneExistingImages(zone.id);
-                    const totalZoneImages = zoneImages.length + zoneExistingImages.length;
-                    const isDragging = draggedImageId || draggedExistingImageId;
-                    return (
-                      <Box
-                        key={zone.id}
-                        p={3}
-                        borderWidth={2}
-                        borderStyle="dashed"
-                        borderColor={isDragging ? 'brand.300' : 'gray.200'}
-                        borderRadius="lg"
-                        bg={isDragging ? 'brand.50' : 'white'}
-                        minH="120px"
-                        transition="all 0.2s ease"
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => {
-                          handleDrop(e, zone.id);
-                          handleExistingImageDrop(e, zone.id);
-                        }}
-                      >
-                        <HStack justify="space-between" mb={2}>
-                          <Text fontWeight="bold" fontSize="sm">{zone.name || 'Unnamed Zone'}</Text>
-                          <Badge>{totalZoneImages}</Badge>
-                        </HStack>
-                        {totalZoneImages > 0 ? (
-                          <SimpleGrid columns={4} spacing={1}>
-                            {zoneExistingImages.map(img => (
-                              <Box
-                                key={img.image_id}
-                                position="relative"
-                                borderRadius="sm"
-                                overflow="hidden"
-                                cursor="grab"
-                                draggable
-                                onDragStart={() => setDraggedExistingImageId(img.image_id)}
-                                onDragEnd={() => setDraggedExistingImageId(null)}
-                                border="2px solid"
-                                borderColor="blue.200"
-                              >
-                                <Image
-                                  src={`/api/uploads/${projectId}/${img.image_id}_${img.filename}`}
-                                  alt={img.filename}
-                                  h="40px"
-                                  w="100%"
-                                  objectFit="cover"
-                                  fallback={<Box h="40px" bg="gray.200" />}
-                                />
-                              </Box>
-                            ))}
-                            {zoneImages.map(img => (
-                              <Box
-                                key={img.id}
-                                position="relative"
-                                borderRadius="sm"
-                                overflow="hidden"
-                                cursor="grab"
-                                draggable
-                                onDragStart={() => setDraggedImageId(img.id)}
-                                onDragEnd={() => setDraggedImageId(null)}
-                              >
-                                <Image src={img.url} alt={img.name} h="40px" w="100%" objectFit="cover" />
-                              </Box>
-                            ))}
-                          </SimpleGrid>
-                        ) : (
-                          <Text fontSize="sm" color="gray.400" textAlign="center" py={4}>
-                            Drop images here
-                          </Text>
-                        )}
-                      </Box>
-                    );
-                  })}
-                </SimpleGrid>
-              </Box>
-            )}
-          </CardBody>
-        </Card>
-
         {/* Action Buttons */}
-        <HStack justify="center" spacing={4}>
+        <HStack justify="space-between">
           <Button variant="outline" onClick={() => navigate('/projects')}>
             Cancel
           </Button>
           <Button colorScheme="blue" size="lg" onClick={handleSave} isLoading={saving}>
-            {isEditMode ? 'Save Changes' : 'Create Project'}
+            {isEditMode ? 'Save & Continue' : 'Create & Continue'}
           </Button>
         </HStack>
       </VStack>

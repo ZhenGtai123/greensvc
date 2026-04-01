@@ -102,9 +102,11 @@ function Analysis() {
   const projectSummary = useMemo(() => {
     if (!selectedProject) return null;
     const totalImages = selectedProject.uploaded_images.length;
-    const assignedImages = selectedProject.uploaded_images.filter(img => img.zone_id).length;
+    const assigned = selectedProject.uploaded_images.filter(img => img.zone_id);
+    const assignedImages = assigned.length;
+    const analyzedImages = assigned.filter(img => img.mask_filepaths?.semantic_map).length;
     const zones = selectedProject.spatial_zones.length;
-    return { totalImages, assignedImages, zones };
+    return { totalImages, assignedImages, analyzedImages, zones };
   }, [selectedProject]);
 
   const handleRunPipeline = useCallback(async () => {
@@ -147,10 +149,24 @@ function Analysis() {
           </Text>
 
           {projectSummary && (
-            <Alert status={projectSummary.assignedImages > 0 ? 'info' : 'warning'} mb={4}>
-              <AlertIcon />
-              {projectSummary.assignedImages} of {projectSummary.totalImages} images assigned to {projectSummary.zones} zones
-            </Alert>
+            <>
+              <Alert status={projectSummary.assignedImages > 0 ? 'info' : 'warning'} mb={4}>
+                <AlertIcon />
+                {projectSummary.assignedImages} of {projectSummary.totalImages} images assigned to {projectSummary.zones} zones
+              </Alert>
+              {projectSummary.assignedImages > 0 && projectSummary.analyzedImages === 0 && (
+                <Alert status="error" mb={4}>
+                  <AlertIcon />
+                  No images have been analyzed by Vision API. Go to Prepare step to run vision analysis first.
+                </Alert>
+              )}
+              {projectSummary.analyzedImages > 0 && projectSummary.analyzedImages < projectSummary.assignedImages && (
+                <Alert status="warning" mb={4}>
+                  <AlertIcon />
+                  Only {projectSummary.analyzedImages} of {projectSummary.assignedImages} zone-assigned images have vision results. Unanalyzed images will be skipped.
+                </Alert>
+              )}
+            </>
           )}
 
           <Box mb={4}>
@@ -221,7 +237,7 @@ function Analysis() {
             colorScheme="green"
             onClick={handleRunPipeline}
             isLoading={isRunning}
-            isDisabled={!selectedProjectId || selectedIndicatorIds.length === 0 || isRunning}
+            isDisabled={!selectedProjectId || selectedIndicatorIds.length === 0 || isRunning || projectSummary?.analyzedImages === 0}
             mt={4}
           >
             Run Pipeline
