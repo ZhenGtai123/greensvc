@@ -1,7 +1,10 @@
 """
-Report Service — Agent C (v5.0)
+Report Service — Agent C (v6.0)
 Synthesises Stages 1-3 into a comprehensive evidence-based design strategy report.
 Uses LLM to generate a professional markdown report with I->SVCs->P traceability.
+
+v6.0 Change: Stage 2 data is now purely descriptive (no status/priority/problems).
+Agent A's direction decisions and rationale are included in Stage 3 data.
 """
 
 import json
@@ -82,7 +85,7 @@ When presenting evidence, always qualify its strength:
 
 ### 1. Executive Summary (300-400 words, 4 paragraphs)
 P1: Project identity (name, climate, setting, target dimensions)
-P2: Key diagnostic findings (N points, K archetypes, dominant pattern, worst deficit)
+P2: Key diagnostic findings (N points, K archetypes, dominant pattern, most distinctive unit)
 P3: Top 3 recommendations with full I->SVCs->P chain
 P4: Principal caveat
 
@@ -93,12 +96,12 @@ End with cross-indicator synthesis paragraph.
 
 ### 3. Spatial Diagnosis and Archetype Analysis
 3.1 Project-level overview (N points, clustering method, silhouette)
-3.2 Per-archetype profiles (indicator table, SVC pattern, priority problems)
+3.2 Per-archetype profiles (indicator table, SVC pattern, key deviations)
 3.3 Cross-archetype comparison
 
 ### 4. Design Strategies
 Per spatial unit, ordered by priority:
-4.X.1 Integrated diagnosis
+4.X.1 Integrated diagnosis (from Agent A)
 4.X.2 Strategy table (3-5 strategies each with: target indicators, 4-axis
       signature, causal pathway, evidence basis, expected effects, trade-offs,
       implementation guidance, supporting IOMs)
@@ -189,7 +192,7 @@ class ReportService:
         chain_refs = report_text.count('->')
 
         metadata = {
-            "version": "5.0",
+            "version": "6.0",
             "generated_at": datetime.now().isoformat(),
             "model": "current",
             "elapsed_seconds": round(elapsed, 1),
@@ -244,9 +247,10 @@ class ReportService:
         return json.dumps(compact, ensure_ascii=False, indent=2)
 
     def _prepare_stage2(self, zone_analysis: ZoneAnalysisResult) -> str:
-        """Compact Stage 2 zone analysis for prompt."""
+        """Compact Stage 2 zone analysis for prompt (v6.0 descriptive)."""
         meta = zone_analysis.computation_metadata
         summary: dict = {
+            "version": "v6.0-descriptive",
             "has_clustering": meta.has_clustering if meta else False,
             "n_indicators": meta.n_indicators if meta else 0,
             "n_zones": meta.n_zones if meta else 0,
@@ -263,36 +267,26 @@ class ReportService:
             }
         summary["indicator_definitions"] = ind_defs
 
-        # Diagnosis units
+        # Diagnosis units (v6.0: descriptive only — no status/problems)
         units = zone_analysis.segment_diagnostics or zone_analysis.zone_diagnostics or []
         summary["diagnosis_units"] = []
         for u in units:
             unit_data = {
                 "id": u.zone_id,
                 "name": u.zone_name,
-                "status": u.status,
+                "mean_abs_z": round(u.mean_abs_z, 2) if u.mean_abs_z else 0,
                 "rank": u.rank,
-                "composite_zscore": round(u.composite_zscore, 2) if u.composite_zscore else 0,
+                "point_count": u.point_count,
                 "indicator_status": {},
-                "problems": [],
             }
             for ind_id, data in (u.indicator_status or {}).items():
                 if isinstance(data, dict):
                     full = data.get("full", data)
                     unit_data["indicator_status"][ind_id] = {
-                        "mean": full.get("mean"),
+                        "value": full.get("value", full.get("mean")),
                         "z_score": full.get("z_score"),
-                        "classification": full.get("classification"),
+                        "target_direction": full.get("target_direction", ""),
                     }
-            for p in (u.problems_by_layer or {}).get("full", []):
-                if isinstance(p, dict):
-                    unit_data["problems"].append({
-                        "indicator_id": p.get("indicator_id"),
-                        "z_score": p.get("z_score"),
-                        "priority": p.get("priority"),
-                    })
-                else:
-                    unit_data["problems"].append({"data": str(p)})
             summary["diagnosis_units"].append(unit_data)
 
         # Clustering info
@@ -346,7 +340,7 @@ class ReportService:
         return json.dumps(summary, ensure_ascii=False, indent=2)
 
     def _prepare_stage3(self, design_result: Optional[DesignStrategyResult]) -> str:
-        """Compact Stage 3 design strategies for prompt."""
+        """Compact Stage 3 design strategies for prompt (v6.0)."""
         if not design_result:
             return "Stage 3 results not available."
 
@@ -354,7 +348,8 @@ class ReportService:
         for uid, zone in design_result.zones.items():
             unit_data = {
                 "unit_name": zone.zone_name,
-                "status": zone.status,
+                "mean_abs_z": zone.mean_abs_z,
+                "diagnosis": zone.diagnosis,
                 "overall_assessment": zone.overall_assessment,
                 "n_iom_matches": len(zone.matched_ioms),
                 "top_ioms": [],

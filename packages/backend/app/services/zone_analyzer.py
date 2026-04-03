@@ -1,11 +1,15 @@
 """
-Zone Analyzer Service  (Stage 2.5)
+Zone Analyzer Service  (Stage 2.5 — v6.0 Descriptive)
 Stateless, pure numpy/pandas/scipy — no LLM, no I/O.
 
 Consumes flat zone_statistics records and returns:
-  - Enriched records with Z-scores, percentiles, priority, classification
-  - Zone diagnostics (status, problems by layer)
+  - Enriched records with Z-scores, percentiles (no priority/classification)
+  - Zone diagnostics (mean_abs_z, indicator_status — no status/problems)
   - Correlation / p-value matrices by layer
+
+v6.0 Change: All evaluative logic (classify, priority, status, problems)
+removed.  Stage 2 is now purely descriptive.  Direction-dependent evaluation
+belongs to Stage 3 Agent A.
 """
 
 import logging
@@ -22,7 +26,6 @@ from app.models.analysis import (
     ZoneAnalysisResult,
     EnrichedZoneStat,
     ZoneDiagnostic,
-    ZoneProblem,
     ComputationMetadata,
 )
 
@@ -32,14 +35,13 @@ LAYERS = ["full", "foreground", "middleground", "background"]
 
 
 class ZoneAnalyzer:
-    """Stateless Stage 2.5 analysis service."""
+    """Stateless Stage 2.5 analysis service (v6.0 descriptive)."""
 
     # ------------------------------------------------------------------
     # Public entry point
     # ------------------------------------------------------------------
     def analyze(self, request: ZoneAnalysisRequest) -> ZoneAnalysisResult:
         ind_defs = request.indicator_definitions
-        thresholds = (request.zscore_moderate, request.zscore_significant, request.zscore_critical)
 
         # 1) Pivot flat records into per-layer DataFrames of mean values
         raw_by_layer, meta_by_layer = self._build_dataframes(request.zone_statistics)
@@ -80,25 +82,7 @@ class ZoneAnalyzer:
             layer: df.rank(pct=True) * 100 for layer, df in raw_by_layer.items()
         }
 
-        # 4) Classification / priority per layer
-        priority_by_layer: dict[str, pd.DataFrame] = {}
-        classification_by_layer: dict[str, pd.DataFrame] = {}
-        for layer in raw_by_layer:
-            pr_data: dict[str, dict[str, int]] = {}
-            cl_data: dict[str, dict[str, str]] = {}
-            for zone in zone_names:
-                pr_data[zone] = {}
-                cl_data[zone] = {}
-                for ind_id in ind_ids:
-                    z = zscore_by_layer[layer].loc[zone, ind_id]
-                    direction = ind_defs[ind_id].target_direction.upper() if ind_id in ind_defs else "INCREASE"
-                    label, pri = _classify(z, direction, thresholds)
-                    pr_data[zone][ind_id] = pri
-                    cl_data[zone][ind_id] = label
-            priority_by_layer[layer] = pd.DataFrame(pr_data).T
-            classification_by_layer[layer] = pd.DataFrame(cl_data).T
-
-        # 5) Enriched flat records
+        # 4) Enriched flat records (descriptive only — no priority/classification)
         enriched: list[EnrichedZoneStat] = []
         for rec in request.zone_statistics:
             layer = rec.layer
@@ -112,8 +96,6 @@ class ZoneAnalyzer:
                 continue
             z_val = float(z_df.loc[zone, ind])
             pct_val = float(p_df.loc[zone, ind]) if not pd.isna(p_df.loc[zone, ind]) else None
-            pri = int(priority_by_layer[layer].loc[zone, ind])
-            cl = str(classification_by_layer[layer].loc[zone, ind])
             enriched.append(EnrichedZoneStat(
                 zone_id=rec.zone_id,
                 zone_name=rec.zone_name,
@@ -128,11 +110,9 @@ class ZoneAnalyzer:
                 area_sqm=rec.area_sqm,
                 z_score=round(z_val, 4),
                 percentile=round(pct_val, 2) if pct_val is not None else None,
-                priority=pri,
-                classification=cl,
             ))
 
-        # 6) Correlations per layer
+        # 5) Correlations per layer
         corr_out: dict[str, dict] = {}
         pval_out: dict[str, dict] = {}
         for layer, z_df in zscore_by_layer.items():
@@ -146,17 +126,16 @@ class ZoneAnalyzer:
                 for c1 in pval_m.index
             }
 
-        # 7) Zone diagnostics (with composite z-score + rank)
+        # 6) Zone diagnostics (descriptive: mean_abs_z + indicator_status)
         diagnostics = self._build_diagnostics(
             zone_names, ind_ids, ind_defs,
-            priority_by_layer, classification_by_layer,
             zscore_by_layer, raw_by_layer, meta_by_layer,
         )
 
-        # 8) Layer-level statistics (mean/std/N across zones, per indicator)
+        # 7) Layer-level statistics (mean/std/N across zones, per indicator)
         layer_statistics = self._compute_layer_statistics(raw_by_layer, meta_by_layer)
 
-        # 9) Radar profiles from full-layer percentiles
+        # 8) Radar profiles from full-layer percentiles
         radar_profiles: dict[str, dict[str, float]] = {}
         if "full" in pct_by_layer:
             pct_full = pct_by_layer["full"]
@@ -225,78 +204,42 @@ class ZoneAnalyzer:
     @staticmethod
     def _build_diagnostics(
         zone_names, ind_ids, ind_defs,
-        priority_by_layer, classification_by_layer,
         zscore_by_layer, raw_by_layer, meta_by_layer,
     ) -> list[ZoneDiagnostic]:
+        """Build purely descriptive zone diagnostics (v6.0)."""
         diagnostics: list[ZoneDiagnostic] = []
 
         for zone in zone_names:
-            layer_priorities: dict[str, int] = {}
-            problems_by_layer: dict[str, list[ZoneProblem]] = {}
             indicator_status: dict[str, dict[str, Any]] = {}
 
-            for layer in LAYERS:
-                if layer not in priority_by_layer:
-                    continue
-                pr_df = priority_by_layer[layer]
-                if zone not in pr_df.index:
-                    continue
-                layer_priorities[layer] = int(pr_df.loc[zone].sum())
-
-                problems: list[ZoneProblem] = []
-                for ind_id in ind_ids:
-                    if ind_id not in pr_df.columns:
-                        continue
-                    pri = int(pr_df.loc[zone, ind_id])
-                    if pri >= 4:
-                        m = meta_by_layer.get((zone, ind_id, layer), {})
-                        ind_def = ind_defs.get(ind_id)
-                        problems.append(ZoneProblem(
-                            indicator_id=ind_id,
-                            indicator_name=ind_def.name if ind_def else ind_id,
-                            layer=layer,
-                            value=float(raw_by_layer[layer].loc[zone, ind_id])
-                                if not pd.isna(raw_by_layer[layer].loc[zone, ind_id]) else None,
-                            unit=m.get("unit", ""),
-                            z_score=round(float(zscore_by_layer[layer].loc[zone, ind_id]), 3),
-                            priority=pri,
-                            classification=str(classification_by_layer[layer].loc[zone, ind_id]),
-                            target_direction=ind_def.target_direction if ind_def else "",
-                        ))
-                problems.sort(key=lambda p: p.priority, reverse=True)
-                problems_by_layer[layer] = problems
-
-            # Build per-indicator status (full layer as summary)
+            # Build per-indicator status (descriptive only: value + z_score + target_direction)
             for ind_id in ind_ids:
                 layer_data: dict[str, dict] = {}
                 for layer in LAYERS:
                     if layer not in zscore_by_layer or zone not in zscore_by_layer[layer].index:
                         continue
                     z = float(zscore_by_layer[layer].loc[zone, ind_id])
-                    pri = int(priority_by_layer[layer].loc[zone, ind_id])
-                    cl = str(classification_by_layer[layer].loc[zone, ind_id])
                     val = raw_by_layer[layer].loc[zone, ind_id]
+                    defn = ind_defs.get(ind_id)
                     layer_data[layer] = {
                         "value": round(float(val), 4) if not pd.isna(val) else None,
                         "z_score": round(z, 3),
-                        "priority": pri,
-                        "classification": cl,
+                        "target_direction": defn.target_direction if defn else "INCREASE",
                     }
                 indicator_status[ind_id] = layer_data
 
-            total_priority = layer_priorities.get("full", 0)
-            if total_priority >= 15:
-                status = "Critical"
-            elif total_priority >= 12:
-                status = "Poor"
-            elif total_priority >= 8:
-                status = "Moderate"
-            else:
-                status = "Good"
+            # mean_abs_z: mean of abs(z_score) across all indicators in full layer
+            mean_abs_z = 0.0
+            if "full" in zscore_by_layer and zone in zscore_by_layer["full"].index:
+                full_z = zscore_by_layer["full"].loc[zone]
+                abs_z = full_z.abs().dropna()
+                if len(abs_z) > 0:
+                    mean_abs_z = round(float(abs_z.mean()), 4)
 
             # Get zone_id and area_sqm from meta
             zone_id = zone
             area_sqm = 0.0
+            point_count = 0
             for ind_id in ind_ids:
                 for lyr in LAYERS:
                     m = meta_by_layer.get((zone, ind_id, lyr), {})
@@ -304,33 +247,24 @@ class ZoneAnalyzer:
                         zone_id = m["zone_id"]
                     if m.get("area_sqm"):
                         area_sqm = m["area_sqm"]
+                    if m.get("n_images") and m["n_images"] > point_count:
+                        point_count = m["n_images"]
                     if zone_id != zone:
                         break
                 if zone_id != zone:
                     break
 
-            # Composite z-score: mean of abs(z_score) across all indicators in full layer
-            composite_zscore = 0.0
-            if "full" in zscore_by_layer and zone in zscore_by_layer["full"].index:
-                full_z = zscore_by_layer["full"].loc[zone]
-                abs_z = full_z.abs().dropna()
-                if len(abs_z) > 0:
-                    composite_zscore = round(float(abs_z.mean()), 4)
-
             diagnostics.append(ZoneDiagnostic(
                 zone_id=zone_id,
                 zone_name=zone,
                 area_sqm=area_sqm,
-                status=status,
-                total_priority=total_priority,
-                composite_zscore=composite_zscore,
-                priority_by_layer=layer_priorities,
-                problems_by_layer=problems_by_layer,
+                mean_abs_z=mean_abs_z,
+                point_count=point_count,
                 indicator_status=indicator_status,
             ))
 
-        diagnostics.sort(key=lambda d: d.composite_zscore, reverse=True)
-        # Assign rank: 1 = highest composite z-score (worst)
+        # Sort by mean_abs_z descending (most distinctive first)
+        diagnostics.sort(key=lambda d: d.mean_abs_z, reverse=True)
         for rank_idx, diag in enumerate(diagnostics, start=1):
             diag.rank = rank_idx
         return diagnostics
@@ -360,40 +294,6 @@ class ZoneAnalyzer:
 # ---------------------------------------------------------------------------
 # Module-level helpers
 # ---------------------------------------------------------------------------
-
-def _classify(
-    z: float,
-    direction: str,
-    thresholds: tuple[float, float, float] = (0.5, 1.0, 1.5),
-) -> tuple[str, int]:
-    """Classify a Z-score into a label + priority (0=Excellent … 5=Critical)."""
-    moderate, significant, critical = thresholds
-
-    if direction == "INCREASE":
-        if z <= -critical:
-            return "Critical", 5
-        if z <= -significant:
-            return "Needs Attention", 4
-        if z <= -moderate:
-            return "Moderate", 3
-        if z <= moderate:
-            return "Acceptable", 2
-        if z <= significant:
-            return "Good", 1
-        return "Excellent", 0
-    else:  # DECREASE or NEUTRAL
-        if z >= critical:
-            return "Critical", 5
-        if z >= significant:
-            return "Needs Attention", 4
-        if z >= moderate:
-            return "Moderate", 3
-        if z >= -moderate:
-            return "Acceptable", 2
-        if z >= -significant:
-            return "Good", 1
-        return "Excellent", 0
-
 
 def _calc_corr_pval(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Pearson correlation + p-value matrices (min 3 data points)."""

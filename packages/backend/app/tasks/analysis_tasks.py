@@ -71,9 +71,6 @@ def run_full_analysis_task(self, request_data: dict, output_path: Optional[str] 
     zone_req = ZoneAnalysisRequest(
         indicator_definitions=request.indicator_definitions,
         zone_statistics=request.zone_statistics,
-        zscore_moderate=request.zscore_moderate,
-        zscore_significant=request.zscore_significant,
-        zscore_critical=request.zscore_critical,
     )
     zone_result = analyzer.analyze(zone_req)
 

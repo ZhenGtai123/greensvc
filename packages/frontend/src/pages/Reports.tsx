@@ -68,14 +68,19 @@ import type { ReportRequest, EnrichedZoneStat, ZoneDiagnostic, ZoneDesignOutput,
 
 const LAYERS = ['full', 'foreground', 'middleground', 'background'];
 const LAYER_LABELS: Record<string, string> = { full: 'Full', foreground: 'FG', middleground: 'MG', background: 'BG' };
-const STATUS_COLORS: Record<string, string> = { Critical: 'red', Poor: 'orange', Moderate: 'yellow', Good: 'green' };
-const PRIORITY_COLORS: Record<number, string> = { 0: 'green.100', 1: 'green.200', 2: 'yellow.100', 3: 'yellow.300', 4: 'orange.200', 5: 'red.200' };
+// v6.0: deviation-based coloring (purely descriptive)
+function deviationBgColor(meanAbsZ: number): string {
+  if (meanAbsZ >= 1.5) return 'red.50';
+  if (meanAbsZ >= 1.0) return 'orange.50';
+  if (meanAbsZ >= 0.5) return 'yellow.50';
+  return 'green.50';
+}
 
-function statusBgColor(status: string): string {
-  if (status.toLowerCase().includes('critical')) return 'red.100';
-  if (status.toLowerCase().includes('poor')) return 'orange.100';
-  if (status.toLowerCase().includes('moderate')) return 'yellow.100';
-  return 'green.100';
+function deviationColorScheme(meanAbsZ: number): string {
+  if (meanAbsZ >= 1.5) return 'red';
+  if (meanAbsZ >= 1.0) return 'orange';
+  if (meanAbsZ >= 0.5) return 'yellow';
+  return 'green';
 }
 
 function formatNum(v: number | null | undefined, decimals = 2): string {
@@ -299,7 +304,7 @@ function Reports() {
   // Derived data
   const sortedDiagnostics = useMemo(() => {
     if (!zoneAnalysisResult) return [];
-    return [...zoneAnalysisResult.zone_diagnostics].sort((a, b) => b.total_priority - a.total_priority);
+    return [...zoneAnalysisResult.zone_diagnostics].sort((a, b) => b.mean_abs_z - a.mean_abs_z);
   }, [zoneAnalysisResult]);
 
   const filteredStats = useMemo(() => {
@@ -537,7 +542,7 @@ function Reports() {
                     {/* Zone Cards */}
                     <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing={4}>
                       {sortedDiagnostics.map((diag: ZoneDiagnostic) => (
-                        <Card key={diag.zone_id} bg={statusBgColor(diag.status)}>
+                        <Card key={diag.zone_id} bg={deviationBgColor(diag.mean_abs_z)}>
                           <CardBody>
                             <VStack align="stretch" spacing={2}>
                               <HStack justify="space-between">
@@ -545,14 +550,10 @@ function Reports() {
                                   {diag.rank > 0 && <Badge colorScheme="purple" fontSize="xs">#{diag.rank}</Badge>}
                                   <Text fontWeight="bold" fontSize="sm" noOfLines={1}>{diag.zone_name}</Text>
                                 </HStack>
-                                <Badge colorScheme={STATUS_COLORS[diag.status] || 'gray'}>{diag.status}</Badge>
+                                <Badge colorScheme={deviationColorScheme(diag.mean_abs_z)}>|z|={diag.mean_abs_z?.toFixed(2) ?? '-'}</Badge>
                               </HStack>
-                              <HStack justify="space-between"><Text fontSize="xs" color="gray.600">Total Priority</Text><Text fontWeight="bold">{diag.total_priority}</Text></HStack>
-                              <HStack justify="space-between"><Text fontSize="xs" color="gray.600">Composite Z</Text><Text fontWeight="bold">{diag.composite_zscore?.toFixed(2) ?? '-'}</Text></HStack>
-                              <HStack justify="space-between">
-                                <Text fontSize="xs" color="gray.600">Problems (P{'\u2265'}4)</Text>
-                                <Text fontWeight="bold">{Object.values(diag.problems_by_layer).flat().filter(p => p.priority >= 4).length}</Text>
-                              </HStack>
+                              <HStack justify="space-between"><Text fontSize="xs" color="gray.600">Mean |Z-score|</Text><Text fontWeight="bold">{diag.mean_abs_z?.toFixed(2) ?? '-'}</Text></HStack>
+                              <HStack justify="space-between"><Text fontSize="xs" color="gray.600">Points</Text><Text fontWeight="bold">{diag.point_count}</Text></HStack>
                             </VStack>
                           </CardBody>
                         </Card>
@@ -561,7 +562,7 @@ function Reports() {
 
                     {/* Charts */}
                     <Card>
-                      <CardHeader><Heading size="sm">Zone Priority Overview</Heading></CardHeader>
+                      <CardHeader><Heading size="sm">Zone Deviation Overview</Heading></CardHeader>
                       <CardBody><ZonePriorityChart diagnostics={sortedDiagnostics} /></CardBody>
                     </Card>
 
@@ -730,7 +731,7 @@ function Reports() {
                       <Box overflowX="auto">
                         <Table size="sm">
                           <Thead>
-                            <Tr><Th>Zone</Th><Th>Indicator</Th><Th isNumeric>Mean</Th><Th isNumeric>Std</Th><Th isNumeric>Z-score</Th><Th isNumeric>Percentile</Th><Th isNumeric>Priority</Th><Th>Classification</Th></Tr>
+                            <Tr><Th>Zone</Th><Th>Indicator</Th><Th isNumeric>Mean</Th><Th isNumeric>Std</Th><Th isNumeric>Z-score</Th><Th isNumeric>Percentile</Th></Tr>
                           </Thead>
                           <Tbody>
                             {filteredStats.map((stat: EnrichedZoneStat, idx: number) => (
@@ -739,12 +740,10 @@ function Reports() {
                                 <Td fontSize="xs">{stat.indicator_id}</Td>
                                 <Td isNumeric fontSize="xs">{formatNum(stat.mean)}</Td>
                                 <Td isNumeric fontSize="xs">{formatNum(stat.std)}</Td>
-                                <Td isNumeric fontSize="xs" color={stat.z_score != null ? (stat.z_score < 0 ? 'red.600' : 'green.600') : undefined} fontWeight={stat.z_score != null ? 'bold' : undefined}>
+                                <Td isNumeric fontSize="xs" color={stat.z_score != null ? (stat.z_score < 0 ? 'blue.600' : 'orange.600') : undefined} fontWeight={stat.z_score != null ? 'bold' : undefined}>
                                   {formatNum(stat.z_score)}
                                 </Td>
                                 <Td isNumeric fontSize="xs">{formatNum(stat.percentile, 0)}</Td>
-                                <Td isNumeric><Badge bg={PRIORITY_COLORS[stat.priority] || 'gray.100'} fontSize="xs">{stat.priority}</Badge></Td>
-                                <Td fontSize="xs">{stat.classification}</Td>
                               </Tr>
                             ))}
                           </Tbody>
@@ -891,7 +890,7 @@ function Reports() {
                           <HStack flex="1" justify="space-between" pr={2}>
                             <HStack spacing={3}>
                               <Text fontWeight="bold">{zone.zone_name}</Text>
-                              <Badge colorScheme={STATUS_COLORS[zone.status] || 'gray'}>{zone.status}</Badge>
+                              <Badge colorScheme={deviationColorScheme(zone.mean_abs_z)}>|z|={zone.mean_abs_z?.toFixed(2) ?? '-'}</Badge>
                             </HStack>
                             <Text fontSize="sm" color="gray.500">{zone.design_strategies.length} strategies</Text>
                           </HStack>

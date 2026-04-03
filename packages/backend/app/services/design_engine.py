@@ -1,14 +1,16 @@
 """
-Design Engine Service  (Stage 3 — v5.0)
+Design Engine Service  (Stage 3 — v6.0)
 Signature-based IOM matching with 4-factor scoring, enriched LLM prompts,
 deterministic transferability computation.
 
 Pipeline per unit:
-  Agent A (LLM) → Spatial diagnosis → IOM queries
+  Agent A (LLM) → Spatial diagnosis → IOM queries (Agent A determines direction)
   Python         → Signature-based IOM matching (4-factor)
   Agent B (LLM) → Strategy synthesis with signatures
 
-Depends on KnowledgeBase (IOM + evidence + context + appendix) and LLMClient.
+v6.0 Change: Agent A now determines direction (increase/decrease) using
+evidence + design brief.  Stage 2 provides only descriptive data.
+Removed all references to status, priority, classification from Stage 2.
 """
 
 import asyncio
@@ -17,6 +19,8 @@ import logging
 import re
 from collections import Counter, defaultdict
 from typing import Any, Optional
+
+import numpy as np
 
 from app.models.analysis import (
     DesignStrategyRequest,
@@ -98,7 +102,7 @@ _CONF_SCORE = {"GRD_A": 1.0, "GRD_B": 0.7, "GRD_C": 0.4}
 # ---------------------------------------------------------------------------
 
 class DesignEngine:
-    """Stage 3: diagnosis → IOM matching → strategy generation (v5.0)."""
+    """Stage 3: diagnosis → IOM matching → strategy generation (v6.0)."""
 
     def __init__(self, knowledge_base: KnowledgeBase, llm_client: LLMClient):
         self.kb = knowledge_base
@@ -148,16 +152,21 @@ class DesignEngine:
         if zone_analysis.segment_diagnostics:
             diagnostics = zone_analysis.segment_diagnostics
 
+        # Build project-level indicator overview (v6.0: for supplementing missing indicators)
+        project_indicators = self._build_project_indicators(zone_analysis, diagnostics)
+
         zones_output: dict[str, ZoneDesignOutput] = {}
 
         for diag in diagnostics:
             zone_id = diag.zone_id
 
-            # Sub-step 1: Diagnosis → IOM queries
+            # Sub-step 1: Diagnosis → IOM queries (Agent A determines direction)
+            diagnosis_data = {}
             try:
                 if use_llm:
-                    iom_queries = await self._llm_diagnosis(
-                        diag, zone_analysis, request.project_context, allowed
+                    iom_queries, diagnosis_data = await self._llm_diagnosis(
+                        diag, zone_analysis, request.project_context, allowed,
+                        project_indicators,
                     )
                 else:
                     iom_queries = self._rule_based_diagnosis(diag, zone_analysis, allowed)
@@ -178,6 +187,7 @@ class DesignEngine:
                         zone_analysis,
                         list(allowed) if allowed else [],
                         request.max_strategies_per_zone,
+                        diagnosis_data,
                     )
                 else:
                     design_out = self._rule_based_strategies(diag, matched_ioms, allowed)
@@ -188,7 +198,8 @@ class DesignEngine:
             zones_output[zone_id] = ZoneDesignOutput(
                 zone_id=zone_id,
                 zone_name=diag.zone_name,
-                status=diag.status,
+                mean_abs_z=diag.mean_abs_z,
+                diagnosis=diagnosis_data,
                 overall_assessment=design_out.get("overall_assessment", ""),
                 matched_ioms=[MatchedIOM(**m) for m in matched_ioms],
                 design_strategies=[DesignStrategy(**s) for s in design_out.get("design_strategies", [])],
@@ -199,7 +210,9 @@ class DesignEngine:
         return DesignStrategyResult(
             zones=zones_output,
             metadata={
-                "version": "5.0",
+                "version": "6.0",
+                "stage2_version": "v6.0-descriptive",
+                "evaluative_logic": "Agent A determines direction from evidence + query",
                 "diagnosis_mode": "LLM" if use_llm else "rule-based",
                 "diagnosis_source": "segments" if zone_analysis.segment_diagnostics else "zones",
                 "total_zones": len(zones_output),
@@ -213,7 +226,45 @@ class DesignEngine:
         )
 
     # ------------------------------------------------------------------
-    # Sub-step 1a: LLM Diagnosis (Agent A)
+    # v6.0: Build project-level indicator overview
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_project_indicators(
+        zone_analysis: ZoneAnalysisResult,
+        diagnostics: list[ZoneDiagnostic],
+    ) -> dict[str, dict]:
+        """Build project-level indicator overview from layer_statistics.
+
+        This provides data for ALL indicators at project level, enabling Agent A
+        to reason about indicators that may be missing from a particular segment
+        due to clustering.
+        """
+        result: dict[str, dict] = {}
+        layer_stats = zone_analysis.layer_statistics or {}
+        ind_defs = zone_analysis.indicator_definitions or {}
+
+        for ind_id, stats in layer_stats.items():
+            full = stats.get("full", {})
+            defn = ind_defs.get(ind_id)
+            result[ind_id] = {
+                "name": defn.name if defn else ind_id,
+                "unit": defn.unit if defn else "",
+                "target_direction": defn.target_direction if defn else "INCREASE",
+                "project_mean": full.get("Mean"),
+                "project_std": full.get("Std"),
+                "project_n": full.get("N"),
+                "layers": {
+                    layer: {"Mean": s.get("Mean"), "Std": s.get("Std")}
+                    for layer, s in stats.items()
+                    if isinstance(s, dict) and "Mean" in s
+                },
+            }
+
+        return result
+
+    # ------------------------------------------------------------------
+    # Sub-step 1a: LLM Diagnosis (Agent A) — v6.0
     # ------------------------------------------------------------------
 
     async def _llm_diagnosis(
@@ -222,14 +273,16 @@ class DesignEngine:
         zone_analysis: ZoneAnalysisResult,
         project_context: ProjectContext,
         allowed: Optional[set[str]],
-    ) -> list[dict]:
+        project_indicators: dict[str, dict],
+    ) -> tuple[list[dict], dict]:
+        """Agent A diagnosis. Returns (iom_queries, full_diagnosis_data)."""
         ind_defs = zone_analysis.indicator_definitions
         allowed_list = list(allowed) if allowed else list(diag.indicator_status.keys())
 
         # Build enriched context
         ctx = self._build_diagnosis_context(diag, zone_analysis, project_context)
 
-        # Build indicator table
+        # Build indicator table (descriptive only: value + z_score + target_direction)
         ind_lines = []
         for ind_id in allowed_list:
             layer_data = diag.indicator_status.get(ind_id, {})
@@ -239,9 +292,7 @@ class DesignEngine:
             ind_lines.append(
                 f"  {ind_id}: value={full.get('mean', full.get('value', 'N/A'))}, "
                 f"z_score={full.get('z_score', 'N/A')}, "
-                f"priority={full.get('priority', 'N/A')}, "
-                f"status={full.get('classification', full.get('status', 'N/A'))}, "
-                f"target_direction={target_dir}"
+                f"target_direction={target_dir} (informational)"
             )
         indicator_table = '\n'.join(ind_lines) if ind_lines else '(no indicator data)'
 
@@ -277,22 +328,51 @@ class DesignEngine:
         else:
             clustering_text = '(no clustering performed)'
 
-        # Cross-zone overview
+        # Cross-zone overview (v6.0: uses mean_abs_z instead of status)
         cross_zone = ctx.get("cross_zone_overview", [])
         if len(cross_zone) > 1:
             cz_lines = []
             for cz in cross_zone:
                 marker = " <- THIS UNIT" if cz["zone_id"] == diag.zone_id else ""
-                cz_lines.append(f"  {cz['zone_name']} ({cz['zone_id']}): status={cz['status']}, rank={cz['rank']}{marker}")
+                cz_lines.append(f"  {cz['zone_name']} ({cz['zone_id']}): mean|z|={cz['mean_abs_z']}, rank={cz['rank']}{marker}")
             overview_text = '\n'.join(cz_lines)
-            relative_position = f"Rank {diag.rank}/{len(cross_zone)} by composite z-score (1=worst)"
+            relative_position = f"Rank {diag.rank}/{len(cross_zone)} by mean|z| (1=most distinctive)"
         else:
             overview_text = f"Single-unit project: {diag.zone_name}"
             relative_position = "Only unit in project"
 
+        # v6.0: Project-level indicator overview (for supplementing missing indicators)
+        proj_ind_lines = []
+        unit_indicator_ids = set(diag.indicator_status.keys())
+        for ind_id, pdata in project_indicators.items():
+            in_unit = "YES" if ind_id in unit_indicator_ids else "MISSING"
+            proj_ind_lines.append(
+                f"  {ind_id} ({pdata['name']}): project_mean={pdata.get('project_mean', 'N/A')}, "
+                f"target_direction={pdata['target_direction']}, in_this_unit={in_unit}")
+        project_indicator_overview = '\n'.join(proj_ind_lines) if proj_ind_lines else '(no project indicators)'
+
+        # v6.0: Supplementary indicators (missing from this unit)
+        supp_lines = []
+        for ind_id, pdata in project_indicators.items():
+            if ind_id not in unit_indicator_ids:
+                layer_info = ', '.join(
+                    f"{l}={ld.get('Mean', 'N/A')}"
+                    for l, ld in pdata.get('layers', {}).items()
+                )
+                supp_lines.append(
+                    f"  {ind_id} ({pdata['name']}): project_mean={pdata.get('project_mean', 'N/A')}, "
+                    f"layers=[{layer_info}], target_direction={pdata['target_direction']}")
+        supplementary_indicators = '\n'.join(supp_lines) if supp_lines else '(none — all indicators present)'
+
         prompt = f"""You are an expert landscape analyst. IMPORTANT: Respond ONLY in English.
 Analyze this spatial unit's indicator data and generate IOM queries
 (which indicators to change, in what direction) for the IOM matching engine.
+
+**IMPORTANT**: YOU determine the direction (increase/decrease) for each indicator.
+Stage 2 provides only descriptive data (values, z-scores). The indicator's
+declared target_direction may be INCREASE, DECREASE, NEUTRAL, or CONTEXT —
+treat this as a general hint, NOT a binding instruction. Your direction judgment
+must be based on the design brief, project context, and indicator relationships.
 
 ## Project
 - Name: {project_context.project.get('name', 'N/A')}
@@ -301,14 +381,24 @@ Analyze this spatial unit's indicator data and generate IOM queries
 - Design brief: {(project_context.performance_query.get('design_brief', '') or '')[:500]}
 - Target dimensions: {json.dumps(project_context.performance_query.get('dimensions', []))}
 
-## Project-Wide Overview ({len(cross_zone)} units total)
+## Project-Wide Indicator Overview (ALL indicators, project-level)
+These are the project-wide averages for ALL computed indicators.
+Some indicators may be missing from this unit's cluster but are still
+relevant to the design brief. Pay special attention to these.
+{project_indicator_overview}
+
+## Supplementary Indicators (missing from this unit, project-level data)
+{supplementary_indicators}
+
+## Project-Wide Unit Overview ({len(cross_zone)} units total)
 {overview_text}
 
 ## This Unit: {diag.zone_name} ({diag.zone_id})
-- Status: {diag.status}
+- Mean |Z-score|: {diag.mean_abs_z} (descriptive deviation)
 - Rank: {relative_position}
+- Points: {diag.point_count}
 
-## Indicator Values (full layer)
+## Indicator Values (full layer — descriptive only)
 {indicator_table}
 
 ## Layer Breakdown (FG / MG / BG)
@@ -324,23 +414,25 @@ Analyze this spatial unit's indicator data and generate IOM queries
 | ID | Rule |
 |----|------|
 | C1 | Only use indicator IDs from this list: {json.dumps(allowed_list)} |
-| C2 | Direction must be "increase" or "decrease" — based on the indicator's target_direction and current z_score |
-| C3 | Priority 1-3: 3=most urgent. Base on z_score magnitude and alignment with design brief |
+| C2 | YOU determine direction (increase/decrease) by reasoning about the design brief, project goals, and indicator context. target_direction is informational only — NEUTRAL and CONTEXT indicators require your judgment |
+| C3 | Priority 1-3: 3=most urgent. Base on deviation from project goals described in design brief |
 | C4 | Consider layer breakdown: a problem may be severe in foreground but acceptable in background |
 | C5 | Consider correlations: changing one indicator may cascade to correlated indicators |
 | C6 | Consider neighbours: interventions should be compatible with adjacent zones' conditions |
-| C7 | Do NOT invent indicator IDs |
-| C8 | Output valid JSON only, no markdown fences |
+| C7 | You MAY generate queries for indicators missing from this segment if the design brief demands it — use project-level values |
+| C8 | Do NOT invent indicator IDs |
+| C9 | Output valid JSON only, no markdown fences |
 
 Return ONLY valid JSON:
 {{
-  "zone_id": "{diag.zone_id}",
-  "integrated_diagnosis": "2-3 sentence diagnosis referencing specific indicator values, layer patterns, cross-indicator correlations, and the unit's relative position within the project",
+  "unit_id": "{diag.zone_id}",
+  "integrated_diagnosis": "2-3 sentence diagnosis referencing specific indicator values, layer patterns, cross-indicator relationships, and the unit's relative position within the project",
   "cross_zone_notes": "If multi-zone: how this unit relates to its neighbours. If single unit: null",
   "iom_queries": [
     {{
       "indicator_id": "IND_xxx",
       "direction": "increase|decrease",
+      "direction_rationale": "Why this direction, based on design brief and context",
       "priority": 3,
       "target_layer": "foreground|middleground|background|all",
       "qualitative_target": "What should change and why",
@@ -366,16 +458,26 @@ Return ONLY valid JSON:
             cleaned.append({
                 "indicator_id": ind,
                 "direction": direction,
+                "direction_rationale": q.get("direction_rationale", ""),
                 "priority": int(q.get("priority", 1) or 1),
                 "qualitative_target": q.get("qualitative_target", ""),
                 "constraints": q.get("constraints", []),
             })
 
         cleaned.sort(key=lambda x: -x.get("priority", 1))
-        return cleaned[:6]
+        iom_queries = cleaned[:6]
+
+        # Return full diagnosis data for storage
+        diagnosis_data = {
+            "integrated_diagnosis": data.get("integrated_diagnosis", ""),
+            "cross_zone_notes": data.get("cross_zone_notes"),
+            "iom_queries": iom_queries,
+        }
+
+        return iom_queries, diagnosis_data
 
     # ------------------------------------------------------------------
-    # Sub-step 1b: Rule-based Diagnosis (fallback)
+    # Sub-step 1b: Rule-based Diagnosis (fallback) — v6.0
     # ------------------------------------------------------------------
 
     def _rule_based_diagnosis(
@@ -384,6 +486,7 @@ Return ONLY valid JSON:
         zone_analysis: ZoneAnalysisResult,
         allowed: Optional[set[str]],
     ) -> list[dict]:
+        """v6.0: Generate queries based on z-score magnitude and target_direction."""
         ind_defs = zone_analysis.indicator_definitions
         queries: list[dict] = []
 
@@ -396,24 +499,39 @@ Return ONLY valid JSON:
             ind_def = ind_defs.get(ind_id)
             target_dir = (ind_def.target_direction if ind_def else "INCREASE").upper()
 
-            if target_dir == "INCREASE":
-                direction = "increase"
-            elif target_dir == "DECREASE":
-                direction = "decrease"
-            else:
-                direction = "maintain"
+            full = layer_data.get("full", layer_data) if isinstance(layer_data, dict) else {}
+            z_score = full.get("z_score", 0)
 
-            if direction == "maintain":
+            # v6.0: Determine direction from z-score and target_direction hint
+            if target_dir == "INCREASE":
+                if z_score < -0.5:
+                    direction = "increase"
+                else:
+                    continue  # already adequate
+            elif target_dir == "DECREASE":
+                if z_score > 0.5:
+                    direction = "decrease"
+                else:
+                    continue  # already adequate
+            else:
+                # NEUTRAL/CONTEXT: skip in rule-based mode
                 continue
 
-            status_priority = {"Critical": 3, "Poor": 2, "Moderate": 1, "Good": 0}
-            priority = status_priority.get(diag.status, 1)
+            # Priority based on z-score magnitude
+            abs_z = abs(z_score)
+            if abs_z >= 1.5:
+                priority = 3
+            elif abs_z >= 1.0:
+                priority = 2
+            else:
+                priority = 1
 
             queries.append({
                 "indicator_id": ind_id,
                 "direction": direction,
+                "direction_rationale": f"z_score={z_score:.2f}, target_direction={target_dir}",
                 "priority": priority,
-                "qualitative_target": f"{direction.capitalize()} {ind_id} (status: {diag.status})",
+                "qualitative_target": f"{direction.capitalize()} {ind_id} (z={z_score:.2f})",
                 "constraints": [],
             })
 
@@ -514,7 +632,7 @@ Return ONLY valid JSON:
         return all_matched
 
     # ------------------------------------------------------------------
-    # Sub-step 3a: LLM Strategy Generation (Agent B)
+    # Sub-step 3a: LLM Strategy Generation (Agent B) — v6.0
     # ------------------------------------------------------------------
 
     async def _llm_strategy_generation(
@@ -525,6 +643,7 @@ Return ONLY valid JSON:
         zone_analysis: ZoneAnalysisResult,
         allowed_ids: list[str],
         max_strategies: int = 5,
+        diagnosis_data: dict = None,
     ) -> dict:
         # Group IOMs by indicator (top 3 per)
         by_ind: dict[str, list[dict]] = defaultdict(list)
@@ -553,7 +672,7 @@ Return ONLY valid JSON:
                     },
                 })
 
-        # Build indicator profile for this unit
+        # Build indicator profile (v6.0: descriptive, no status/classification)
         ind_defs = zone_analysis.indicator_definitions
         profile_lines = []
         for ind_id in allowed_ids:
@@ -565,7 +684,6 @@ Return ONLY valid JSON:
                     f"  {ind_id} ({defn.name if defn else '?'}): "
                     f"value={full.get('mean', full.get('value', 'N/A'))}, "
                     f"z={full.get('z_score', 'N/A')}, "
-                    f"status={full.get('classification', full.get('status', 'N/A'))}, "
                     f"target={defn.target_direction if defn else 'N/A'}")
         unit_indicator_profile = '\n'.join(profile_lines) if profile_lines else '(no data)'
 
@@ -582,6 +700,11 @@ Return ONLY valid JSON:
         # Encoding dictionary subset
         encoding_subset = self.kb.get_codebook_subset(max_chars=20000)
 
+        # v6.0: Use Agent A's diagnosis instead of Stage 2 status
+        unit_diagnosis = ""
+        if diagnosis_data:
+            unit_diagnosis = diagnosis_data.get("integrated_diagnosis", "")
+
         prompt = f"""You are an expert landscape architect. IMPORTANT: Respond ONLY in English.
 Synthesize the matched IOM operations into 3-{min(max_strategies, 5)} concrete, actionable design
 strategies for this spatial unit. Ground every strategy in the provided IOM evidence.
@@ -593,10 +716,11 @@ strategies for this spatial unit. Ground every strategy in the provided IOM evid
 - Design brief: {(project_context.performance_query.get('design_brief', '') or '')[:500]}
 
 ## Spatial Unit: {diag.zone_name} ({diag.zone_id})
-- Status: {diag.status}
+- Diagnosis: {unit_diagnosis}
+- Mean |Z-score|: {diag.mean_abs_z}
 - Area: {diag.area_sqm} sqm
 
-## Current Indicator Profile
+## Current Indicator Profile (descriptive)
 {unit_indicator_profile}
 
 ## Layer Breakdown
@@ -746,7 +870,7 @@ Generate {min(max_strategies, 5)} concrete design strategies. Return ONLY valid 
                 break
 
         return {
-            "overall_assessment": f"Zone requires attention on {len(seen_indicators)} indicator(s)",
+            "overall_assessment": f"Unit requires attention on {len(seen_indicators)} indicator(s)",
             "design_strategies": strategies,
             "implementation_sequence": "Prioritize by strategy number",
             "synergies": "Strategies may have cumulative positive effects",
@@ -893,7 +1017,7 @@ Generate {min(max_strategies, 5)} concrete design strategies. Return ONLY valid 
                 ],
             }
 
-        # Cross-zone overview
+        # Cross-zone overview (v6.0: uses mean_abs_z instead of status)
         all_diags = zone_analysis.zone_diagnostics or []
         if zone_analysis.segment_diagnostics:
             all_diags = zone_analysis.segment_diagnostics
@@ -901,9 +1025,8 @@ Generate {min(max_strategies, 5)} concrete design strategies. Return ONLY valid 
             {
                 "zone_id": d.zone_id,
                 "zone_name": d.zone_name,
-                "status": d.status,
+                "mean_abs_z": round(d.mean_abs_z, 2) if d.mean_abs_z else 0,
                 "rank": d.rank,
-                "composite_zscore": round(d.composite_zscore, 2) if d.composite_zscore else 0,
             }
             for d in all_diags
         ]

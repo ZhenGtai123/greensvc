@@ -35,18 +35,12 @@ function getZoneColor(index: number): string {
   return ZONE_COLORS[index % ZONE_COLORS.length];
 }
 
-const STATUS_BAR_COLORS: Record<string, string> = {
-  Critical: '#E53E3E',
-  Poor: '#DD6B20',
-  Moderate: '#D69E2E',
-  Good: '#38A169',
-};
-
-function statusBarColor(status: string): string {
-  for (const [key, color] of Object.entries(STATUS_BAR_COLORS)) {
-    if (status.toLowerCase().includes(key.toLowerCase())) return color;
-  }
-  return '#A0AEC0';
+// v6.0: color by mean_abs_z deviation level (purely descriptive)
+function deviationBarColor(meanAbsZ: number): string {
+  if (meanAbsZ >= 1.5) return '#E53E3E';
+  if (meanAbsZ >= 1.0) return '#DD6B20';
+  if (meanAbsZ >= 0.5) return '#D69E2E';
+  return '#38A169';
 }
 
 // ─── Radar Profile Chart ────────────────────────────────────────────────────
@@ -103,7 +97,7 @@ export function RadarProfileChart({ radarProfiles }: RadarProfileChartProps) {
   );
 }
 
-// ─── Zone Priority Bar Chart ────────────────────────────────────────────────
+// ─── Zone Deviation Chart (v6.0 descriptive) ──────────────────────────────
 
 interface ZonePriorityChartProps {
   diagnostics: ZoneDiagnostic[];
@@ -112,12 +106,11 @@ interface ZonePriorityChartProps {
 export function ZonePriorityChart({ diagnostics }: ZonePriorityChartProps) {
   const data = useMemo(() => {
     return [...diagnostics]
-      .sort((a, b) => b.composite_zscore - a.composite_zscore)
+      .sort((a, b) => b.mean_abs_z - a.mean_abs_z)
       .map(d => ({
         zone: d.zone_name,
-        composite_zscore: Number(d.composite_zscore?.toFixed(2) ?? 0),
-        total_priority: d.total_priority,
-        status: d.status,
+        mean_abs_z: Number(d.mean_abs_z?.toFixed(2) ?? 0),
+        point_count: d.point_count,
       }));
   }, [diagnostics]);
 
@@ -137,12 +130,12 @@ export function ZonePriorityChart({ diagnostics }: ZonePriorityChartProps) {
         <Tooltip
           formatter={(value: number, name: string) => [
             value,
-            name === 'composite_zscore' ? 'Composite Z-score' : 'Total Priority',
+            name === 'mean_abs_z' ? 'Mean |Z-score|' : 'Points',
           ]}
         />
-        <Bar dataKey="composite_zscore" name="Composite Z-score" barSize={20}>
+        <Bar dataKey="mean_abs_z" name="Mean |Z-score|" barSize={20}>
           {data.map((entry, i) => (
-            <Cell key={i} fill={statusBarColor(entry.status)} />
+            <Cell key={i} fill={deviationBarColor(entry.mean_abs_z)} />
           ))}
         </Bar>
       </BarChart>
@@ -273,22 +266,22 @@ export function CorrelationHeatmap({ corr, pval, indicators }: CorrelationHeatma
   );
 }
 
-// ─── Priority Heatmap (Zone × Indicator) ────────────────────────────────────
+// ─── Z-Score Heatmap (Zone × Indicator) — v6.0 descriptive ─────────────────
 
-const PRIORITY_COLORS: Record<string, string> = {
-  Excellent: '#276749',
-  Good: '#38A169',
-  Acceptable: '#68D391',
-  Moderate: '#ECC94B',
-  'Needs Attention': '#ED8936',
-  Critical: '#E53E3E',
-};
-
-function priorityCellColor(classification: string): string {
-  for (const [key, color] of Object.entries(PRIORITY_COLORS)) {
-    if (classification.toLowerCase() === key.toLowerCase()) return color;
+function zScoreCellColor(z: number): string {
+  // coolwarm-style: neutral center, blue for negative, red for positive
+  const absZ = Math.abs(z);
+  if (absZ < 0.25) return '#E2E8F0';     // near zero = gray
+  if (z > 0) {
+    if (absZ > 1.5) return '#C53030';
+    if (absZ > 1.0) return '#E53E3E';
+    if (absZ > 0.5) return '#FC8181';
+    return '#FEB2B2';
   }
-  return '#E2E8F0';
+  if (absZ > 1.5) return '#2B6CB0';
+  if (absZ > 1.0) return '#3182CE';
+  if (absZ > 0.5) return '#63B3ED';
+  return '#BEE3F8';
 }
 
 interface PriorityHeatmapProps {
@@ -300,18 +293,16 @@ export function PriorityHeatmap({ diagnostics, layer = 'full' }: PriorityHeatmap
   const { zones, indicators, grid } = useMemo(() => {
     const zoneList = diagnostics.map(d => d.zone_name);
     const indSet = new Set<string>();
-    const gridMap: Record<string, Record<string, { classification: string; priority: number; value: number | null; z_score: number }>> = {};
+    const gridMap: Record<string, Record<string, { value: number | null; z_score: number }>> = {};
 
     for (const diag of diagnostics) {
       gridMap[diag.zone_name] = {};
       const status = diag.indicator_status || {};
       for (const [indId, layerData] of Object.entries(status)) {
         indSet.add(indId);
-        const ld = (layerData as Record<string, { classification?: string; priority?: number; value?: number | null; z_score?: number }>)[layer];
+        const ld = (layerData as Record<string, { value?: number | null; z_score?: number }>)[layer];
         if (ld) {
           gridMap[diag.zone_name][indId] = {
-            classification: ld.classification || '',
-            priority: ld.priority || 0,
             value: ld.value ?? null,
             z_score: ld.z_score || 0,
           };
@@ -330,6 +321,14 @@ export function PriorityHeatmap({ diagnostics, layer = 'full' }: PriorityHeatmap
   const svgW = labelW + indicators.length * cellW;
   const svgH = labelH + zones.length * cellH + 30;
 
+  const legendItems = [
+    { label: 'z<-1.5', color: '#2B6CB0' },
+    { label: 'z<-0.5', color: '#63B3ED' },
+    { label: 'z~0', color: '#E2E8F0' },
+    { label: 'z>0.5', color: '#FC8181' },
+    { label: 'z>1.5', color: '#C53030' },
+  ];
+
   return (
     <Box overflowX="auto">
       <svg width={svgW} height={svgH} style={{ fontFamily: 'system-ui, sans-serif' }}>
@@ -343,18 +342,17 @@ export function PriorityHeatmap({ diagnostics, layer = 'full' }: PriorityHeatmap
             fontSize={9}
             transform={`rotate(-45, ${labelW + ci * cellW + cellW / 2}, ${labelH - 6})`}
           >
-            {ind.length > 12 ? ind.slice(0, 12) + '…' : ind}
+            {ind.length > 12 ? ind.slice(0, 12) + '...' : ind}
           </text>
         ))}
         {/* Rows */}
         {zones.map((zone, ri) => (
           <g key={zone}>
             <text x={labelW - 6} y={labelH + ri * cellH + cellH / 2 + 4} textAnchor="end" fontSize={10}>
-              {zone.length > 14 ? zone.slice(0, 14) + '…' : zone}
+              {zone.length > 14 ? zone.slice(0, 14) + '...' : zone}
             </text>
             {indicators.map((ind, ci) => {
               const cell = grid[zone]?.[ind];
-              const cls = cell?.classification || '';
               const zs = cell?.z_score ?? 0;
               return (
                 <g key={`${zone}-${ind}`}>
@@ -364,21 +362,21 @@ export function PriorityHeatmap({ diagnostics, layer = 'full' }: PriorityHeatmap
                     width={cellW - 2}
                     height={cellH - 2}
                     rx={3}
-                    fill={priorityCellColor(cls)}
+                    fill={zScoreCellColor(zs)}
                     opacity={0.85}
                   >
-                    <title>{`${zone} × ${ind}: ${cls} (z=${zs.toFixed(2)})`}</title>
+                    <title>{`${zone} x ${ind}: z=${zs.toFixed(2)}`}</title>
                   </rect>
                   <text
                     x={labelW + ci * cellW + (cellW - 2) / 2}
                     y={labelH + ri * cellH + (cellH - 2) / 2 + 4}
                     textAnchor="middle"
                     fontSize={9}
-                    fill="#fff"
+                    fill={Math.abs(zs) > 0.8 ? '#fff' : '#2D3748'}
                     fontWeight="bold"
                     pointerEvents="none"
                   >
-                    {cell?.priority ?? ''}
+                    {zs.toFixed(1)}
                   </text>
                 </g>
               );
@@ -387,10 +385,10 @@ export function PriorityHeatmap({ diagnostics, layer = 'full' }: PriorityHeatmap
         ))}
         {/* Legend */}
         <g transform={`translate(${labelW}, ${svgH - 22})`}>
-          {Object.entries(PRIORITY_COLORS).map(([label, color], i) => (
-            <g key={label} transform={`translate(${i * 90}, 0)`}>
-              <rect width={12} height={12} fill={color} rx={2} opacity={0.85} />
-              <text x={16} y={10} fontSize={8} fill="#4A5568">{label}</text>
+          {legendItems.map((item, i) => (
+            <g key={item.label} transform={`translate(${i * 80}, 0)`}>
+              <rect width={12} height={12} fill={item.color} rx={2} opacity={0.85} />
+              <text x={16} y={10} fontSize={8} fill="#4A5568">{item.label}</text>
             </g>
           ))}
         </g>

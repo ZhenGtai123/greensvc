@@ -19,8 +19,6 @@ import {
   Switch,
   FormControl,
   FormLabel,
-  NumberInput,
-  NumberInputField,
   Tag,
   TagLabel,
   Wrap,
@@ -74,9 +72,6 @@ function Analysis() {
   const setDesignResult = setDesignStrategyResult;
 
   // Config state
-  const [zscoreModerate, setZscoreModerate] = useState(0.5);
-  const [zscoreSignificant, setZscoreSignificant] = useState(1.0);
-  const [zscoreCritical, setZscoreCritical] = useState(1.5);
   const [useLlm, setUseLlm] = useState(true);
 
   // Queries
@@ -117,9 +112,6 @@ function Analysis() {
         indicator_ids: selectedIndicatorIds,
         run_stage3: true,
         use_llm: useLlm,
-        zscore_moderate: zscoreModerate,
-        zscore_significant: zscoreSignificant,
-        zscore_critical: zscoreCritical,
       });
       setPipelineResult(result);
       if (result.zone_analysis) setZoneResult(result.zone_analysis);
@@ -129,7 +121,7 @@ function Analysis() {
       const msg = extractErrorMessage(err, 'Pipeline failed');
       toast({ title: msg, status: 'error' });
     }
-  }, [selectedProjectId, selectedIndicatorIds, useLlm, zscoreModerate, zscoreSignificant, zscoreCritical, projectPipeline, toast, setPipelineResult, setZoneResult, setDesignResult]);
+  }, [selectedProjectId, selectedIndicatorIds, useLlm, projectPipeline, toast, setPipelineResult, setZoneResult, setDesignResult]);
 
   const isRunning = projectPipeline.isPending;
   const hasResults = zoneAnalysisResult !== null;
@@ -192,39 +184,9 @@ function Analysis() {
           <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide" mb={2}>
             Analysis Parameters
           </Text>
-          <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4} alignItems="end" mb={4}>
-            <FormControl>
-              <Tooltip label="Indicators deviating beyond this threshold are flagged as moderate concerns." placement="top" hasArrow>
-                <FormLabel fontSize="sm" cursor="help" borderBottom="1px dashed" borderColor="gray.300" display="inline-block">
-                  Z-score Moderate
-                </FormLabel>
-              </Tooltip>
-              <NumberInput value={zscoreModerate} onChange={(_, val) => setZscoreModerate(isNaN(val) ? 0.5 : val)} step={0.1} min={0} size="sm">
-                <NumberInputField />
-              </NumberInput>
-            </FormControl>
-            <FormControl>
-              <Tooltip label="Indicators beyond this threshold are flagged as significant problems." placement="top" hasArrow>
-                <FormLabel fontSize="sm" cursor="help" borderBottom="1px dashed" borderColor="gray.300" display="inline-block">
-                  Z-score Significant
-                </FormLabel>
-              </Tooltip>
-              <NumberInput value={zscoreSignificant} onChange={(_, val) => setZscoreSignificant(isNaN(val) ? 1.0 : val)} step={0.1} min={0} size="sm">
-                <NumberInputField />
-              </NumberInput>
-            </FormControl>
-            <FormControl>
-              <Tooltip label="Indicators beyond this threshold are flagged as critical — top priority for intervention." placement="top" hasArrow>
-                <FormLabel fontSize="sm" cursor="help" borderBottom="1px dashed" borderColor="gray.300" display="inline-block">
-                  Z-score Critical
-                </FormLabel>
-              </Tooltip>
-              <NumberInput value={zscoreCritical} onChange={(_, val) => setZscoreCritical(isNaN(val) ? 1.5 : val)} step={0.1} min={0} size="sm">
-                <NumberInputField />
-              </NumberInput>
-            </FormControl>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} alignItems="end" mb={4}>
             <FormControl display="flex" alignItems="center">
-              <Tooltip label="When enabled, Stage 3 uses LLM for context-aware design strategies. When disabled, uses rule-based matching." placement="top" hasArrow maxW="320px">
+              <Tooltip label="When enabled, Stage 3 uses LLM for context-aware design strategies (Agent A determines direction). When disabled, uses rule-based matching." placement="top" hasArrow maxW="320px">
                 <FormLabel fontSize="sm" mb={0} cursor="help" borderBottom="1px dashed" borderColor="gray.300">
                   Use LLM (Stage 3)
                 </FormLabel>

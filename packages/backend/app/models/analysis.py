@@ -39,16 +39,13 @@ class IndicatorLayerValue(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ZoneAnalysisRequest(BaseModel):
-    """Request for Stage 2.5 cross-zone statistical analysis."""
+    """Request for Stage 2.5 cross-zone statistical analysis (v6.0 descriptive)."""
     indicator_definitions: dict[str, IndicatorDefinitionInput]
     zone_statistics: list[IndicatorLayerValue]
-    zscore_moderate: float = Field(default=0.5, ge=0)
-    zscore_significant: float = Field(default=1.0, ge=0)
-    zscore_critical: float = Field(default=1.5, ge=0)
 
 
 class EnrichedZoneStat(BaseModel):
-    """Zone stat record enriched with Z-score, priority, classification."""
+    """Zone stat record enriched with Z-score and percentile (v6.0 descriptive)."""
     zone_id: str
     zone_name: str
     indicator_id: str
@@ -62,34 +59,16 @@ class EnrichedZoneStat(BaseModel):
     area_sqm: float = 0
     z_score: Optional[float] = None
     percentile: Optional[float] = None
-    priority: int = 0
-    classification: str = ""
-
-
-class ZoneProblem(BaseModel):
-    """A single problem identified for a zone (priority >= 4)."""
-    indicator_id: str
-    indicator_name: str
-    layer: str
-    value: Optional[float] = None
-    unit: str = ""
-    z_score: float = 0
-    priority: int = 0
-    classification: str = ""
-    target_direction: str = ""
 
 
 class ZoneDiagnostic(BaseModel):
-    """Diagnostic summary for one zone."""
+    """Diagnostic summary for one zone (v6.0 descriptive — no evaluative fields)."""
     zone_id: str
     zone_name: str
     area_sqm: float = 0
-    status: str = ""  # Critical | Poor | Moderate | Good
-    total_priority: int = 0
-    composite_zscore: float = 0.0
-    rank: int = 0
-    priority_by_layer: dict[str, int] = Field(default_factory=dict)
-    problems_by_layer: dict[str, list[ZoneProblem]] = Field(default_factory=dict)
+    mean_abs_z: float = 0.0  # descriptive deviation measure
+    rank: int = 0  # 1 = most distinctive (highest mean|z|)
+    point_count: int = 0
     indicator_status: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
@@ -171,6 +150,7 @@ class IOMQuery(BaseModel):
     """A single IOM query derived from diagnosis."""
     indicator_id: str
     direction: str  # increase | decrease | maintain
+    direction_rationale: str = ""  # v6.0: why this direction
     priority: int = 1
     qualitative_target: str = ""
     constraints: list[str] = Field(default_factory=list)
@@ -216,10 +196,11 @@ class DesignStrategy(BaseModel):
 
 
 class ZoneDesignOutput(BaseModel):
-    """Full design output for a single zone."""
+    """Full design output for a single zone (v6.0)."""
     zone_id: str
     zone_name: str = ""
-    status: str = ""
+    mean_abs_z: float = 0.0  # v6.0: descriptive deviation
+    diagnosis: dict = Field(default_factory=dict)  # v6.0: Agent A's diagnosis + iom_queries
     overall_assessment: str = ""
     matched_ioms: list[MatchedIOM] = Field(default_factory=list)
     design_strategies: list[DesignStrategy] = Field(default_factory=list)
@@ -274,9 +255,6 @@ class FullAnalysisRequest(BaseModel):
     project_context: ProjectContext = Field(default_factory=ProjectContext)
     allowed_indicator_ids: list[str] = Field(default_factory=list)
     use_llm: bool = True
-    zscore_moderate: float = Field(default=0.5, ge=0)
-    zscore_significant: float = Field(default=1.0, ge=0)
-    zscore_critical: float = Field(default=1.5, ge=0)
     max_ioms_per_query: int = Field(default=6, ge=1, le=20)
     max_strategies_per_zone: int = Field(default=5, ge=1, le=10)
 
@@ -297,9 +275,6 @@ class ProjectPipelineRequest(BaseModel):
     indicator_ids: list[str]
     run_stage3: bool = True
     use_llm: bool = False
-    zscore_moderate: float = Field(default=0.5, ge=0)
-    zscore_significant: float = Field(default=1.0, ge=0)
-    zscore_critical: float = Field(default=1.5, ge=0)
     max_ioms_per_query: int = Field(default=6, ge=1, le=20)
     max_strategies_per_zone: int = Field(default=5, ge=1, le=10)
 

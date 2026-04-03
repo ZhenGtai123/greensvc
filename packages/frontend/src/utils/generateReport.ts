@@ -57,18 +57,13 @@ export function generateReport(params: {
     }
   }
 
-  // 3. Zone Diagnostics Overview
-  const sortedDiags = [...zoneResult.zone_diagnostics].sort((a, b) => b.total_priority - a.total_priority);
+  // 3. Zone Diagnostics Overview (v6.0 descriptive)
+  const sortedDiags = [...zoneResult.zone_diagnostics].sort((a, b) => b.mean_abs_z - a.mean_abs_z);
   if (sortedDiags.length > 0) {
     sections.push('## Zone Diagnostics Overview');
     sections.push(mdTable(
-      ['Zone Name', 'Status', 'Total Priority', 'Problems (P\u22654)'],
-      sortedDiags.map(d => {
-        const highProblems = Object.values(d.problems_by_layer)
-          .flat()
-          .filter(p => p.priority >= 4).length;
-        return [d.zone_name, d.status, String(d.total_priority), String(highProblems)];
-      }),
+      ['Zone Name', 'Mean |Z|', 'Rank', 'Points'],
+      sortedDiags.map(d => [d.zone_name, fmt(d.mean_abs_z), String(d.rank), String(d.point_count)]),
     ));
   }
 
@@ -77,7 +72,7 @@ export function generateReport(params: {
   if (fullStats.length > 0) {
     sections.push('## Zone Statistics — Full Layer');
     sections.push(mdTable(
-      ['Zone', 'Indicator', 'Mean', 'Std', 'Z-score', 'Percentile', 'Priority', 'Classification'],
+      ['Zone', 'Indicator', 'Mean', 'Std', 'Z-score', 'Percentile'],
       fullStats.map(s => [
         s.zone_name,
         s.indicator_id,
@@ -85,8 +80,6 @@ export function generateReport(params: {
         fmt(s.std),
         fmt(s.z_score),
         fmt(s.percentile, 0),
-        String(s.priority),
-        s.classification,
       ]),
     ));
   }
@@ -145,7 +138,7 @@ export function generateReport(params: {
   if (designResult) {
     sections.push('## Design Strategies');
     for (const zone of Object.values(designResult.zones)) {
-      sections.push(`### Zone: ${zone.zone_name} — ${zone.status}`);
+      sections.push(`### Zone: ${zone.zone_name} (mean|z|=${fmt(zone.mean_abs_z)})`);
       if (zone.overall_assessment) {
         sections.push(`**Assessment:** ${zone.overall_assessment}`);
       }

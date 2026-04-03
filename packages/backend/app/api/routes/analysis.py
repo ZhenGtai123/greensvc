@@ -209,9 +209,6 @@ async def run_full_analysis(
         zone_request = ZoneAnalysisRequest(
             indicator_definitions=request.indicator_definitions,
             zone_statistics=request.zone_statistics,
-            zscore_moderate=request.zscore_moderate,
-            zscore_significant=request.zscore_significant,
-            zscore_critical=request.zscore_critical,
         )
         zone_result = analyzer.analyze(zone_request)
 
@@ -409,9 +406,6 @@ async def run_project_pipeline(
             zone_request = ZoneAnalysisRequest(
                 indicator_definitions=indicator_definitions,
                 zone_statistics=zone_statistics,
-                zscore_moderate=request.zscore_moderate,
-                zscore_significant=request.zscore_significant,
-                zscore_critical=request.zscore_critical,
             )
             zone_result = analyzer.analyze(zone_request)
             steps.append(ProjectPipelineProgress(step="zone_analysis", status="completed",

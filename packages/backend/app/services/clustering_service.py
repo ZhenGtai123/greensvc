@@ -1,17 +1,20 @@
 """
-SVC Archetype Clustering Service
+SVC Archetype Clustering Service (v6.0 Descriptive)
 KMeans clustering on geo-located image points to discover data-driven
 spatial archetypes.  Optional KNN smoothing reduces salt-and-pepper noise.
 
 Pipeline:
-  1. Build point × indicator matrix from per-image metrics
+  1. Build point x indicator matrix from per-image metrics
   2. Standardise (z-scores)
   3. Find optimal K via silhouette analysis (K=2..max_k)
-  4. KMeans fit → initial labels
+  4. KMeans fit -> initial labels
   5. KNN spatial smoothing (majority vote among k-nearest neighbours)
   6. Profile archetypes (centroid values + z-scores)
   7. Name archetypes (top features)
-  8. Generate segment diagnostics (zone_diagnostics-compatible)
+  8. Generate segment diagnostics (descriptive, zone_diagnostics-compatible)
+
+v6.0 Change: Removed all evaluative logic (classify, priority, status,
+problems).  Segment diagnostics are now purely descriptive.
 """
 
 import logging
@@ -29,7 +32,6 @@ from app.models.analysis import (
     ClusteringResult,
     SpatialSegment,
     ZoneDiagnostic,
-    ZoneProblem,
     IndicatorDefinitionInput,
 )
 
@@ -41,7 +43,7 @@ DEFAULT_KNN_K = 7
 
 
 class ClusteringService:
-    """Stateless SVC archetype clustering service."""
+    """Stateless SVC archetype clustering service (v6.0 descriptive)."""
 
     def cluster(
         self,
@@ -50,7 +52,6 @@ class ClusteringService:
         layer: str = "full",
         max_k: int = DEFAULT_MAX_K,
         knn_k: int = DEFAULT_KNN_K,
-        zscore_thresholds: tuple[float, float, float] = (0.5, 1.0, 1.5),
     ) -> ClusteringResult | None:
         """Run the full clustering pipeline.
 
@@ -63,7 +64,6 @@ class ClusteringService:
             layer: which layer's values to use (default "full")
             max_k: maximum number of clusters to try
             knn_k: k for KNN spatial smoothing
-            zscore_thresholds: (moderate, significant, critical)
 
         Returns:
             ClusteringResult or None if insufficient data.
@@ -76,37 +76,37 @@ class ClusteringService:
             )
             return None
 
-        # ── 1. Build point × indicator matrix ──
+        # 1. Build point x indicator matrix
         df, coords, point_ids = self._build_matrix(point_metrics, ind_ids)
         if len(df) < MIN_POINTS:
             return None
 
-        # ── 2. Standardise ──
+        # 2. Standardise
         scaler = StandardScaler()
         X = scaler.fit_transform(df.values)
 
-        # ── 3. Optimal K via silhouette ──
+        # 3. Optimal K via silhouette
         best_k, best_score, labels, silhouette_scores = self._find_optimal_k(X, max_k)
         logger.info("Optimal K=%d (silhouette=%.3f)", best_k, best_score)
 
-        # ── 4. KNN spatial smoothing (if coordinates available) ──
+        # 4. KNN spatial smoothing (if coordinates available)
         has_coords = coords is not None and len(coords) == len(labels)
         if has_coords and knn_k > 0 and len(labels) > knn_k:
             labels = self._knn_smooth(coords, labels, knn_k)
             logger.info("KNN smoothing applied (k=%d)", knn_k)
 
-        # ── 5. Profile archetypes ──
+        # 5. Profile archetypes
         archetypes = self._profile_archetypes(df, X, labels, ind_ids, indicator_definitions)
 
-        # ── 6. Build spatial segments ──
+        # 6. Build spatial segments
         segments = self._build_segments(
             df, labels, point_ids, coords, archetypes, ind_ids,
         )
 
-        # ── 7. Segment diagnostics ──
+        # 7. Segment diagnostics (descriptive)
         segment_diagnostics = self._build_segment_diagnostics(
             df, X, labels, ind_ids, indicator_definitions,
-            archetypes, coords, point_ids, zscore_thresholds,
+            archetypes, coords, point_ids,
         )
 
         return ClusteringResult(
@@ -129,7 +129,7 @@ class ClusteringService:
         point_metrics: list[dict],
         ind_ids: list[str],
     ) -> tuple[pd.DataFrame, np.ndarray | None, list[str]]:
-        """Build a (points × indicators) DataFrame + optional coordinate array."""
+        """Build a (points x indicators) DataFrame + optional coordinate array."""
         rows = []
         coords_list = []
         point_ids = []
@@ -269,9 +269,8 @@ class ClusteringService:
         archetypes: list[ArchetypeProfile],
         coords: np.ndarray | None,
         point_ids: list[str],
-        thresholds: tuple[float, float, float],
     ) -> list[ZoneDiagnostic]:
-        """Generate zone_diagnostics-compatible records for each cluster."""
+        """Generate descriptive zone_diagnostics-compatible records for each cluster (v6.0)."""
         arch_map = {a.archetype_id: a for a in archetypes}
         diagnostics: list[ZoneDiagnostic] = []
 
@@ -281,64 +280,32 @@ class ClusteringService:
             centroid_z = pd.Series(X_scaled[mask].mean(axis=0), index=ind_ids)
             centroid_raw = df.loc[mask].mean()
 
-            # Classify each indicator
+            # Build descriptive indicator_status (value + z_score + target_direction only)
             indicator_status: dict[str, dict] = {}
-            problems: list[ZoneProblem] = []
-            total_priority = 0
-
             for ind_id in ind_ids:
                 z = float(centroid_z[ind_id])
                 val = float(centroid_raw[ind_id]) if ind_id in centroid_raw else None
-                direction = ind_defs[ind_id].target_direction.upper() if ind_id in ind_defs else "INCREASE"
-                label, pri = _classify(z, direction, thresholds)
-                total_priority += pri
-
+                defn = ind_defs.get(ind_id)
                 indicator_status[ind_id] = {
                     "full": {
                         "value": round(val, 4) if val is not None else None,
                         "z_score": round(z, 3),
-                        "priority": pri,
-                        "classification": label,
+                        "target_direction": defn.target_direction if defn else "INCREASE",
                     }
                 }
 
-                if pri >= 4:
-                    problems.append(ZoneProblem(
-                        indicator_id=ind_id,
-                        indicator_name=ind_defs[ind_id].name if ind_id in ind_defs else ind_id,
-                        layer="full",
-                        value=round(val, 4) if val is not None else None,
-                        unit=ind_defs[ind_id].unit if ind_id in ind_defs else "",
-                        z_score=round(z, 3),
-                        priority=pri,
-                        classification=label,
-                        target_direction=direction,
-                    ))
-
-            problems.sort(key=lambda p: p.priority, reverse=True)
-
-            if total_priority >= 15:
-                status = "Critical"
-            elif total_priority >= 12:
-                status = "Poor"
-            elif total_priority >= 8:
-                status = "Moderate"
-            else:
-                status = "Good"
+            mean_abs_z = round(float(centroid_z.abs().mean()), 4)
 
             diagnostics.append(ZoneDiagnostic(
                 zone_id=f"seg_{cid}",
                 zone_name=arch.archetype_label if arch else f"Segment {cid}",
                 area_sqm=0,
-                status=status,
-                total_priority=total_priority,
-                composite_zscore=round(float(centroid_z.abs().mean()), 4),
-                priority_by_layer={"full": total_priority},
-                problems_by_layer={"full": problems},
+                mean_abs_z=mean_abs_z,
+                point_count=int(mask.sum()),
                 indicator_status=indicator_status,
             ))
 
-        diagnostics.sort(key=lambda d: d.composite_zscore, reverse=True)
+        diagnostics.sort(key=lambda d: d.mean_abs_z, reverse=True)
         for rank, d in enumerate(diagnostics, 1):
             d.rank = rank
         return diagnostics
@@ -363,36 +330,3 @@ def _name_archetype(
         prefix = "High" if z > 0 else "Low"
         parts.append(f"{prefix}-{short}")
     return " / ".join(parts)
-
-
-def _classify(
-    z: float,
-    direction: str,
-    thresholds: tuple[float, float, float] = (0.5, 1.0, 1.5),
-) -> tuple[str, int]:
-    """Classify a Z-score into label + priority (same logic as ZoneAnalyzer)."""
-    moderate, significant, critical = thresholds
-    if direction == "INCREASE":
-        if z <= -critical:
-            return "Critical", 5
-        if z <= -significant:
-            return "Needs Attention", 4
-        if z <= -moderate:
-            return "Moderate", 3
-        if z <= moderate:
-            return "Acceptable", 2
-        if z <= significant:
-            return "Good", 1
-        return "Excellent", 0
-    else:
-        if z >= critical:
-            return "Critical", 5
-        if z >= significant:
-            return "Needs Attention", 4
-        if z >= moderate:
-            return "Moderate", 3
-        if z >= -moderate:
-            return "Acceptable", 2
-        if z >= -significant:
-            return "Good", 1
-        return "Excellent", 0
