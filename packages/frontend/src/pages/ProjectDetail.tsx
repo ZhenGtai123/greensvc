@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Box,
@@ -22,12 +22,11 @@ import {
   Select,
   Spinner,
 } from '@chakra-ui/react';
-import { Upload, FolderUp, X, Undo2, ImageIcon, MapPin } from 'lucide-react';
+import { Upload, FolderUp, X, Undo2, MapPin, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
-import useAppStore from '../store/useAppStore';
 import useAppToast from '../hooks/useAppToast';
-import type { Project, UploadedImage } from '../types';
+import type { UploadedImage } from '../types';
 import PageShell from '../components/PageShell';
 import EmptyState from '../components/EmptyState';
 
@@ -43,12 +42,12 @@ function ProjectDetail() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const { setCurrentProject, clearPipelineResults } = useAppStore();
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(new Set());
   const [targetZoneId, setTargetZoneId] = useState('');
+  const [gpsFilter, setGpsFilter] = useState<'all' | 'has' | 'missing'>('all');
   const [batchAssigning, setBatchAssigning] = useState(false);
   const [zoneUploading, setZoneUploading] = useState<string | null>(null);
   const [zoneUploadProgress, setZoneUploadProgress] = useState(0);
@@ -67,16 +66,8 @@ function ProjectDetail() {
     enabled: !!projectId,
   });
 
-  useEffect(() => {
-    if (project) {
-      // Read previous project without subscribing to avoid re-render loop
-      const prev = useAppStore.getState().currentProject;
-      if (prev && prev.id !== project.id) {
-        clearPipelineResults();
-      }
-      setCurrentProject(project);
-    }
-  }, [project, setCurrentProject, clearPipelineResults]);
+  // currentProject sync + clearPipelineResults moved to ProjectPipelineLayout so it fires
+  // on every /projects/:id/* route, not just ProjectDetail.
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -282,8 +273,14 @@ function ProjectDetail() {
     if (ref) ref.value = '';
   };
 
+  const matchesGpsFilter = (img: UploadedImage) => {
+    if (gpsFilter === 'all') return true;
+    if (gpsFilter === 'has') return !!img.has_gps;
+    return !img.has_gps;
+  };
+
   const handleImageClick = (imageId: string, index: number, e: React.MouseEvent) => {
-    const ungrouped = project?.uploaded_images.filter(img => !img.zone_id) || [];
+    const ungrouped = (project?.uploaded_images.filter(img => !img.zone_id) || []).filter(matchesGpsFilter);
 
     if (e.shiftKey && lastClickedIndex.current >= 0) {
       // Shift+Click: select range between last click and current
@@ -316,6 +313,26 @@ function ProjectDetail() {
     },
   });
 
+  const batchDeleteMutation = useMutation({
+    mutationFn: (imageIds: string[]) => api.projects.batchDeleteImages(projectId!, imageIds),
+    onSuccess: (res) => {
+      const count = res.data.deleted;
+      setSelectedImageIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      toast({ title: `${count} image(s) deleted`, status: 'success' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete images', status: 'error' });
+    },
+  });
+
+  const handleBatchDelete = () => {
+    if (selectedImageIds.size === 0) return;
+    const count = selectedImageIds.size;
+    if (!window.confirm(`Delete ${count} image(s)? This cannot be undone.`)) return;
+    batchDeleteMutation.mutate(Array.from(selectedImageIds));
+  };
+
   if (isLoading) {
     return <PageShell isLoading loadingText="Loading project..." />;
   }
@@ -335,10 +352,13 @@ function ProjectDetail() {
   }
 
   const ungroupedImages = project.uploaded_images.filter(img => !img.zone_id);
+  const visibleUngrouped = ungroupedImages.filter(matchesGpsFilter);
   const getZoneImages = (zoneId: string) =>
     project.uploaded_images.filter(img => img.zone_id === zoneId);
 
   const assignedCount = project.uploaded_images.filter(i => i.zone_id).length;
+  const gpsCount = project.uploaded_images.filter(i => i.has_gps).length;
+  const ungroupedGpsCount = ungroupedImages.filter(i => i.has_gps).length;
   const hasZones = project.spatial_zones.length > 0;
   const hasImages = project.uploaded_images.length > 0;
   const isReady = hasZones && hasImages && assignedCount > 0;
@@ -373,6 +393,12 @@ function ProjectDetail() {
           <Text fontSize="sm" color="gray.500">Assigned:</Text>
           <Badge colorScheme={assignedCount > 0 ? 'purple' : 'gray'}>{assignedCount}</Badge>
         </HStack>
+        {hasImages && (
+          <HStack spacing={1} title="Images with GPS coordinates extracted from EXIF">
+            <MapPin size={12} color="#319795" />
+            <Badge colorScheme={gpsCount > 0 ? 'teal' : 'gray'}>{gpsCount}/{project.uploaded_images.length}</Badge>
+          </HStack>
+        )}
         {project.performance_dimensions.length > 0 && (
           <Wrap spacing={1}>
             {project.performance_dimensions.slice(0, 3).map(dim => (
@@ -578,6 +604,21 @@ function ProjectDetail() {
                             _groupHover={{ opacity: 1 }}
                             onClick={() => deleteImageMutation.mutate(img.image_id)}
                           />
+                          {img.has_gps && (
+                            <Box
+                              position="absolute"
+                              bottom={1}
+                              left={1}
+                              bg="teal.500"
+                              color="white"
+                              borderRadius="sm"
+                              p="2px"
+                              title={`GPS: ${img.latitude?.toFixed(4)}, ${img.longitude?.toFixed(4)}`}
+                              pointerEvents="none"
+                            >
+                              <MapPin size={10} />
+                            </Box>
+                          )}
                         </Box>
                       ))}
                     </SimpleGrid>
@@ -616,17 +657,39 @@ function ProjectDetail() {
       {ungroupedImages.length > 0 && (
         <Card mb={4}>
           <CardHeader py={3}>
-            <Heading size="sm">Ungrouped Images ({ungroupedImages.length})</Heading>
+            <HStack justify="space-between" flexWrap="wrap" gap={2}>
+              <Heading size="sm">
+                Ungrouped Images ({gpsFilter === 'all' ? ungroupedImages.length : `${visibleUngrouped.length} of ${ungroupedImages.length}`})
+              </Heading>
+              <HStack spacing={2}>
+                <Text fontSize="xs" color="gray.500">GPS:</Text>
+                <Select
+                  size="xs"
+                  maxW="170px"
+                  value={gpsFilter}
+                  onChange={(e) => {
+                    setGpsFilter(e.target.value as 'all' | 'has' | 'missing');
+                    setSelectedImageIds(new Set());
+                    lastClickedIndex.current = -1;
+                  }}
+                >
+                  <option value="all">All ({ungroupedImages.length})</option>
+                  <option value="has">Has GPS ({ungroupedGpsCount})</option>
+                  <option value="missing">Missing GPS ({ungroupedImages.length - ungroupedGpsCount})</option>
+                </Select>
+              </HStack>
+            </HStack>
           </CardHeader>
           <CardBody pt={0}>
             {hasZones && (
               <HStack spacing={3} flexWrap="wrap" mb={3}>
                 <Checkbox
-                  isChecked={selectedImageIds.size === ungroupedImages.length && ungroupedImages.length > 0}
-                  isIndeterminate={selectedImageIds.size > 0 && selectedImageIds.size < ungroupedImages.length}
+                  isChecked={selectedImageIds.size === visibleUngrouped.length && visibleUngrouped.length > 0}
+                  isIndeterminate={selectedImageIds.size > 0 && selectedImageIds.size < visibleUngrouped.length}
+                  isDisabled={visibleUngrouped.length === 0}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      setSelectedImageIds(new Set(ungroupedImages.map(img => img.image_id)));
+                      setSelectedImageIds(new Set(visibleUngrouped.map(img => img.image_id)));
                     } else {
                       setSelectedImageIds(new Set());
                     }
@@ -656,16 +719,32 @@ function ProjectDetail() {
                 >
                   Assign ({selectedImageIds.size})
                 </Button>
+                <Button
+                  size="sm"
+                  colorScheme="red"
+                  variant="outline"
+                  leftIcon={<Trash2 size={14} />}
+                  isDisabled={selectedImageIds.size === 0}
+                  isLoading={batchDeleteMutation.isPending}
+                  onClick={handleBatchDelete}
+                >
+                  Delete ({selectedImageIds.size})
+                </Button>
               </HStack>
             )}
-            {ungroupedImages.length > 16 && (
+            {visibleUngrouped.length > 16 && (
               <Text fontSize="xs" color="gray.400" mb={1}>
                 Tip: Click to select, Shift+Click to select a range
               </Text>
             )}
+            {visibleUngrouped.length === 0 && ungroupedImages.length > 0 && (
+              <Text fontSize="sm" color="gray.400" textAlign="center" py={4}>
+                No images match the current GPS filter
+              </Text>
+            )}
             <Box maxH="400px" overflowY="auto" borderRadius="md">
               <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={2}>
-                {ungroupedImages.slice(0, ungroupedVisibleCount).map((img, idx) => (
+                {visibleUngrouped.slice(0, ungroupedVisibleCount).map((img, idx) => (
                   <Box key={img.image_id} position="relative" role="group">
                     <Box
                       h="80px"
@@ -691,6 +770,21 @@ function ProjectDetail() {
                         onChange={(e) => handleImageClick(img.image_id, idx, e as unknown as React.MouseEvent)}
                       />
                     )}
+                    {img.has_gps && (
+                      <Box
+                        position="absolute"
+                        bottom={1}
+                        left={1}
+                        bg="teal.500"
+                        color="white"
+                        borderRadius="sm"
+                        p="2px"
+                        title={`GPS: ${img.latitude?.toFixed(4)}, ${img.longitude?.toFixed(4)}`}
+                        pointerEvents="none"
+                      >
+                        <MapPin size={10} />
+                      </Box>
+                    )}
                     <IconButton
                       aria-label="Delete"
                       icon={<X size={12} />}
@@ -707,7 +801,7 @@ function ProjectDetail() {
                 ))}
               </SimpleGrid>
             </Box>
-            {ungroupedImages.length > ungroupedVisibleCount && (
+            {visibleUngrouped.length > ungroupedVisibleCount && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -715,7 +809,7 @@ function ProjectDetail() {
                 w="full"
                 onClick={() => setUngroupedVisibleCount(prev => prev + UNGROUPED_PAGE_SIZE)}
               >
-                Show more ({ungroupedImages.length - ungroupedVisibleCount} remaining)
+                Show more ({visibleUngrouped.length - ungroupedVisibleCount} remaining)
               </Button>
             )}
           </CardBody>

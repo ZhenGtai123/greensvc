@@ -22,6 +22,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy.cluster.hierarchy import linkage
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.neighbors import NearestNeighbors
@@ -89,8 +90,16 @@ class ClusteringService:
         best_k, best_score, labels, silhouette_scores = self._find_optimal_k(X, max_k)
         logger.info("Optimal K=%d (silhouette=%.3f)", best_k, best_score)
 
+        # 3b. Ward hierarchical linkage (for dendrogram). Cheap enough to always compute.
+        try:
+            Z_linkage = linkage(X, method="ward", metric="euclidean").tolist()
+        except Exception as e:
+            logger.warning("Ward linkage failed: %s", e)
+            Z_linkage = []
+
         # 4. KNN spatial smoothing (if coordinates available)
         has_coords = coords is not None and len(coords) == len(labels)
+        labels_raw = labels.copy()
         if has_coords and knn_k > 0 and len(labels) > knn_k:
             labels = self._knn_smooth(coords, labels, knn_k)
             logger.info("KNN smoothing applied (k=%d)", knn_k)
@@ -109,6 +118,9 @@ class ClusteringService:
             archetypes, coords, point_ids,
         )
 
+        point_lats = coords[:, 0].tolist() if has_coords else []
+        point_lngs = coords[:, 1].tolist() if has_coords else []
+
         return ClusteringResult(
             method="KMeans + KNN spatial smoothing" if has_coords else "KMeans",
             k=best_k,
@@ -118,6 +130,12 @@ class ClusteringService:
             layer_used=layer,
             archetype_profiles=archetypes,
             spatial_segments=segments,
+            point_ids_ordered=list(point_ids),
+            point_lats=point_lats,
+            point_lngs=point_lngs,
+            labels_raw=[int(x) for x in labels_raw.tolist()],
+            labels_smoothed=[int(x) for x in labels.tolist()],
+            dendrogram_linkage=Z_linkage,
         ), segment_diagnostics
 
     # ------------------------------------------------------------------

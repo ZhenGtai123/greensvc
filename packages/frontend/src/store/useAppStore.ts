@@ -118,9 +118,14 @@ export const useAppStore = create<AppState>()(persist((set) => ({
 }), {
   name: 'scenerx-store',
   partialize: (state) => ({
-    currentProject: state.currentProject,
+    // currentProject is NOT persisted — it contains uploaded_images (can be 1000s)
+    // which blows past localStorage's 5-10MB quota. It's re-fetched via React Query
+    // in ProjectPipelineLayout on every /projects/:id/* route.
+    // visionMaskResults is NOT persisted — it scales linearly with image count
+    // (~2KB per image) and each batch-flush during analysis would re-serialize the
+    // growing array to localStorage (O(n²) writes). VisionAnalysis.tsx rebuilds it
+    // from project.uploaded_images[].mask_filepaths on mount if the store is empty.
     selectedIndicators: state.selectedIndicators,
-    visionMaskResults: state.visionMaskResults,
     visionStatistics: state.visionStatistics,
     recommendations: state.recommendations,
     indicatorRelationships: state.indicatorRelationships,

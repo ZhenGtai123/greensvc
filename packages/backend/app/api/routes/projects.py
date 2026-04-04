@@ -30,6 +30,10 @@ from app.api.deps import get_current_user
 class ZoneAssignment(BaseModel):
     image_id: str
     zone_id: Optional[str] = None
+
+
+class BatchImageDelete(BaseModel):
+    image_ids: List[str]
 from app.core.config import get_settings
 from app.db.project_store import get_project_store, ProjectStore
 
@@ -345,6 +349,49 @@ async def assign_image_to_zone(
             return {"success": True, "image_id": image_id, "zone_id": zone_id}
 
     raise HTTPException(status_code=404, detail=f"Image not found: {image_id}")
+
+
+@router.post("/{project_id}/images/batch-delete")
+async def batch_delete_images(
+    project_id: str,
+    payload: BatchImageDelete,
+    _user: UserResponse = Depends(get_current_user),
+):
+    """Delete multiple images from a project in one request."""
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    target_ids = set(payload.image_ids)
+    if not target_ids:
+        return {"success": True, "deleted": 0, "deleted_ids": [], "not_found": []}
+
+    deleted_ids: list[str] = []
+    remaining: list[UploadedImage] = []
+    for img in project.uploaded_images:
+        if img.image_id in target_ids:
+            try:
+                os.remove(img.filepath)
+            except Exception:
+                pass
+            deleted_ids.append(img.image_id)
+        else:
+            remaining.append(img)
+
+    not_found = sorted(target_ids - set(deleted_ids))
+
+    if deleted_ids:
+        project.uploaded_images = remaining
+        project.updated_at = datetime.now()
+        store.save(project)
+
+    return {
+        "success": True,
+        "deleted": len(deleted_ids),
+        "deleted_ids": deleted_ids,
+        "not_found": not_found,
+    }
 
 
 @router.delete("/{project_id}/images/{image_id}")

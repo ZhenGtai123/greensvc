@@ -54,11 +54,14 @@ import {
   PriorityHeatmap,
   DescriptiveStatsChart,
   ZScoreHeatmap,
-  BoxPlotChart,
   ArchetypeRadarChart,
   ClusterSizeChart,
-  SpatialScatterMap,
+  SpatialScatterByLayer,
   SilhouetteCurve,
+  IndicatorDeepDive,
+  CrossIndicatorSpatialMaps,
+  Dendrogram,
+  ClusterSpatialBeforeAfter,
 } from '../components/AnalysisCharts';
 import type { ReportRequest, EnrichedZoneStat, ZoneDiagnostic, ZoneDesignOutput, ClusteringResponse } from '../types';
 
@@ -571,50 +574,63 @@ function Reports() {
                       <CardBody><PriorityHeatmap diagnostics={sortedDiagnostics} layer="full" /></CardBody>
                     </Card>
 
-                    {/* Z-Score Heatmap */}
+                    {/* Z-Score Heatmaps (2x2 grid — one per layer, matches Stage2 Fig 2) */}
                     {zoneAnalysisResult && (
                       <Card>
-                        <CardHeader><Heading size="sm">Z-Score Heatmap (Full Layer)</Heading></CardHeader>
-                        <CardBody><ZScoreHeatmap stats={zoneAnalysisResult.zone_statistics} layer="full" /></CardBody>
+                        <CardHeader><Heading size="sm">Z-Score Heatmaps by Layer</Heading></CardHeader>
+                        <CardBody>
+                          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                            {LAYERS.map(layer => (
+                              <Box key={layer}>
+                                <Text fontSize="sm" fontWeight="bold" mb={2} color="gray.600">
+                                  {LAYER_LABELS[layer]} Layer
+                                </Text>
+                                <ZScoreHeatmap stats={zoneAnalysisResult.zone_statistics} layer={layer} />
+                              </Box>
+                            ))}
+                          </SimpleGrid>
+                        </CardBody>
                       </Card>
                     )}
 
-                    {/* Spatial Scatter Maps (only when GPS data available) */}
+                    {/* Spatial Distribution by Layer (Fig 7 — 2x2 grid per indicator) */}
                     {currentProject && (() => {
                       const gpsImages = currentProject.uploaded_images.filter(img => img.has_gps && img.latitude != null && img.longitude != null);
                       if (gpsImages.length === 0) return null;
-                      // Get all indicator IDs that have metrics
-                      const indIds = Array.from(new Set(gpsImages.flatMap(img => Object.keys(img.metrics_results).filter(k => !k.includes('__') && img.metrics_results[k] != null)))).sort();
+                      // Get all indicator IDs that have metrics (any layer)
+                      const indIds = Array.from(new Set(gpsImages.flatMap(img =>
+                        Object.keys(img.metrics_results)
+                          .filter(k => img.metrics_results[k] != null)
+                          .map(k => k.split('__')[0])
+                      ))).sort();
                       if (indIds.length === 0) return null;
                       return (
-                        <Card>
-                          <CardHeader>
-                            <HStack justify="space-between">
-                              <Heading size="sm">Spatial Distribution</Heading>
-                              <Badge colorScheme="green">{gpsImages.length} GPS images</Badge>
-                            </HStack>
-                          </CardHeader>
-                          <CardBody>
-                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                              {indIds.map(ind => {
-                                const points = gpsImages
-                                  .filter(img => img.metrics_results[ind] != null)
-                                  .map(img => ({
-                                    lat: img.latitude!,
-                                    lng: img.longitude!,
-                                    value: img.metrics_results[ind]!,
-                                    label: img.zone_id || img.filename,
-                                  }));
-                                if (points.length < 2) return null;
-                                return (
-                                  <Box key={ind}>
-                                    <SpatialScatterMap points={points} indicatorId={ind} />
-                                  </Box>
-                                );
-                              })}
-                            </SimpleGrid>
-                          </CardBody>
-                        </Card>
+                        <>
+                          <Card>
+                            <CardHeader>
+                              <HStack justify="space-between">
+                                <Heading size="sm">Spatial Distribution by Layer (Fig 7)</Heading>
+                                <Badge colorScheme="green">{gpsImages.length} GPS images</Badge>
+                              </HStack>
+                            </CardHeader>
+                            <CardBody>
+                              <VStack align="stretch" spacing={6}>
+                                {indIds.map(ind => (
+                                  <SpatialScatterByLayer key={ind} gpsImages={gpsImages} indicatorId={ind} />
+                                ))}
+                              </VStack>
+                            </CardBody>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <Heading size="sm">Cross-Indicator Spatial Maps (Fig 8)</Heading>
+                            </CardHeader>
+                            <CardBody>
+                              <CrossIndicatorSpatialMaps gpsImages={gpsImages} indicatorIds={indIds} />
+                            </CardBody>
+                          </Card>
+                        </>
                       );
                     })()}
 
@@ -680,6 +696,26 @@ function Reports() {
                             <Card>
                               <CardHeader><Heading size="sm">Silhouette Score Curve</Heading></CardHeader>
                               <CardBody><SilhouetteCurve scores={cl.silhouette_scores} bestK={cl.k} /></CardBody>
+                            </Card>
+                          )}
+                          {cl.dendrogram_linkage && cl.dendrogram_linkage.length > 0 && (
+                            <Card>
+                              <CardHeader><Heading size="sm">Ward Hierarchical Clustering</Heading></CardHeader>
+                              <CardBody><Dendrogram linkage={cl.dendrogram_linkage} /></CardBody>
+                            </Card>
+                          )}
+                          {cl.point_lats && cl.point_lats.length > 0 && cl.labels_raw && cl.labels_raw.length > 0 && (
+                            <Card>
+                              <CardHeader><Heading size="sm">Cluster Spatial Smoothing</Heading></CardHeader>
+                              <CardBody>
+                                <ClusterSpatialBeforeAfter
+                                  lats={cl.point_lats}
+                                  lngs={cl.point_lngs}
+                                  labelsRaw={cl.labels_raw}
+                                  labelsSmoothed={cl.labels_smoothed}
+                                  archetypeLabels={Object.fromEntries(cl.archetype_profiles.map(a => [a.archetype_id, a.archetype_label]))}
+                                />
+                              </CardBody>
                             </Card>
                           )}
                           <Card>
@@ -832,22 +868,30 @@ function Reports() {
                   );
                 })()}
 
-                {/* Box Plots per indicator */}
+                {/* Per-Indicator Deep Dive (Cell 16) */}
                 {zoneAnalysisResult && (() => {
                   const indIds = Array.from(new Set(zoneAnalysisResult.zone_statistics.map(s => s.indicator_id))).sort();
                   if (indIds.length === 0) return null;
+                  const indDefs = zoneAnalysisResult.indicator_definitions || {};
                   return (
                     <Card mt={6}>
-                      <CardHeader><Heading size="sm">Distribution by Layer (Box Plots)</Heading></CardHeader>
+                      <CardHeader><Heading size="sm">Per-Indicator Deep Dive</Heading></CardHeader>
                       <CardBody>
-                        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                          {indIds.map(ind => (
-                            <Box key={ind}>
-                              <Text fontSize="xs" fontWeight="bold" mb={1} textAlign="center">{ind}</Text>
-                              <BoxPlotChart stats={zoneAnalysisResult.zone_statistics} indicatorId={ind} />
-                            </Box>
-                          ))}
-                        </SimpleGrid>
+                        <VStack align="stretch" spacing={8} divider={<Box borderTopWidth="1px" borderColor="gray.200" />}>
+                          {indIds.map(ind => {
+                            const def = indDefs[ind];
+                            return (
+                              <IndicatorDeepDive
+                                key={ind}
+                                stats={zoneAnalysisResult.zone_statistics}
+                                indicatorId={ind}
+                                indicatorName={def?.name}
+                                unit={def?.unit}
+                                targetDirection={def?.target_direction}
+                              />
+                            );
+                          })}
+                        </VStack>
                       </CardBody>
                     </Card>
                   );

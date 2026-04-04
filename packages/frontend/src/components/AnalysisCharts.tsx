@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Box, Text } from '@chakra-ui/react';
+import { Box, Text, SimpleGrid } from '@chakra-ui/react';
 import {
   RadarChart,
   PolarGrid,
@@ -23,7 +23,7 @@ import {
   Line,
   ReferenceLine,
 } from 'recharts';
-import type { EnrichedZoneStat, ZoneDiagnostic, ArchetypeProfile } from '../types';
+import type { EnrichedZoneStat, ZoneDiagnostic, ArchetypeProfile, UploadedImage } from '../types';
 
 // Shared color palette for zones
 const ZONE_COLORS = [
@@ -653,6 +653,251 @@ export function BoxPlotChart({ stats, indicatorId }: BoxPlotChartProps) {
 }
 
 
+// ─── Per-Indicator Deep Dive (Cell 16 — bars + heatmap + stats + boxplot) ──
+
+interface IndicatorDeepDiveProps {
+  stats: EnrichedZoneStat[];
+  indicatorId: string;
+  indicatorName?: string;
+  unit?: string;
+  targetDirection?: string;
+}
+
+const DD_LAYERS = ['full', 'foreground', 'middleground', 'background'] as const;
+const DD_LAYER_LABELS: Record<string, string> = { full: 'Full', foreground: 'FG', middleground: 'MG', background: 'BG' };
+const DD_LAYER_COLORS: Record<string, string> = { full: '#3182CE', foreground: '#E53E3E', middleground: '#38A169', background: '#805AD5' };
+
+function viridisColor(t: number): string {
+  // Linear approximation of the viridis colormap in 4 stops
+  const stops = [
+    [68, 1, 84],     // 0.0 dark purple
+    [59, 82, 139],   // 0.33 blue
+    [33, 145, 140],  // 0.66 teal
+    [253, 231, 37],  // 1.0 yellow
+  ];
+  const clamped = Math.max(0, Math.min(1, t));
+  const seg = clamped * (stops.length - 1);
+  const i0 = Math.floor(seg);
+  const i1 = Math.min(stops.length - 1, i0 + 1);
+  const f = seg - i0;
+  const r = Math.round(stops[i0][0] * (1 - f) + stops[i1][0] * f);
+  const g = Math.round(stops[i0][1] * (1 - f) + stops[i1][1] * f);
+  const b = Math.round(stops[i0][2] * (1 - f) + stops[i1][2] * f);
+  return `rgb(${r},${g},${b})`;
+}
+
+export function IndicatorDeepDive({ stats, indicatorId, indicatorName, unit, targetDirection }: IndicatorDeepDiveProps) {
+  const derived = useMemo(() => {
+    const indStats = stats.filter(s => s.indicator_id === indicatorId);
+    if (indStats.length === 0) return null;
+
+    // Unique zones (preserve first-seen name)
+    const seen = new Map<string, string>();
+    for (const s of indStats) if (!seen.has(s.zone_id)) seen.set(s.zone_id, s.zone_name);
+    const zoneList = Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+
+    const getVal = (zId: string, layer: string): number | null => {
+      const rec = indStats.find(s => s.zone_id === zId && s.layer === layer);
+      return rec?.mean != null ? rec.mean : null;
+    };
+
+    // Bar charts per layer
+    const barCharts = DD_LAYERS.map(layer => {
+      const entries = zoneList
+        .map(z => ({ name: z.name, value: getVal(z.id, layer) }))
+        .filter(e => e.value != null) as { name: string; value: number }[];
+      entries.sort((a, b) => b.value - a.value);
+      const maxV = entries.length > 0 ? Math.max(...entries.map(e => e.value)) : 0;
+      const minV = entries.length > 0 ? Math.min(...entries.map(e => e.value)) : 0;
+      return { layer, entries, maxV, minV };
+    });
+
+    // Zone × Layer heatmap matrix
+    const matrix = zoneList.map(z => ({
+      zoneName: z.name,
+      values: DD_LAYERS.map(l => getVal(z.id, l)),
+    }));
+    const allHmVals = matrix.flatMap(r => r.values.filter((v): v is number => v != null));
+    const hmMin = allHmVals.length > 0 ? Math.min(...allHmVals) : 0;
+    const hmMax = allHmVals.length > 0 ? Math.max(...allHmVals) : 1;
+
+    // Layer statistics (aggregated across zones)
+    const layerStats = DD_LAYERS.map(layer => {
+      const vals = zoneList.map(z => getVal(z.id, layer)).filter((v): v is number => v != null);
+      if (vals.length === 0) return { layer, n: 0, mean: 0, std: 0, cv: 0 };
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
+      const std = Math.sqrt(variance);
+      const cv = mean !== 0 ? (std / Math.abs(mean)) * 100 : 0;
+      return { layer, n: vals.length, mean, std, cv };
+    });
+
+    return { barCharts, matrix, hmMin, hmMax, layerStats };
+  }, [stats, indicatorId]);
+
+  if (!derived) return null;
+  const { barCharts, matrix, hmMin, hmMax, layerStats } = derived;
+  const hmRange = hmMax - hmMin || 1;
+
+  return (
+    <Box>
+      <Box mb={2}>
+        <Text fontSize="sm" fontWeight="bold">
+          {indicatorId}{indicatorName ? `: ${indicatorName}` : ''}
+        </Text>
+        {(unit || targetDirection) && (
+          <Text fontSize="xs" color="gray.500">
+            {unit ? `Unit: ${unit}` : ''}
+            {unit && targetDirection ? ' | ' : ''}
+            {targetDirection ? `Direction: ${targetDirection} (informational)` : ''}
+          </Text>
+        )}
+      </Box>
+
+      {/* Top row: 4 horizontal zone bar charts, one per layer */}
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={2} mb={3}>
+        {barCharts.map(bc => (
+          <Box key={bc.layer}>
+            <Text fontSize="xs" fontWeight="bold" mb={1} textAlign="center" color={DD_LAYER_COLORS[bc.layer]}>
+              {DD_LAYER_LABELS[bc.layer]}
+            </Text>
+            {bc.entries.length === 0 ? (
+              <Box h="80px" display="flex" alignItems="center" justifyContent="center" bg="gray.50" borderRadius="md">
+                <Text fontSize="xs" color="gray.400">No data</Text>
+              </Box>
+            ) : (() => {
+              const svgW = 220;
+              const rowH = 16;
+              const svgH = bc.entries.length * rowH + 10;
+              const labelW = 70;
+              const barAreaW = svgW - labelW - 44;
+              const range = bc.maxV - bc.minV || 1;
+              return (
+                <svg width={svgW} height={svgH} style={{ fontFamily: 'system-ui, sans-serif' }}>
+                  {bc.entries.map((e, i) => {
+                    const w = ((e.value - bc.minV) / range) * barAreaW;
+                    const y = i * rowH + 3;
+                    const t = range > 0 ? (e.value - bc.minV) / range : 0.5;
+                    return (
+                      <g key={i}>
+                        <text x={labelW - 4} y={y + rowH * 0.7} fontSize={9} textAnchor="end" fill="#4A5568">
+                          {e.name.length > 10 ? e.name.slice(0, 10) + '…' : e.name}
+                        </text>
+                        <rect x={labelW} y={y + 1} width={Math.max(w, 1)} height={rowH - 4} fill={viridisColor(t)} rx={1} />
+                        <text x={labelW + w + 3} y={y + rowH * 0.7} fontSize={8} fill="#718096">
+                          {e.value.toFixed(2)}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              );
+            })()}
+          </Box>
+        ))}
+      </SimpleGrid>
+
+      {/* Bottom row: Zone × Layer heatmap | Layer Stats | BoxPlot */}
+      <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
+        {/* Zone × Layer Heatmap */}
+        <Box>
+          <Text fontSize="xs" fontWeight="bold" mb={1}>Zone × Layer ({unit || 'value'})</Text>
+          {(() => {
+            const cellW = 42;
+            const cellH = 22;
+            const labelW = 85;
+            const headerH = 18;
+            const svgW = labelW + DD_LAYERS.length * cellW + 4;
+            const svgH = headerH + matrix.length * cellH + 4;
+            return (
+              <Box overflowX="auto">
+                <svg width={svgW} height={svgH} style={{ fontFamily: 'system-ui, sans-serif' }}>
+                  {DD_LAYERS.map((l, j) => (
+                    <text key={l} x={labelW + (j + 0.5) * cellW} y={13} fontSize={9} textAnchor="middle" fill="#2D3748" fontWeight="bold">
+                      {DD_LAYER_LABELS[l]}
+                    </text>
+                  ))}
+                  {matrix.map((row, i) => (
+                    <g key={i}>
+                      <text x={labelW - 4} y={headerH + (i + 0.65) * cellH} fontSize={9} textAnchor="end" fill="#4A5568">
+                        {row.zoneName.length > 12 ? row.zoneName.slice(0, 12) + '…' : row.zoneName}
+                      </text>
+                      {row.values.map((v, j) => {
+                        const t = v != null ? (v - hmMin) / hmRange : 0;
+                        return (
+                          <g key={j}>
+                            <rect
+                              x={labelW + j * cellW}
+                              y={headerH + i * cellH}
+                              width={cellW}
+                              height={cellH}
+                              fill={v != null ? viridisColor(t) : '#F7FAFC'}
+                              stroke="#fff"
+                              strokeWidth={0.5}
+                            />
+                            {v != null && (
+                              <text
+                                x={labelW + (j + 0.5) * cellW}
+                                y={headerH + i * cellH + cellH * 0.65}
+                                fontSize={8}
+                                textAnchor="middle"
+                                fill={t > 0.55 ? '#1A202C' : '#FFFFFF'}
+                                fontWeight="bold"
+                              >
+                                {v.toFixed(2)}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })}
+                    </g>
+                  ))}
+                </svg>
+              </Box>
+            );
+          })()}
+        </Box>
+
+        {/* Layer Statistics */}
+        <Box>
+          <Text fontSize="xs" fontWeight="bold" mb={1}>Layer Statistics</Text>
+          <Box as="table" fontSize="10px" width="100%" sx={{ borderCollapse: 'collapse' }}>
+            <Box as="thead">
+              <Box as="tr" bg="gray.50" fontWeight="bold">
+                <Box as="th" px={2} py={1} textAlign="left">Layer</Box>
+                <Box as="th" px={2} py={1} textAlign="right">N</Box>
+                <Box as="th" px={2} py={1} textAlign="right">Mean</Box>
+                <Box as="th" px={2} py={1} textAlign="right">Std</Box>
+                <Box as="th" px={2} py={1} textAlign="right">CV%</Box>
+              </Box>
+            </Box>
+            <Box as="tbody">
+              {layerStats.map(ls => (
+                <Box as="tr" key={ls.layer} borderTop="1px solid" borderColor="gray.100">
+                  <Box as="td" px={2} py={1} color={DD_LAYER_COLORS[ls.layer]} fontWeight="bold">
+                    {DD_LAYER_LABELS[ls.layer]}
+                  </Box>
+                  <Box as="td" px={2} py={1} textAlign="right">{ls.n}</Box>
+                  <Box as="td" px={2} py={1} textAlign="right">{ls.mean.toFixed(3)}</Box>
+                  <Box as="td" px={2} py={1} textAlign="right">{ls.std.toFixed(3)}</Box>
+                  <Box as="td" px={2} py={1} textAlign="right">{ls.cv.toFixed(1)}</Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </Box>
+
+        {/* BoxPlot */}
+        <Box>
+          <Text fontSize="xs" fontWeight="bold" mb={1}>Distribution by Layer</Text>
+          <BoxPlotChart stats={stats} indicatorId={indicatorId} />
+        </Box>
+      </SimpleGrid>
+    </Box>
+  );
+}
+
+
 // ─── Archetype Radar Chart (Cluster Centroids) ─────────────────────────────
 
 interface ArchetypeRadarChartProps {
@@ -729,19 +974,24 @@ export function ClusterSizeChart({ archetypes }: ClusterSizeChartProps) {
 interface SpatialScatterMapProps {
   points: { lat: number; lng: number; value: number; label?: string }[];
   indicatorId?: string;
+  /** Shared min/max for color scaling across sibling maps (e.g., per-layer grid). */
+  vMin?: number;
+  vMax?: number;
+  /** Compact mode: smaller dimensions for grid layouts. */
+  compact?: boolean;
 }
 
-export function SpatialScatterMap({ points, indicatorId }: SpatialScatterMapProps) {
+export function SpatialScatterMap({ points, indicatorId, vMin: vMinProp, vMax: vMaxProp, compact }: SpatialScatterMapProps) {
   if (!points || points.length === 0) return null;
 
   const vals = points.map(p => p.value);
-  const vMin = Math.min(...vals);
-  const vMax = Math.max(...vals);
+  const vMin = vMinProp ?? Math.min(...vals);
+  const vMax = vMaxProp ?? Math.max(...vals);
   const vRange = vMax - vMin || 1;
 
-  const svgW = 500;
-  const svgH = 400;
-  const margin = { l: 60, r: 20, t: 20, b: 50 };
+  const svgW = compact ? 340 : 500;
+  const svgH = compact ? 260 : 400;
+  const margin = compact ? { l: 50, r: 16, t: 16, b: 40 } : { l: 60, r: 20, t: 20, b: 50 };
   const plotW = svgW - margin.l - margin.r;
   const plotH = svgH - margin.t - margin.b;
 
@@ -774,7 +1024,7 @@ export function SpatialScatterMap({ points, indicatorId }: SpatialScatterMapProp
         {indicatorId && <text x={svgW / 2} y={14} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#2D3748">{indicatorId}</text>}
         {/* Points */}
         {points.map((p, i) => (
-          <circle key={i} cx={toX(p.lng)} cy={toYPos(p.lat)} r={5} fill={valColor(p.value)} stroke="#fff" strokeWidth={0.5} opacity={0.85}>
+          <circle key={i} cx={toX(p.lng)} cy={toYPos(p.lat)} r={compact ? 3.5 : 5} fill={valColor(p.value)} stroke="#fff" strokeWidth={0.5} opacity={0.85}>
             <title>{`${p.label || ''} (${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}): ${p.value.toFixed(3)}`}</title>
           </circle>
         ))}
@@ -788,6 +1038,469 @@ export function SpatialScatterMap({ points, indicatorId }: SpatialScatterMapProp
         <rect x={margin.l + plotW - 120} y={margin.t + 5} width={100} height={10} fill="url(#spatialGrad)" rx={2} />
         <text x={margin.l + plotW - 122} y={margin.t + 14} textAnchor="end" fontSize={8} fill="#718096">{vMin.toFixed(2)}</text>
         <text x={margin.l + plotW - 18} y={margin.t + 14} textAnchor="start" fontSize={8} fill="#718096">{vMax.toFixed(2)}</text>
+      </svg>
+    </Box>
+  );
+}
+
+
+// ─── Per-Indicator Spatial Scatter by Layer (Fig 7: 2x2 grid) ──────────────
+
+interface SpatialScatterByLayerProps {
+  /** GPS-enabled images (has_gps && latitude != null && longitude != null). */
+  gpsImages: UploadedImage[];
+  indicatorId: string;
+}
+
+const LAYER_DEFS: { key: string; label: string; suffix: string }[] = [
+  { key: 'full', label: 'Full', suffix: '' },
+  { key: 'foreground', label: 'FG', suffix: '__foreground' },
+  { key: 'middleground', label: 'MG', suffix: '__middleground' },
+  { key: 'background', label: 'BG', suffix: '__background' },
+];
+
+export function SpatialScatterByLayer({ gpsImages, indicatorId }: SpatialScatterByLayerProps) {
+  const layerPoints = LAYER_DEFS.map(l => {
+    const key = l.suffix ? `${indicatorId}${l.suffix}` : indicatorId;
+    const points = gpsImages
+      .filter(img => img.metrics_results[key] != null)
+      .map(img => ({
+        lat: img.latitude!,
+        lng: img.longitude!,
+        value: img.metrics_results[key]!,
+        label: img.zone_id || img.filename,
+      }));
+    return { ...l, points };
+  });
+
+  // Shared color scale across all 4 layers for cross-layer comparability
+  const allValues = layerPoints.flatMap(lp => lp.points.map(p => p.value));
+  if (allValues.length === 0) return null;
+  const vMin = Math.min(...allValues);
+  const vMax = Math.max(...allValues);
+
+  return (
+    <Box>
+      <Text fontSize="sm" fontWeight="bold" mb={2}>
+        {indicatorId}: Spatial Distribution by Layer
+      </Text>
+      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+        {layerPoints.map(lp => (
+          <Box key={lp.key}>
+            <Text fontSize="xs" fontWeight="bold" mb={1} color="gray.600" textAlign="center">
+              {lp.label} (n={lp.points.length})
+            </Text>
+            {lp.points.length > 0 ? (
+              <SpatialScatterMap points={lp.points} vMin={vMin} vMax={vMax} compact />
+            ) : (
+              <Box h="260px" display="flex" alignItems="center" justifyContent="center" bg="gray.50" borderRadius="md">
+                <Text fontSize="xs" color="gray.400">No data</Text>
+              </Box>
+            )}
+          </Box>
+        ))}
+      </SimpleGrid>
+    </Box>
+  );
+}
+
+
+// ─── Cross-Indicator Spatial Maps (Fig 8) ──────────────────────────────────
+
+interface CrossIndicatorSpatialMapsProps {
+  gpsImages: UploadedImage[];
+  indicatorIds: string[];
+}
+
+/** YlOrRd-ish gradient: yellow → orange → red. `t` in [0, 1]. */
+function ylOrRdColor(t: number): string {
+  const clamped = Math.max(0, Math.min(1, t));
+  const stops = [
+    [255, 255, 178], // yellow
+    [253, 141, 60],  // orange
+    [189, 0, 38],    // red
+  ];
+  const seg = clamped * (stops.length - 1);
+  const i0 = Math.floor(seg);
+  const i1 = Math.min(stops.length - 1, i0 + 1);
+  const f = seg - i0;
+  const r = Math.round(stops[i0][0] * (1 - f) + stops[i1][0] * f);
+  const g = Math.round(stops[i0][1] * (1 - f) + stops[i1][1] * f);
+  const b = Math.round(stops[i0][2] * (1 - f) + stops[i1][2] * f);
+  return `rgb(${r},${g},${b})`;
+}
+
+const CATEGORICAL_PALETTE = [
+  '#3182CE', '#E53E3E', '#38A169', '#D69E2E',
+  '#805AD5', '#DD6B20', '#0BC5EA', '#ED64A6',
+  '#4A5568', '#F56565', '#48BB78', '#ECC94B',
+];
+
+interface CrossPoint {
+  lat: number;
+  lng: number;
+  label?: string;
+  meanAbsZ: number;
+  mostDistinctive: string;
+}
+
+function renderCrossScatter(
+  points: CrossPoint[],
+  mode: 'gradient' | 'categorical',
+  getColor: (p: CrossPoint) => string,
+  valueFn: (p: CrossPoint) => string,
+) {
+  if (points.length === 0) return null;
+  const svgW = 340;
+  const svgH = 260;
+  const margin = { l: 50, r: 16, t: 14, b: 38 };
+  const plotW = svgW - margin.l - margin.r;
+  const plotH = svgH - margin.t - margin.b;
+
+  const lngs = points.map(p => p.lng);
+  const lats = points.map(p => p.lat);
+  const lngMin = Math.min(...lngs), lngMax = Math.max(...lngs);
+  const latMin = Math.min(...lats), latMax = Math.max(...lats);
+  const lngRange = lngMax - lngMin || 0.001;
+  const latRange = latMax - latMin || 0.001;
+
+  const toX = (lng: number) => margin.l + ((lng - lngMin) / lngRange) * plotW;
+  const toY = (lat: number) => margin.t + plotH - ((lat - latMin) / latRange) * plotH;
+
+  return (
+    <svg width={svgW} height={svgH} style={{ fontFamily: 'system-ui, sans-serif' }}>
+      <line x1={margin.l} y1={margin.t} x2={margin.l} y2={margin.t + plotH} stroke="#CBD5E0" />
+      <line x1={margin.l} y1={margin.t + plotH} x2={margin.l + plotW} y2={margin.t + plotH} stroke="#CBD5E0" />
+      <text x={svgW / 2} y={svgH - 4} textAnchor="middle" fontSize={9} fill="#718096">Longitude</text>
+      <text x={12} y={svgH / 2} textAnchor="middle" fontSize={9} fill="#718096" transform={`rotate(-90, 12, ${svgH / 2})`}>Latitude</text>
+      {points.map((p, i) => (
+        <circle key={i} cx={toX(p.lng)} cy={toY(p.lat)} r={3.5} fill={getColor(p)} stroke="#fff" strokeWidth={0.4} opacity={0.85}>
+          <title>{`${p.label || ''} (${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}): ${valueFn(p)}`}</title>
+        </circle>
+      ))}
+      {mode === 'gradient' && (
+        <>
+          <defs>
+            <linearGradient id={`ylOrRd-${points.length}`} x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor={ylOrRdColor(0)} />
+              <stop offset="50%" stopColor={ylOrRdColor(0.5)} />
+              <stop offset="100%" stopColor={ylOrRdColor(1)} />
+            </linearGradient>
+          </defs>
+          <rect x={margin.l + plotW - 110} y={margin.t + 4} width={90} height={8} fill={`url(#ylOrRd-${points.length})`} rx={2} />
+          <text x={margin.l + plotW - 112} y={margin.t + 11} textAnchor="end" fontSize={7} fill="#718096">0</text>
+          <text x={margin.l + plotW - 16} y={margin.t + 11} textAnchor="start" fontSize={7} fill="#718096">2+</text>
+        </>
+      )}
+    </svg>
+  );
+}
+
+export function CrossIndicatorSpatialMaps({ gpsImages, indicatorIds }: CrossIndicatorSpatialMapsProps) {
+  const perLayer = useMemo(() => {
+    return DD_LAYERS.map(layer => {
+      // Compute mean/std per indicator across all points in this layer
+      const indStats: Record<string, { mean: number; std: number }> = {};
+      for (const ind of indicatorIds) {
+        const key = layer === 'full' ? ind : `${ind}__${layer}`;
+        const vals: number[] = [];
+        for (const img of gpsImages) {
+          const v = img.metrics_results[key];
+          if (v != null) vals.push(v);
+        }
+        if (vals.length < 2) continue;
+        const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
+        const std = Math.sqrt(variance);
+        if (std > 0) indStats[ind] = { mean, std };
+      }
+
+      // Per point: compute z-scores, mean_abs_z, most_distinctive
+      const points: CrossPoint[] = [];
+      for (const img of gpsImages) {
+        if (img.latitude == null || img.longitude == null) continue;
+        let sumAbsZ = 0;
+        let count = 0;
+        let bestInd = '';
+        let bestAbsZ = -1;
+        for (const ind of indicatorIds) {
+          const stats = indStats[ind];
+          if (!stats) continue;
+          const key = layer === 'full' ? ind : `${ind}__${layer}`;
+          const val = img.metrics_results[key];
+          if (val == null) continue;
+          const z = (val - stats.mean) / stats.std;
+          const absZ = Math.abs(z);
+          sumAbsZ += absZ;
+          count++;
+          if (absZ > bestAbsZ) { bestAbsZ = absZ; bestInd = ind; }
+        }
+        if (count === 0) continue;
+        points.push({
+          lat: img.latitude,
+          lng: img.longitude,
+          label: img.zone_id || img.filename,
+          meanAbsZ: sumAbsZ / count,
+          mostDistinctive: bestInd,
+        });
+      }
+
+      return { layer, points };
+    }).filter(l => l.points.length > 0);
+  }, [gpsImages, indicatorIds]);
+
+  if (perLayer.length === 0) return null;
+
+  // Categorical color map for dominant indicators (consistent across layers)
+  const allDominantInds = Array.from(
+    new Set(perLayer.flatMap(l => l.points.map(p => p.mostDistinctive)))
+  ).sort();
+  const indColor: Record<string, string> = {};
+  allDominantInds.forEach((ind, i) => { indColor[ind] = CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length]; });
+
+  return (
+    <Box>
+      {/* Shared legend for dominant indicators */}
+      <Box mb={3} display="flex" flexWrap="wrap" gap={2}>
+        <Text fontSize="xs" fontWeight="bold" color="gray.600" mr={1}>Dominant indicator:</Text>
+        {allDominantInds.map(ind => (
+          <Box key={ind} display="inline-flex" alignItems="center" gap={1}>
+            <Box w="10px" h="10px" borderRadius="sm" bg={indColor[ind]} />
+            <Text fontSize="xs" color="gray.600">{ind.replace('IND_', '')}</Text>
+          </Box>
+        ))}
+      </Box>
+
+      <Box display="flex" flexDirection="column" gap={4}>
+        {perLayer.map(({ layer, points }) => (
+          <Box key={layer}>
+            <Text fontSize="sm" fontWeight="bold" color={DD_LAYER_COLORS[layer]} mb={1}>
+              {DD_LAYER_LABELS[layer]} (n={points.length})
+            </Text>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+              <Box>
+                <Text fontSize="xs" textAlign="center" mb={1} color="gray.600">
+                  Deviation from Average (Mean |Z|)
+                </Text>
+                {renderCrossScatter(
+                  points,
+                  'gradient',
+                  p => ylOrRdColor(p.meanAbsZ / 2),  // matches notebook vmax=2
+                  p => `Mean |Z| = ${p.meanAbsZ.toFixed(3)}`,
+                )}
+              </Box>
+              <Box>
+                <Text fontSize="xs" textAlign="center" mb={1} color="gray.600">
+                  Most Distinctive Indicator
+                </Text>
+                {renderCrossScatter(
+                  points,
+                  'categorical',
+                  p => indColor[p.mostDistinctive] || '#A0AEC0',
+                  p => `${p.mostDistinctive} (|Z| highest)`,
+                )}
+              </Box>
+            </SimpleGrid>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+
+// ─── Cluster Spatial Scatter (before vs after smoothing) ──────────────────
+
+interface ClusterSpatialBeforeAfterProps {
+  lats: number[];
+  lngs: number[];
+  labelsRaw: number[];
+  labelsSmoothed: number[];
+  archetypeLabels?: Record<number, string>;
+}
+
+export function ClusterSpatialBeforeAfter({
+  lats, lngs, labelsRaw, labelsSmoothed, archetypeLabels = {},
+}: ClusterSpatialBeforeAfterProps) {
+  if (lats.length === 0 || lats.length !== lngs.length) return null;
+
+  const uniqueLabels = Array.from(new Set([...labelsRaw, ...labelsSmoothed])).sort((a, b) => a - b);
+  const colorMap: Record<number, string> = {};
+  uniqueLabels.forEach((l, i) => { colorMap[l] = CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length]; });
+
+  const nChanged = labelsRaw.reduce((acc, r, i) => acc + (r !== labelsSmoothed[i] ? 1 : 0), 0);
+  const pctChanged = labelsRaw.length > 0 ? (nChanged / labelsRaw.length) * 100 : 0;
+
+  function renderMap(labels: number[], title: string) {
+    const svgW = 340;
+    const svgH = 280;
+    const margin = { l: 50, r: 16, t: 14, b: 38 };
+    const plotW = svgW - margin.l - margin.r;
+    const plotH = svgH - margin.t - margin.b;
+
+    const lngMin = Math.min(...lngs), lngMax = Math.max(...lngs);
+    const latMin = Math.min(...lats), latMax = Math.max(...lats);
+    const lngRange = lngMax - lngMin || 0.001;
+    const latRange = latMax - latMin || 0.001;
+    const toX = (lng: number) => margin.l + ((lng - lngMin) / lngRange) * plotW;
+    const toY = (lat: number) => margin.t + plotH - ((lat - latMin) / latRange) * plotH;
+
+    return (
+      <Box>
+        <Text fontSize="xs" textAlign="center" mb={1} color="gray.600" fontWeight="bold">{title}</Text>
+        <svg width={svgW} height={svgH} style={{ fontFamily: 'system-ui, sans-serif' }}>
+          <line x1={margin.l} y1={margin.t} x2={margin.l} y2={margin.t + plotH} stroke="#CBD5E0" />
+          <line x1={margin.l} y1={margin.t + plotH} x2={margin.l + plotW} y2={margin.t + plotH} stroke="#CBD5E0" />
+          <text x={svgW / 2} y={svgH - 4} textAnchor="middle" fontSize={9} fill="#718096">Longitude</text>
+          <text x={12} y={svgH / 2} textAnchor="middle" fontSize={9} fill="#718096" transform={`rotate(-90, 12, ${svgH / 2})`}>Latitude</text>
+          {lats.map((lat, i) => (
+            <circle
+              key={i}
+              cx={toX(lngs[i])}
+              cy={toY(lat)}
+              r={3}
+              fill={colorMap[labels[i]] || '#A0AEC0'}
+              opacity={0.7}
+              stroke="#fff"
+              strokeWidth={0.3}
+            >
+              <title>{`Cluster ${labels[i]}${archetypeLabels[labels[i]] ? ': ' + archetypeLabels[labels[i]] : ''}`}</title>
+            </circle>
+          ))}
+        </svg>
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Text fontSize="xs" color="gray.600" mb={2}>
+        Spatial smoothing changed <strong>{nChanged}</strong> labels ({pctChanged.toFixed(1)}% of {labelsRaw.length} points)
+      </Text>
+      {/* Legend */}
+      <Box mb={3} display="flex" flexWrap="wrap" gap={2}>
+        {uniqueLabels.map(l => (
+          <Box key={l} display="inline-flex" alignItems="center" gap={1}>
+            <Box w="10px" h="10px" borderRadius="sm" bg={colorMap[l]} />
+            <Text fontSize="xs" color="gray.600">
+              {archetypeLabels[l] || `Cluster ${l}`}
+            </Text>
+          </Box>
+        ))}
+      </Box>
+      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+        {renderMap(labelsRaw, '(a) Before Smoothing')}
+        {renderMap(labelsSmoothed, '(b) After Spatial Smoothing')}
+      </SimpleGrid>
+    </Box>
+  );
+}
+
+
+// ─── Dendrogram (Ward hierarchical clustering tree) ───────────────────────
+
+interface DendrogramProps {
+  /** scipy linkage matrix: each row = [id1, id2, distance, count] */
+  linkage: number[][];
+  /** Show cut line at 85th percentile of merge distances (matches notebook Cell 23) */
+  showCutLine?: boolean;
+}
+
+export function Dendrogram({ linkage, showCutLine = true }: DendrogramProps) {
+  if (!linkage || linkage.length === 0) {
+    return <Text fontSize="sm" color="gray.400">No dendrogram data</Text>;
+  }
+
+  const n = linkage.length + 1; // number of original samples
+  const maxDist = Math.max(...linkage.map(row => row[2]));
+
+  // Compute leaf display order via DFS (left-first)
+  const leafOrder: number[] = [];
+  function collect(nodeId: number) {
+    if (nodeId < n) { leafOrder.push(nodeId); return; }
+    const row = linkage[nodeId - n];
+    collect(Math.round(row[0]));
+    collect(Math.round(row[1]));
+  }
+  collect(n + linkage.length - 1);
+
+  const leafX: Record<number, number> = {};
+  leafOrder.forEach((leafId, idx) => { leafX[leafId] = idx; });
+
+  // Compute position (x, y) for every node (leaves + internal)
+  const nodes: { x: number; y: number }[] = new Array(n + linkage.length);
+  for (let i = 0; i < n; i++) nodes[i] = { x: leafX[i], y: 0 };
+  for (let i = 0; i < linkage.length; i++) {
+    const [left, right, dist] = linkage[i];
+    const ln = nodes[Math.round(left)];
+    const rn = nodes[Math.round(right)];
+    nodes[n + i] = { x: (ln.x + rn.x) / 2, y: dist };
+  }
+
+  const width = Math.min(1000, Math.max(400, n * 6));
+  const height = 280;
+  const marginL = 50, marginR = 16, marginT = 14, marginB = 28;
+  const plotW = width - marginL - marginR;
+  const plotH = height - marginT - marginB;
+
+  const toX = (x: number) => marginL + (n > 1 ? (x / (n - 1)) * plotW : plotW / 2);
+  const toY = (y: number) => marginT + plotH - (y / (maxDist || 1)) * plotH;
+
+  // 85th percentile cut line
+  const distances = linkage.map(r => r[2]).sort((a, b) => a - b);
+  const cut = distances[Math.floor(distances.length * 0.85)];
+
+  return (
+    <Box overflowX="auto">
+      <svg width={width} height={height} style={{ fontFamily: 'system-ui, sans-serif' }}>
+        {/* Y-axis */}
+        <line x1={marginL} y1={marginT} x2={marginL} y2={marginT + plotH} stroke="#CBD5E0" />
+        {[0, 0.25, 0.5, 0.75, 1].map(t => {
+          const v = t * maxDist;
+          const y = toY(v);
+          return (
+            <g key={t}>
+              <line x1={marginL - 3} y1={y} x2={marginL} y2={y} stroke="#CBD5E0" />
+              <text x={marginL - 5} y={y + 3} textAnchor="end" fontSize={9} fill="#718096">{v.toFixed(1)}</text>
+            </g>
+          );
+        })}
+        <text x={12} y={marginT + plotH / 2} textAnchor="middle" fontSize={9} fill="#718096" transform={`rotate(-90, 12, ${marginT + plotH / 2})`}>
+          Distance (Ward)
+        </text>
+        <text x={width / 2} y={height - 4} textAnchor="middle" fontSize={9} fill="#718096">
+          Sample ({n} points)
+        </text>
+        {/* Cut line */}
+        {showCutLine && (
+          <>
+            <line
+              x1={marginL} y1={toY(cut)} x2={marginL + plotW} y2={toY(cut)}
+              stroke="#E53E3E" strokeWidth={1} strokeDasharray="4 3" opacity={0.7}
+            />
+            <text x={marginL + plotW - 2} y={toY(cut) - 3} textAnchor="end" fontSize={8} fill="#E53E3E">
+              85th pctl cut ({cut.toFixed(2)})
+            </text>
+          </>
+        )}
+        {/* Merge lines */}
+        {linkage.map((row, i) => {
+          const [left, right, dist] = row;
+          const leftNode = nodes[Math.round(left)];
+          const rightNode = nodes[Math.round(right)];
+          const yTop = toY(dist);
+          const xLeft = toX(leftNode.x);
+          const xRight = toX(rightNode.x);
+          const yLeft = toY(leftNode.y);
+          const yRight = toY(rightNode.y);
+          return (
+            <g key={i}>
+              <line x1={xLeft} y1={yLeft} x2={xLeft} y2={yTop} stroke="#4A5568" strokeWidth={0.8} />
+              <line x1={xRight} y1={yRight} x2={xRight} y2={yTop} stroke="#4A5568" strokeWidth={0.8} />
+              <line x1={xLeft} y1={yTop} x2={xRight} y2={yTop} stroke="#4A5568" strokeWidth={0.8} />
+            </g>
+          );
+        })}
       </svg>
     </Box>
   );

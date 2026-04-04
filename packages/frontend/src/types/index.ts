@@ -371,6 +371,14 @@ export interface ClusteringResult {
   layer_used: string;
   archetype_profiles: ArchetypeProfile[];
   spatial_segments: SpatialSegment[];
+  // Per-point data (for before/after-smoothing scatter)
+  point_ids_ordered: string[];
+  point_lats: number[];
+  point_lngs: number[];
+  labels_raw: number[];
+  labels_smoothed: number[];
+  // Ward hierarchical linkage (for dendrogram): [id1, id2, dist, count]
+  dendrogram_linkage: number[][];
 }
 
 export interface ClusteringRequest {

@@ -92,9 +92,16 @@ function VisionAnalysis() {
   // Panorama mode
   const [isPanorama, setIsPanorama] = useState(false);
 
+  // Force re-analyze (bypass skip-already-processed resume logic)
+  const [forceRerun, setForceRerun] = useState(false);
+
   // Analysis state
   const [analyzing, setAnalyzing] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{current: number; total: number} | null>(null);
+
+  // Lazy render: show only N mask preview cards at a time (prevents 30K+ DOM nodes)
+  const MASK_PREVIEW_PAGE = 30;
+  const [maskVisibleCount, setMaskVisibleCount] = useState(MASK_PREVIEW_PAGE);
 
   // Vision results persisted in store (survive navigation)
   const {
@@ -137,6 +144,23 @@ function VisionAnalysis() {
       },
     });
   }, [project, recommendMutation, toast]);
+
+  // Preview: how many of the selected images are already processed (eligible for resume/skip)
+  const resumePreview = useMemo(() => {
+    if (!project || selectedProjectImages.length === 0) return { alreadyDone: 0, toProcess: 0 };
+    const selectedSet = new Set(selectedProjectImages);
+    let alreadyDone = 0;
+    for (const img of project.uploaded_images) {
+      if (!selectedSet.has(img.image_id)) continue;
+      const mp = img.mask_filepaths;
+      if (!mp || Object.keys(mp).length === 0) continue;
+      const matched = isPanorama
+        ? ['front_semantic_map', 'left_semantic_map', 'right_semantic_map'].some(k => !!mp[k])
+        : !!mp['semantic_map'];
+      if (matched) alreadyDone++;
+    }
+    return { alreadyDone, toProcess: selectedProjectImages.length - alreadyDone };
+  }, [project, selectedProjectImages, isPanorama]);
 
   const isIndicatorSelected = (id: string) => selectedIndicators.some(i => i.indicator_id === id);
   const toggleIndicator = (rec: IndicatorRecommendation) => {
@@ -226,12 +250,16 @@ function VisionAnalysis() {
     setStatistics(null);
     setBatchProgress(null);
     setMaskResults([]);
+    setMaskVisibleCount(MASK_PREVIEW_PAGE);
 
     try {
       if (selectedProjectImages.length > 0 && projectId) {
+        const FLUSH_SIZE = 20;
         let processed = 0;
-        const allResults: Record<string, unknown>[] = [];
-        const allMasks: Array<{imageId: string; maskPaths: Record<string, string>}> = [];
+        let skipped = 0;
+        let successCount = 0;
+        // Rolling buffer — flushed to Zustand every FLUSH_SIZE iterations to keep JS heap bounded.
+        let maskBuffer: Array<{imageId: string; maskPaths: Record<string, string>}> = [];
         const failedImages: string[] = [];
         const requestPayload = {
           semantic_classes: selectedClasses,
@@ -240,9 +268,38 @@ function VisionAnalysis() {
           enable_hole_filling: holeFilling,
         };
 
+        const flushMaskBuffer = () => {
+          if (maskBuffer.length === 0) return;
+          const current = useAppStore.getState().visionMaskResults;
+          setMaskResults([...current, ...maskBuffer]);
+          maskBuffer = [];
+        };
+
+        // Detect whether this image is already processed by checking backend-persisted mask_filepaths.
+        // Standard mode needs `semantic_map`; panorama mode needs at least one `{view}_semantic_map`.
+        const isAlreadyProcessed = (img: UploadedImage): boolean => {
+          const mp = img.mask_filepaths;
+          if (!mp || Object.keys(mp).length === 0) return false;
+          if (isPanorama) {
+            return ['front_semantic_map', 'left_semantic_map', 'right_semantic_map'].some(k => !!mp[k]);
+          }
+          return !!mp['semantic_map'];
+        };
+
         for (const imageId of selectedProjectImages) {
           const img = project?.uploaded_images.find(i => i.image_id === imageId);
           if (!img) continue;
+
+          // Resume: skip already-processed images (unless user forces re-run)
+          if (!forceRerun && isAlreadyProcessed(img)) {
+            maskBuffer.push({ imageId, maskPaths: img.mask_filepaths });
+            successCount++;
+            skipped++;
+            processed++;
+            setBatchProgress({ current: processed, total: selectedProjectImages.length });
+            if (maskBuffer.length >= FLUSH_SIZE) flushMaskBuffer();
+            continue;
+          }
 
           try {
             if (isPanorama && projectId) {
@@ -257,9 +314,9 @@ function VisionAnalysis() {
               if (views) {
                 for (const [viewName, viewData] of Object.entries(views)) {
                   if (viewData.status === 'success') {
-                    allResults.push(viewData.statistics);
+                    successCount++;
                     if (viewData.mask_paths && Object.keys(viewData.mask_paths).length > 0) {
-                      allMasks.push({ imageId: `${imageId}_${viewName}`, maskPaths: viewData.mask_paths });
+                      maskBuffer.push({ imageId: `${imageId}_${viewName}`, maskPaths: viewData.mask_paths });
                     }
                   }
                 }
@@ -269,9 +326,9 @@ function VisionAnalysis() {
               const response = await api.vision.analyzeProjectImage(projectId, imageId, requestPayload);
 
               if (response.data.status === 'success') {
-                allResults.push(response.data.statistics);
+                successCount++;
                 if (response.data.mask_paths && Object.keys(response.data.mask_paths).length > 0) {
-                  allMasks.push({ imageId, maskPaths: response.data.mask_paths });
+                  maskBuffer.push({ imageId, maskPaths: response.data.mask_paths });
                 }
               } else {
                 failedImages.push(imageId);
@@ -284,27 +341,30 @@ function VisionAnalysis() {
 
           processed++;
           setBatchProgress({ current: processed, total: selectedProjectImages.length });
+          if (maskBuffer.length >= FLUSH_SIZE) flushMaskBuffer();
         }
 
-        setMaskResults(allMasks);
+        // Final flush for any remaining items in the buffer
+        flushMaskBuffer();
 
-        if (allResults.length > 0) {
+        if (successCount > 0) {
           setStatistics({
-            images_processed: allResults.length,
+            images_processed: successCount,
             total_images: selectedProjectImages.length,
-            results: allResults,
           });
         }
 
-        // Show result with failure details
+        // Show result with failure + resume details
+        const actuallyProcessed = processed - skipped;
+        const resumeSuffix = skipped > 0 ? ` (${skipped} skipped, already processed)` : '';
         if (failedImages.length === 0) {
           toast({
-            title: `Analysis complete: ${allResults.length}/${selectedProjectImages.length} images processed`,
+            title: `Analysis complete: ${actuallyProcessed} newly processed${resumeSuffix}`,
             status: 'success',
           });
         } else {
           toast({
-            title: `Analysis done with ${failedImages.length} failure(s): ${failedImages.slice(0, 3).join(', ')}${failedImages.length > 3 ? '...' : ''}`,
+            title: `Analysis done with ${failedImages.length} failure(s)${resumeSuffix}: ${failedImages.slice(0, 3).join(', ')}${failedImages.length > 3 ? '...' : ''}`,
             status: 'warning',
             duration: 8000,
           });
@@ -463,6 +523,23 @@ function VisionAnalysis() {
                     </FormHelperText>
                   </Box>
                 </FormControl>
+                <FormControl display="flex" alignItems="center">
+                  <Switch
+                    id="force-rerun"
+                    isChecked={forceRerun}
+                    onChange={(e) => setForceRerun(e.target.checked)}
+                    mr={3}
+                    colorScheme="orange"
+                  />
+                  <Box>
+                    <FormLabel htmlFor="force-rerun" mb={0} fontSize="sm">
+                      Force re-analyze
+                    </FormLabel>
+                    <FormHelperText mt={0} fontSize="xs">
+                      Ignore cached masks and re-run all selected images (off = resume from last crash)
+                    </FormHelperText>
+                  </Box>
+                </FormControl>
               </VStack>
             </CardBody>
           </Card>
@@ -494,6 +571,18 @@ function VisionAnalysis() {
             </CardBody>
           </Card>
 
+          {/* Resume hint */}
+          {!forceRerun && resumePreview.alreadyDone > 0 && !analyzing && (
+            <Alert status="info" size="sm" borderRadius="md" py={2}>
+              <AlertIcon />
+              <Text fontSize="sm">
+                <strong>{resumePreview.alreadyDone}</strong> of {selectedProjectImages.length} already processed —
+                {' '}only <strong>{resumePreview.toProcess}</strong> new image(s) will be analyzed.
+                {' '}Enable "Force re-analyze" to process all.
+              </Text>
+            </Alert>
+          )}
+
           {/* Analyze Button */}
           <Button
             colorScheme="green"
@@ -502,9 +591,14 @@ function VisionAnalysis() {
             isLoading={analyzing}
             isDisabled={selectedClasses.length === 0 || selectedProjectImages.length === 0 || visionHealthy === false}
           >
-            {selectedProjectImages.length > 1
-              ? `Analyze ${selectedProjectImages.length} Images`
-              : 'Analyze Image'}
+            {(() => {
+              const total = selectedProjectImages.length;
+              if (total === 0) return 'Analyze Image';
+              if (!forceRerun && resumePreview.toProcess < total) {
+                return `Analyze ${resumePreview.toProcess} New Image${resumePreview.toProcess !== 1 ? 's' : ''} (${resumePreview.alreadyDone} cached)`;
+              }
+              return total > 1 ? `Analyze ${total} Images` : 'Analyze Image';
+            })()}
           </Button>
 
           {/* ── Vision Results ── */}
@@ -629,8 +723,13 @@ function VisionAnalysis() {
                 </HStack>
               </CardHeader>
               <CardBody maxH="520px" overflowY="auto">
+                {maskResults.length > MASK_PREVIEW_PAGE && (
+                  <Text fontSize="xs" color="gray.500" mb={2}>
+                    Previewing {Math.min(maskVisibleCount, maskResults.length)} of {maskResults.length} results — ZIP download includes all.
+                  </Text>
+                )}
                 <VStack align="stretch" spacing={4}>
-                  {maskResults.map(({ imageId, maskPaths }) => {
+                  {maskResults.slice(0, maskVisibleCount).map(({ imageId, maskPaths }) => {
                     // For panorama entries like "img1_left", parse the view suffix
                     const viewMatch = imageId.match(/^(.+)_(left|front|right)$/);
                     const baseImageId = viewMatch ? viewMatch[1] : imageId;
@@ -713,6 +812,17 @@ function VisionAnalysis() {
                     );
                   })}
                 </VStack>
+                {maskResults.length > maskVisibleCount && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    mt={3}
+                    w="full"
+                    onClick={() => setMaskVisibleCount(c => c + MASK_PREVIEW_PAGE)}
+                  >
+                    Show more ({maskResults.length - maskVisibleCount} remaining)
+                  </Button>
+                )}
               </CardBody>
             </Card>
           )}

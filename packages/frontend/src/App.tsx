@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Outlet, useParams, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { ChakraProvider, Box, Divider, Flex, Heading, Text, VStack } from '@chakra-ui/react';
@@ -141,13 +142,25 @@ function Sidebar() {
 function ProjectPipelineLayout() {
   const { projectId } = useParams<{ projectId: string }>();
   const { pathname } = useLocation();
-  const { recommendations, zoneAnalysisResult } = useAppStore();
+  const { recommendations, zoneAnalysisResult, setCurrentProject, clearPipelineResults } = useAppStore();
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => api.projects.get(projectId!).then(res => res.data),
     enabled: !!projectId,
   });
+
+  // Keep the Zustand store in sync with React Query. Fires on every page in the pipeline,
+  // so Reports/Analysis pages reached directly have currentProject populated without
+  // depending on localStorage hydration. Clears pipeline results when switching projects.
+  useEffect(() => {
+    if (!project) return;
+    const prev = useAppStore.getState().currentProject;
+    if (prev && prev.id !== project.id) {
+      clearPipelineResults();
+    }
+    setCurrentProject(project);
+  }, [project, setCurrentProject, clearPipelineResults]);
 
   const segment = pathname.split('/').pop() || '';
   // 5-step: Project(1) → Images(2) → Prepare(3) → Analysis(4) → Report(5)

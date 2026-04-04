@@ -79,6 +79,11 @@ export const api = {
       apiClient.put(`/api/projects/${projectId}/images/batch-zone`, assignments),
     deleteImage: (projectId: string, imageId: string) =>
       apiClient.delete(`/api/projects/${projectId}/images/${imageId}`),
+    batchDeleteImages: (projectId: string, imageIds: string[]) =>
+      apiClient.post<{ success: boolean; deleted: number; deleted_ids: string[]; not_found: string[] }>(
+        `/api/projects/${projectId}/images/batch-delete`,
+        { image_ids: imageIds },
+      ),
     listImages: (projectId: string) =>
       apiClient.get(`/api/projects/${projectId}/images`),
   },

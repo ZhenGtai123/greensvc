@@ -118,6 +118,14 @@ class ClusteringResult(BaseModel):
     layer_used: str = "full"
     archetype_profiles: list[ArchetypeProfile] = Field(default_factory=list)
     spatial_segments: list[SpatialSegment] = Field(default_factory=list)
+    # Per-point data (for before/after-smoothing spatial scatter + future viz)
+    point_ids_ordered: list[str] = Field(default_factory=list)
+    point_lats: list[float] = Field(default_factory=list)
+    point_lngs: list[float] = Field(default_factory=list)
+    labels_raw: list[int] = Field(default_factory=list)  # labels before KNN smoothing
+    labels_smoothed: list[int] = Field(default_factory=list)  # labels after KNN smoothing
+    # Ward hierarchical clustering linkage matrix (for dendrogram). Rows: [id1, id2, dist, count].
+    dendrogram_linkage: list[list[float]] = Field(default_factory=list)
 
 
 class ZoneAnalysisResult(BaseModel):
