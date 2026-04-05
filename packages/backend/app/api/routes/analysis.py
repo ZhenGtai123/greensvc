@@ -168,21 +168,20 @@ def run_clustering_by_project(
                 category=info.category,
             )
 
-    # Build point_metrics: one point per zone-assigned image
+    # Build point_metrics: one point per image with computed indicators.
+    # Clustering is zone-agnostic — include all images regardless of zone assignment.
     point_metrics: list[dict] = []
     n_with_gps = 0
+    n_unassigned_included = 0
     for img in project.uploaded_images:
-        if not img.zone_id:
-            continue
         row: dict = {
             "point_id": img.image_id,
-            "zone_id": img.zone_id,
+            "zone_id": img.zone_id,  # may be None; ClusteringService ignores it
         }
         has_gps = img.latitude is not None and img.longitude is not None
         if has_gps:
             row["lat"] = img.latitude
             row["lng"] = img.longitude
-            n_with_gps += 1
         has_any = False
         for ind_id in valid_ids:
             if request.layer == "full":
@@ -195,10 +194,15 @@ def run_clustering_by_project(
                 has_any = True
         if has_any:
             point_metrics.append(row)
+            if has_gps:
+                n_with_gps += 1
+            if not img.zone_id:
+                n_unassigned_included += 1
 
     logger.info(
-        "clustering/by-project: project=%s layer=%s points=%d (gps=%d) indicators=%d",
-        request.project_id, request.layer, len(point_metrics), n_with_gps, len(valid_ids),
+        "clustering/by-project: project=%s layer=%s points=%d (gps=%d, unassigned=%d) indicators=%d",
+        request.project_id, request.layer, len(point_metrics), n_with_gps,
+        n_unassigned_included, len(valid_ids),
     )
 
     try:
@@ -421,15 +425,22 @@ async def run_project_pipeline(
         steps.append(ProjectPipelineProgress(step="validate_indicators", status="completed",
                                              detail=f"{len(valid_ids)} indicators validated"))
 
-    # 3. Filter to zone-assigned images
+    # 3. Filter to zone-assigned images (for later aggregation). Per-image
+    # metric calculation is zone-agnostic — it runs on every uploaded image so
+    # that downstream clustering/exploratory analysis can use the full dataset.
     assigned_images = [img for img in project.uploaded_images if img.zone_id]
     if not assigned_images:
         raise HTTPException(status_code=400, detail="No images assigned to zones in this project")
 
+    total_images = len(project.uploaded_images)
+    n_unassigned = total_images - len(assigned_images)
+    filter_detail = f"{len(assigned_images)} of {total_images} images assigned to zones"
+    if n_unassigned:
+        filter_detail += f" ({n_unassigned} unassigned — will still get per-image metrics for clustering)"
     steps.append(ProjectPipelineProgress(
         step="filter_images",
         status="completed",
-        detail=f"{len(assigned_images)} of {len(project.uploaded_images)} images assigned to zones",
+        detail=filter_detail,
     ))
 
     # 4. Run calculations (use semantic_map when available, plus FMB layers)
@@ -439,11 +450,13 @@ async def run_project_pipeline(
     calc_cached = 0
 
     # Always clear previous results so every pipeline run produces fresh calculations
-    for img in assigned_images:
+    for img in project.uploaded_images:
         img.metrics_results.clear()
     calculator.clear_cache()
 
-    for img in assigned_images:
+    # Compute per-image metrics for ALL uploaded images (zone-agnostic).
+    # The aggregation step (#5) still only uses zone-assigned images.
+    for img in project.uploaded_images:
         # Prefer semantic_map mask over raw photo
         image_path = img.mask_filepaths.get("semantic_map", img.filepath)
 
