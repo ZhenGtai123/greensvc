@@ -94,9 +94,11 @@ const VisionImageTile = memo(function VisionImageTile({
       border={selected ? '2px solid' : '2px solid transparent'}
       borderColor={selected ? 'blue.500' : 'transparent'}
       borderRadius="md"
+      h="100%"
+      w="100%"
     >
       <Box
-        h="60px"
+        h="100%"
         w="100%"
         borderRadius="md"
         bg="gray.200"
@@ -191,6 +193,100 @@ const LazyMaskImage = memo(function LazyMaskImage({
         </HStack>
       </HStack>
     </Box>
+  );
+});
+
+/** Auto-sizing virtualized grid for image selection. */
+function ImageSelectionGrid({
+  images,
+  projectId,
+  selectedProjectImages,
+  onToggle,
+}: {
+  images: UploadedImage[];
+  projectId: string;
+  selectedProjectImages: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const COLS = 4;
+  const GAP = 8;
+  const colW = containerWidth > 0 ? (containerWidth - GAP * (COLS - 1)) / COLS : 0;
+  const ROW_H = Math.max(Math.round(colW * 0.7) + GAP, 52); // aspect ~0.7 + gap
+  const rowCount = Math.ceil(images.length / COLS);
+  const gridHeight = Math.min(rowCount * ROW_H, 240);
+
+  return (
+    <Box ref={containerRef} w="100%">
+      {containerWidth > 0 && (
+        <VirtualGrid
+          columnCount={COLS}
+          columnWidth={colW + GAP}
+          rowCount={rowCount}
+          rowHeight={ROW_H}
+          style={{ height: gridHeight, width: containerWidth, overflowX: 'hidden' }}
+          overscanCount={3}
+          cellComponent={ImageGridCell}
+          cellProps={{
+            images,
+            cols: COLS,
+            projectId,
+            selectedProjectImages,
+            onToggle,
+            gap: GAP,
+          }}
+        />
+      )}
+    </Box>
+  );
+}
+
+/** Cell renderer for the virtualized image-selection grid. */
+const ImageGridCell = memo(function ImageGridCell({
+  columnIndex,
+  rowIndex,
+  style,
+  images,
+  cols,
+  projectId,
+  selectedProjectImages,
+  onToggle,
+  gap,
+}: {
+  columnIndex: number;
+  rowIndex: number;
+  style: React.CSSProperties;
+  images: UploadedImage[];
+  cols: number;
+  projectId: string;
+  selectedProjectImages: Set<string>;
+  onToggle: (id: string) => void;
+  gap: number;
+}) {
+  const idx = rowIndex * cols + columnIndex;
+  if (idx >= images.length) return null;
+  const img = images[idx];
+  return (
+    <div style={{ ...style, paddingRight: gap, paddingBottom: gap }}>
+      <VisionImageTile
+        projectId={projectId}
+        imageId={img.image_id}
+        selected={selectedProjectImages.has(img.image_id)}
+        onToggle={onToggle}
+      />
+    </div>
   );
 });
 
@@ -697,42 +793,12 @@ function VisionAnalysis() {
                       <Button size="xs" onClick={handleSelectNoImages}>None</Button>
                     </HStack>
                   </HStack>
-                  {(() => {
-                    const COLS = 4;
-                    const ROW_H = 68;     // tile 60px + 8px gap
-                    const COL_W = 90;     // responsive fallback; actual width set by container
-                    const images = project.uploaded_images;
-                    const rowCount = Math.ceil(images.length / COLS);
-                    const gridHeight = Math.min(rowCount * ROW_H, 200);
-                    return (
-                      <FixedSizeGrid
-                        columnCount={COLS}
-                        columnWidth={COL_W}
-                        rowCount={rowCount}
-                        rowHeight={ROW_H}
-                        height={gridHeight}
-                        width={COLS * COL_W + 16}
-                        overscanRowCount={3}
-                        style={{ overflowX: 'hidden' }}
-                      >
-                        {({ columnIndex, rowIndex, style }) => {
-                          const idx = rowIndex * COLS + columnIndex;
-                          if (idx >= images.length) return null;
-                          const img = images[idx];
-                          return (
-                            <div style={{ ...style, padding: 2 }}>
-                              <VisionImageTile
-                                projectId={projectId!}
-                                imageId={img.image_id}
-                                selected={selectedProjectImages.has(img.image_id)}
-                                onToggle={toggleImageSelection}
-                              />
-                            </div>
-                          );
-                        }}
-                      </FixedSizeGrid>
-                    );
-                  })()}
+                  <ImageSelectionGrid
+                    images={project.uploaded_images}
+                    projectId={projectId!}
+                    selectedProjectImages={selectedProjectImages}
+                    onToggle={toggleImageSelection}
+                  />
                 </VStack>
               )}
             </CardBody>
