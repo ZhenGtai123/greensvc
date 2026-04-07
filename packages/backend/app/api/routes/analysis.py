@@ -28,6 +28,7 @@ from app.models.analysis import (
     ProjectPipelineRequest,
     ProjectPipelineResult,
     ProjectPipelineProgress,
+    SkippedImage,
     IndicatorDefinitionInput,
     ReportRequest,
     ReportResult,
@@ -469,13 +470,19 @@ async def _execute_project_pipeline(
     # Images without semantic_map would fall back to the raw JPG, producing
     # meaningless zeros (raw photo pixels don't match semantic colour codes).
     has_semantic = [img for img in project.uploaded_images if img.mask_filepaths.get("semantic_map")]
-    skipped_images = [img for img in project.uploaded_images if not img.mask_filepaths.get("semantic_map")]
-    if skipped_images:
+    no_semantic_images = [img for img in project.uploaded_images if not img.mask_filepaths.get("semantic_map")]
+    if no_semantic_images:
         logger.info(
             "Skipping %d/%d images without semantic_map (not yet analysed by Vision API): %s",
-            len(skipped_images), len(project.uploaded_images),
-            [img.filename for img in skipped_images[:5]],
+            len(no_semantic_images), len(project.uploaded_images),
+            [img.filename for img in no_semantic_images[:5]],
         )
+
+    # Track all skipped images with reasons for user feedback
+    skipped_list: list[SkippedImage] = [
+        SkippedImage(image_id=img.image_id, filename=img.filename, reason="no_semantic_map")
+        for img in no_semantic_images
+    ]
 
     # Semantic map validation is done inline (inside the loop) to avoid
     # a slow pre-scan that blocks SSE progress events.
@@ -509,6 +516,9 @@ async def _execute_project_pipeline(
                 is_invalid = len(set(thumb.getdata())) <= 1
             if is_invalid:
                 invalid_images.append(img)
+                skipped_list.append(SkippedImage(
+                    image_id=img.image_id, filename=img.filename, reason="invalid_semantic_map",
+                ))
                 logger.warning(
                     "Invalid semantic_map for %s (%s): likely single-color (%.0fKB) — skipping",
                     img.image_id, img.filename, file_kb,
@@ -517,6 +527,9 @@ async def _execute_project_pipeline(
         except Exception as e:
             logger.warning("Cannot validate semantic_map for %s: %s — skipping", img.image_id, e)
             invalid_images.append(img)
+            skipped_list.append(SkippedImage(
+                image_id=img.image_id, filename=img.filename, reason="invalid_semantic_map",
+            ))
             continue
 
         img_idx += 1
@@ -693,6 +706,7 @@ async def _execute_project_pipeline(
         calculations_failed=calc_fail,
         calculations_cached=calc_cached,
         zone_statistics_count=len(zone_statistics),
+        skipped_images=skipped_list,
         zone_analysis=zone_result,
         design_strategies=design_result,
         steps=steps,

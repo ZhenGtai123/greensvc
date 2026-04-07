@@ -571,6 +571,12 @@ export interface ProjectPipelineProgress {
   detail: string;
 }
 
+export interface SkippedImage {
+  image_id: string;
+  filename: string;
+  reason: 'no_semantic_map' | 'invalid_semantic_map';
+}
+
 export interface ProjectPipelineResult {
   project_id: string;
   project_name: string;
@@ -581,6 +587,7 @@ export interface ProjectPipelineResult {
   calculations_failed: number;
   calculations_cached: number;
   zone_statistics_count: number;
+  skipped_images: SkippedImage[];
   zone_analysis: ZoneAnalysisResult | null;
   design_strategies: DesignStrategyResult | null;
   steps: ProjectPipelineProgress[];

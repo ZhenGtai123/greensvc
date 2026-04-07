@@ -357,6 +357,13 @@ class ProjectPipelineProgress(BaseModel):
     detail: str = ""
 
 
+class SkippedImage(BaseModel):
+    """An image that was skipped during pipeline calculation."""
+    image_id: str
+    filename: str
+    reason: str  # "no_semantic_map" | "invalid_semantic_map"
+
+
 class ProjectPipelineResult(BaseModel):
     """Complete result of the project pipeline."""
     project_id: str
@@ -368,6 +375,7 @@ class ProjectPipelineResult(BaseModel):
     calculations_failed: int = 0
     calculations_cached: int = 0
     zone_statistics_count: int = 0
+    skipped_images: list[SkippedImage] = Field(default_factory=list)
     zone_analysis: Optional[ZoneAnalysisResult] = None
     design_strategies: Optional[DesignStrategyResult] = None
     steps: list[ProjectPipelineProgress] = Field(default_factory=list)
