@@ -45,20 +45,37 @@ router = APIRouter()
 def _parse_coords_from_filename(filename: str) -> tuple[float, float] | None:
     """Try to extract (latitude, longitude) from the filename.
 
-    Supports dot-separated formats commonly used in street-view datasets, e.g.:
-        ``0.0.120.1256806.30.2549131桥公 201709 rightp9``
-        → longitude 120.1256806, latitude 30.2549131
+    Supports underscore/space-separated formats common in street-view datasets::
+
+        0_0_120.1256806_30.2549131_杨公堤_201709_front
+              ^^^^^^^^^  ^^^^^^^^^
+              longitude   latitude
+
+    Also handles dot-separated legacy format (``0.0.120.1256806.30.2549131...``).
 
     Returns (latitude, longitude) rounded to 7 decimal places, or None.
     """
-    # Strip extension, then strip non-ASCII suffix (Chinese chars, etc.)
     stem = Path(filename).stem
-    ascii_prefix = re.split(r'[^\x00-\x7f]', stem, maxsplit=1)[0].rstrip('. _-')
 
-    # Split by dots and look for coordinate-like pairs:
-    # an integer part (1-3 digits) followed by a high-precision decimal part (4+ digits)
-    parts = ascii_prefix.split('.')
+    # Split by common separators, then find segments that look like coordinates
+    # e.g. "0_0_120.1256806_30.2549131_杨公堤_201709_front" → ["120.1256806", "30.2549131"]
     candidates: list[float] = []
+    for seg in re.split(r'[_ \-]+', stem):
+        m = re.fullmatch(r'\d{1,3}\.\d{4,}', seg)
+        if m:
+            value = float(m.group())
+            if 1.0 <= abs(value) <= 180.0:
+                candidates.append(value)
+
+    if len(candidates) >= 2:
+        a, b = candidates[-2], candidates[-1]
+        return _assign_lat_lng(a, b)
+
+    # Legacy fallback: dot-separated format where dots serve as both decimal
+    # separator AND field delimiter (e.g. "0.0.120.1256806.30.2549131...")
+    ascii_prefix = re.split(r'[^\x00-\x7f]', stem, maxsplit=1)[0].rstrip('. _-')
+    parts = ascii_prefix.split('.')
+    legacy_candidates: list[float] = []
     i = 0
     while i < len(parts) - 1:
         int_part = parts[i]
@@ -66,18 +83,20 @@ def _parse_coords_from_filename(filename: str) -> tuple[float, float] | None:
         if re.fullmatch(r'\d{1,3}', int_part) and re.fullmatch(r'\d{4,}', dec_part):
             value = float(f"{int_part}.{dec_part}")
             if 1.0 <= abs(value) <= 180.0:
-                candidates.append(value)
+                legacy_candidates.append(value)
                 i += 2
                 continue
         i += 1
 
-    if len(candidates) < 2:
-        return None
+    if len(legacy_candidates) >= 2:
+        a, b = legacy_candidates[-2], legacy_candidates[-1]
+        return _assign_lat_lng(a, b)
 
-    # Take the last two candidates (earlier segments may be IDs/prefixes)
-    a, b = candidates[-2], candidates[-1]
+    return None
 
-    # Assign lat vs lng: latitude ∈ [-90, 90], longitude ∈ [-180, 180]
+
+def _assign_lat_lng(a: float, b: float) -> tuple[float, float] | None:
+    """Given two coordinate candidates, return (latitude, longitude)."""
     if abs(a) <= 90 and abs(b) <= 90:
         # Both could be latitude — assume (lng, lat) order (common in Chinese datasets)
         lat, lng = b, a
@@ -86,8 +105,7 @@ def _parse_coords_from_filename(filename: str) -> tuple[float, float] | None:
     elif abs(b) <= 90:
         lat, lng = b, a
     else:
-        return None  # neither qualifies as latitude
-
+        return None
     return round(lat, 7), round(lng, 7)
 
 
