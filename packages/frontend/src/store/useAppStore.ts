@@ -153,7 +153,9 @@ export const useAppStore = create<AppState>()(persist((set) => ({
       ? { ...state.zoneAnalysisResult, image_records: [] }
       : null,
     designStrategyResult: state.designStrategyResult,
-    pipelineResult: state.pipelineResult,
+    pipelineResult: state.pipelineResult
+      ? { ...state.pipelineResult, skipped_images: [] }
+      : null,
     aiReport: state.aiReport,
     aiReportMeta: state.aiReportMeta,
     hiddenChartIds: state.hiddenChartIds,

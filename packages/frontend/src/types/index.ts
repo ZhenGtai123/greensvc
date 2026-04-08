@@ -326,6 +326,10 @@ export interface ComputationMetadata {
   n_zones: number;
   layers: string[];
   warnings?: string[];
+  system?: string;
+  n_segments?: number;
+  has_spatial_data?: boolean;
+  has_clustering?: boolean;
 }
 
 // v7.0: image-level record (long-format)
@@ -346,7 +350,7 @@ export interface GlobalIndicatorStats {
   indicator_name: string;
   unit: string;
   target_direction: string;
-  by_layer: Record<string, { N: number; Mean: number; Std: number; Min: number; Max: number }>;
+  by_layer: Record<string, { N: number | null; Mean: number | null; Std: number | null; Min: number | null; Max: number | null }>;
   cv_full?: number | null;
   shapiro_w?: number | null;
   shapiro_p?: number | null;
@@ -394,7 +398,7 @@ export interface ArchetypeProfile {
 }
 
 export interface SpatialSegment {
-  segment_id: number;
+  segment_id: string;
   archetype_id: number;
   archetype_label: string;
   point_count: number;
@@ -563,6 +567,8 @@ export interface ProjectPipelineRequest {
   indicator_ids: string[];
   run_stage3?: boolean;
   use_llm?: boolean;
+  max_ioms_per_query?: number;
+  max_strategies_per_zone?: number;
 }
 
 export interface ProjectPipelineProgress {

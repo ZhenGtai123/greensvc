@@ -492,7 +492,7 @@ async def _execute_project_pipeline(
     n_total_images = len(calc_images)
     logger.info(
         "Pipeline: %d images with semantic_map, %d without (of %d total)",
-        n_total_images, len(skipped_images), len(project.uploaded_images),
+        n_total_images, len(no_semantic_images), len(project.uploaded_images),
     )
     img_idx = 0
     for img in calc_images:
@@ -600,10 +600,10 @@ async def _execute_project_pipeline(
     if calc_ok > 0:
         projects_store.save(project)
 
-    n_skip = len(skipped_images) + len(invalid_images)
+    n_skip = len(no_semantic_images) + len(invalid_images)
     skip_parts = []
-    if skipped_images:
-        skip_parts.append(f"{len(skipped_images)} no semantic_map")
+    if no_semantic_images:
+        skip_parts.append(f"{len(no_semantic_images)} no semantic_map")
     if invalid_images:
         skip_parts.append(f"{len(invalid_images)} invalid semantic_map")
     skip_note = f", {n_skip} images skipped ({', '.join(skip_parts)})" if skip_parts else ""
