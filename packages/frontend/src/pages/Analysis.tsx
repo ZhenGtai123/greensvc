@@ -425,13 +425,37 @@ function Analysis() {
               ))}
             </Wrap>
 
+            {hasResults && (
+              <Button
+                colorScheme="blue"
+                size="lg"
+                rightIcon={<ArrowRight size={18} />}
+                onClick={() => navigate(`/projects/${routeProjectId}/reports`)}
+                w="full"
+                mb={4}
+              >
+                View Results & Report
+              </Button>
+            )}
+
             {pipelineResult.skipped_images?.length > 0 && (
-              <Alert status="warning" mb={4} borderRadius="md" alignItems="flex-start">
+              <Alert status="info" borderRadius="md" alignItems="flex-start">
                 <AlertIcon mt={1} />
                 <Box flex={1}>
-                  <Text fontSize="sm" fontWeight="bold" mb={1}>
-                    {pipelineResult.skipped_images.length} image(s) skipped
-                  </Text>
+                  <HStack justify="space-between" align="flex-start" mb={1}>
+                    <Text fontSize="sm" fontWeight="bold">
+                      {pipelineResult.skipped_images.length} image(s) skipped — results are based on the remaining images
+                    </Text>
+                    <Button
+                      size="xs"
+                      colorScheme="orange"
+                      variant="outline"
+                      onClick={() => navigate(`/projects/${routeProjectId}/vision`)}
+                      flexShrink={0}
+                    >
+                      Retry Vision
+                    </Button>
+                  </HStack>
                   <Text fontSize="xs" color="gray.600" mb={2}>
                     {pipelineResult.skipped_images.filter(s => s.reason === 'no_semantic_map').length > 0 &&
                       `${pipelineResult.skipped_images.filter(s => s.reason === 'no_semantic_map').length} not analyzed by Vision API`}
@@ -440,7 +464,7 @@ function Analysis() {
                     {pipelineResult.skipped_images.filter(s => s.reason === 'invalid_semantic_map').length > 0 &&
                       `${pipelineResult.skipped_images.filter(s => s.reason === 'invalid_semantic_map').length} invalid semantic map (single-color)`}
                   </Text>
-                  <Wrap spacing={1} mb={2}>
+                  <Wrap spacing={1}>
                     {pipelineResult.skipped_images.slice(0, 10).map(s => (
                       <WrapItem key={s.image_id}>
                         <Tag size="sm" colorScheme={s.reason === 'no_semantic_map' ? 'orange' : 'red'} variant="subtle">
@@ -454,28 +478,8 @@ function Analysis() {
                       </WrapItem>
                     )}
                   </Wrap>
-                  <Button
-                    size="sm"
-                    colorScheme="orange"
-                    variant="outline"
-                    onClick={() => navigate(`/projects/${routeProjectId}/vision`)}
-                  >
-                    Go to Prepare — Retry Vision Analysis
-                  </Button>
                 </Box>
               </Alert>
-            )}
-
-            {hasResults && (
-              <Button
-                colorScheme="blue"
-                size="lg"
-                rightIcon={<ArrowRight size={18} />}
-                onClick={() => navigate(`/projects/${routeProjectId}/reports`)}
-                w="full"
-              >
-                View Results & Report
-              </Button>
             )}
           </CardBody>
         </Card>
