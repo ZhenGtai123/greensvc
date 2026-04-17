@@ -1,34 +1,18 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_GIN
+"""Calculator Layer.
+
+Indicator ID:   IND_GIN
 Indicator Name: Gini Index
-Type: TYPE B (Custom Mathematical Formula)
+Type:           TYPE B (Custom Mathematical Formula
 
 Description:
-    The Gini Index (GIN) is a measure of statistical dispersion intended 
-    to represent the inequality of a distribution. In the context of 
-    semantic segmentation images, it measures how unequally pixels are 
-    distributed across different semantic classes.
-    
-    A Gini Index of 0 represents perfect equality (all classes have equal
-    pixel counts), while a Gini Index approaching 1 represents maximum
-    inequality (one class dominates all pixels).
-    
-Formula: 
-    G = (sum_i sum_j |p_i - p_j|) / (2 * n)
-    
-    Or equivalently using the sorted cumulative sum approach:
-    G = (n + 1 - 2 * sum((n + 1 - i) * p_sorted_i)) / n
-    
-Variables:
-    - G: Gini Index (coefficient)
-    - p_i: Proportion of pixels in class i
-    - n: Number of classes with non-zero pixels
-    - p_sorted_i: Proportions sorted in ascending order
+    The Gini Index (GIN) is a measure of statistical dispersion intended to
+    represent the inequality of a distribution. In the context of semantic
+    segmentation images, it measures how unequally pixels are distributed across
+    different semantic classes. A Gini Index of 0 represents perfect equality
+    (all classes have equal pixel counts), while a Gini Index approaching 1
+    represents maximum inequality (one class dominates all pixels).
 
-Unit: index (dimensionless)
-Range: 0.0 (perfect equality) to 1.0 (maximum inequality)
+Formula: )
 """
 
 import numpy as np
@@ -71,9 +55,9 @@ INDICATOR = {
     "note": "Higher values indicate more unequal distribution (dominated by few classes)"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Algorithm: {INDICATOR['algorithm']}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Algorithm: {INDICATOR['algorithm']}")
 
 
 # =============================================================================
@@ -363,7 +347,7 @@ def explain_gini_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Gini Index calculator...")
+    print("\nTesting Gini Index calculator...")
     
     # Test 1: Perfect equality (2 classes, 50/50)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -376,9 +360,9 @@ if __name__ == "__main__":
     test_semantic_1 = {"red": (255, 0, 0), "green": (0, 255, 0)}
     result_1 = calculate_indicator(test_path_1, test_semantic_1)
     
-    print(f"\n   Test 1: Two classes, 50/50 split (perfect equality)")
-    print(f"      Expected Gini: 0.000")
-    print(f"      Calculated Gini: {result_1.get('value', 'N/A')}")
+    print(f"\nTest 1: Two classes, 50/50 split (perfect equality)")
+    print(f" Expected Gini: 0.000")
+    print(f" Calculated Gini: {result_1.get('value', 'N/A')}")
     
     os.remove(test_path_1)
     
@@ -392,9 +376,9 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2, test_semantic_1)
     
-    print(f"\n   Test 2: Two classes, 90/10 split (high inequality)")
-    print(f"      Expected Gini: ~0.400")
-    print(f"      Calculated Gini: {result_2.get('value', 'N/A')}")
+    print(f"\nTest 2: Two classes, 90/10 split (high inequality)")
+    print(f" Expected Gini: ~0.400")
+    print(f" Calculated Gini: {result_2.get('value', 'N/A')}")
     
     os.remove(test_path_2)
     
@@ -412,9 +396,9 @@ if __name__ == "__main__":
                        "blue": (0, 0, 255), "yellow": (255, 255, 0)}
     result_3 = calculate_indicator(test_path_3, test_semantic_3)
     
-    print(f"\n   Test 3: Four classes, 25% each (perfect equality)")
-    print(f"      Expected Gini: 0.000")
-    print(f"      Calculated Gini: {result_3.get('value', 'N/A')}")
+    print(f"\nTest 3: Four classes, 25% each (perfect equality)")
+    print(f" Expected Gini: 0.000")
+    print(f" Calculated Gini: {result_3.get('value', 'N/A')}")
     
     os.remove(test_path_3)
     
@@ -427,10 +411,10 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic_1)
     
-    print(f"\n   Test 4: Single class (100% one class)")
-    print(f"      Expected Gini: 0.000 (only one class, no inequality concept)")
-    print(f"      Calculated Gini: {result_4.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_gini(result_4.get('value'))}")
+    print(f"\nTest 4: Single class (100% one class)")
+    print(f" Expected Gini: 0.000 (only one class, no inequality concept)")
+    print(f" Calculated Gini: {result_4.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_gini(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
@@ -449,13 +433,13 @@ if __name__ == "__main__":
                        "yellow": (255, 255, 0), "magenta": (255, 0, 255)}
     result_5 = calculate_indicator(test_path_5, test_semantic_5)
     
-    print(f"\n   Test 5: Five classes (60/20/10/7/3)")
-    print(f"      Expected Gini: ~0.4-0.5 (moderate-high inequality)")
-    print(f"      Calculated Gini: {result_5.get('value', 'N/A')}")
-    print(f"      Dominant class: {result_5.get('dominant_class', 'N/A')}")
-    print(f"      Dominance ratio: {result_5.get('dominance_ratio', 'N/A')}")
-    print(f"      Interpretation: {interpret_gini(result_5.get('value'))}")
+    print(f"\nTest 5: Five classes (60/20/10/7/3)")
+    print(f" Expected Gini: ~0.4-0.5 (moderate-high inequality)")
+    print(f" Calculated Gini: {result_5.get('value', 'N/A')}")
+    print(f" Dominant class: {result_5.get('dominant_class', 'N/A')}")
+    print(f" Dominance ratio: {result_5.get('dominance_ratio', 'N/A')}")
+    print(f" Interpretation: {interpret_gini(result_5.get('value'))}")
     
     os.remove(test_path_5)
     
-    print("\n   ✅ Test complete!")
+    print("\n Test complete!")

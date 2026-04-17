@@ -1,37 +1,22 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_NAT
+"""Calculator Layer.
+
+Indicator ID:   IND_NAT
 Indicator Name: Naturalness Index
-Type: TYPE E (Deep Learning)
+Type:           TYPE E (Deep Learning
 
 Description:
-    The Naturalness Index (NAT) quantifies the perceived naturalness of 
-    a scene using deep learning or rule-based estimation. It measures the 
-    degree to which a streetscape appears natural versus artificial/urban.
-    
-    The indicator considers:
-    - Natural elements: vegetation (trees, grass, plants), sky, water, earth
-    - Artificial elements: buildings, roads, vehicles, walls, infrastructure
-    
-    A higher score indicates a more natural-appearing environment, which is 
-    associated with psychological restoration, stress reduction, and improved 
-    well-being. The naturalness perception is fundamental to understanding 
-    urban environmental quality and the restorative potential of streetscapes.
+    The Naturalness Index (NAT) quantifies the perceived naturalness of a scene
+    using deep learning or rule-based estimation. It measures the degree to
+    which a streetscape appears natural versus artificial/urban. The indicator
+    considers: - Natural elements: vegetation (trees, grass, plants), sky,
+    water, earth - Artificial elements: buildings, roads, vehicles, walls,
+    infrastructure A higher score indicates a more natural-appearing
+    environment, which is associated with psychological restoration, stress
+    reduction, and improved well-being. The naturalness perception is
+    fundamental to understanding urban environmental quality and the restorative
+    potential of streetscapes.
 
-Formula: 
-    - Deep Learning Mode: CNN model prediction (0-10 scale)
-    - Placeholder Mode: score = natural_ratio × 10 × (1 - artificial_ratio × 0.5)
-
-Variables:
-    - natural_ratio: Proportion of natural element pixels
-    - artificial_ratio: Proportion of artificial element pixels
-
-⚠️ Notes:
-    - Full DL implementation requires PyTorch: pip install torch torchvision
-    - Requires pre-trained model file for DL mode
-    - GPU support recommended for better performance
-    - Placeholder mode uses rule-based estimation for testing
+Formula: - Deep Learning Mode: CNN model prediction (0-10 scale)
 """
 
 import numpy as np
@@ -109,8 +94,8 @@ INDICATOR = {
     "note": "Higher scores indicate more natural-appearing environments; supports both DL and rule-based modes"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Mode: {'Placeholder (rule-based)' if INDICATOR.get('use_placeholder', True) else 'Deep Learning'}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Mode: {'Placeholder (rule-based)' if INDICATOR.get('use_placeholder', True) else 'Deep Learning'}")
 
 
 # =============================================================================
@@ -122,10 +107,10 @@ try:
     import torchvision.transforms as transforms
     from torchvision import models
     TORCH_AVAILABLE = True
-    print(f"   PyTorch: Available (version {torch.__version__})")
+    print(f" PyTorch: Available (version {torch.__version__})")
 except ImportError:
-    print(f"   PyTorch: Not installed")
-    print(f"   To enable full DL mode: pip install torch torchvision")
+    print(f" PyTorch: Not installed")
+    print(f" To enable full DL mode: pip install torch torchvision")
 
 
 # =============================================================================
@@ -367,7 +352,7 @@ def interpret_naturalness(score: float) -> str:
 # STANDALONE TEST (Optional)
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Naturalness Index calculator...")
+    print("\nTesting Naturalness Index calculator...")
     
     # Create test image - High naturalness (mostly green)
     test_natural = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -393,13 +378,13 @@ if __name__ == "__main__":
         
         result = calculate_indicator(test_path)
         
-        print(f"\n   {name}:")
-        print(f"      Score: {result['value']}/10")
-        print(f"      Method: {result['method']}")
+        print(f"\n{name}:")
+        print(f" Score: {result['value']}/10")
+        print(f" Method: {result['method']}")
         if 'natural_ratio' in result:
-            print(f"      Natural: {result['natural_ratio']}%, Artificial: {result['artificial_ratio']}%")
-        print(f"      Interpretation: {interpret_naturalness(result['value'])}")
+            print(f" Natural: {result['natural_ratio']}%, Artificial: {result['artificial_ratio']}%")
+        print(f" Interpretation: {interpret_naturalness(result['value'])}")
         
         os.remove(test_path)
     
-    print("\n   🧹 Test cleanup complete")
+    print("\n Test cleanup complete")

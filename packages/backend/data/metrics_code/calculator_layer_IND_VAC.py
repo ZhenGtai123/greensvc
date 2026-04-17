@@ -1,31 +1,17 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_VAC
+"""Calculator Layer.
+
+Indicator ID:   IND_VAC
 Indicator Name: Visible Accessibility Index
-Type: TYPE A (Simple Pixel Ratio)
+Type:           TYPE A (Simple Pixel Ratio
 
 Description:
-    The Visible Accessibility Index (VAC) measures the proportion of 
-    pixels representing accessibility features such as sidewalks, paths, 
-    stairs, streetlights, and benches. This indicator reflects the visual 
-    presence of infrastructure that supports pedestrian accessibility 
-    and mobility in urban environments.
-    
-Formula: 
-    VAC = (Pixels_Sidewalk + Pixels_Path + Pixels_Stairs + 
-           Pixels_Streetlight + Pixels_Bench + ...) / Total_Pixels
-    
-Variables:
-    - Pixels_Sidewalk: Sidewalk/pavement pixels
-    - Pixels_Path: Path/walkway pixels
-    - Pixels_Stairs: Stairs/steps pixels
-    - Pixels_Streetlight: Street light pixels
-    - Pixels_Bench: Bench pixels
-    - Total_Pixels: Total image pixels
+    The Visible Accessibility Index (VAC) measures the proportion of pixels
+    representing accessibility features such as sidewalks, paths, stairs,
+    streetlights, and benches. This indicator reflects the visual presence of
+    infrastructure that supports pedestrian accessibility and mobility in urban
+    environments.
 
-Unit: ratio (0 to 1)
-Range: 0.0 (no accessibility features) to 1.0 (all accessibility features)
+Formula: VAC = (Pixels_Sidewalk + Pixels_Path + Pixels_Stairs +
 """
 
 import numpy as np
@@ -70,9 +56,9 @@ INDICATOR = {
     "note": "Higher values indicate more visible accessibility infrastructure"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE A (Simple Pixel Ratio)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE A (Simple Pixel Ratio)")
 
 
 # =============================================================================
@@ -359,7 +345,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Visible Accessibility Index calculator...")
+    print("\nTesting Visible Accessibility Index calculator...")
     
     # Test 1: No accessibility features (all sky)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -371,10 +357,10 @@ if __name__ == "__main__":
     test_semantic_1 = {"sky": (135, 206, 235)}
     result_1 = calculate_indicator(test_path_1, test_semantic_1)
     
-    print(f"\n   Test 1: No accessibility features (100% sky)")
-    print(f"      Expected VAC: 0.0000")
-    print(f"      Calculated VAC: {result_1.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_vac(result_1.get('value'))}")
+    print(f"\nTest 1: No accessibility features (100% sky)")
+    print(f" Expected VAC: 0.0000")
+    print(f" Calculated VAC: {result_1.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_vac(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -389,11 +375,11 @@ if __name__ == "__main__":
     test_semantic_2 = {"road": (128, 128, 128), "sidewalk": (200, 200, 200)}
     result_2 = calculate_indicator(test_path_2, test_semantic_2)
     
-    print(f"\n   Test 2: 20% sidewalk coverage")
-    print(f"      Expected VAC: 0.2000")
-    print(f"      Calculated VAC: {result_2.get('value', 'N/A')}")
-    print(f"      Category breakdown: {result_2.get('category_breakdown', {})}")
-    print(f"      Interpretation: {interpret_vac(result_2.get('value'))}")
+    print(f"\nTest 2: 20% sidewalk coverage")
+    print(f" Expected VAC: 0.2000")
+    print(f" Calculated VAC: {result_2.get('value', 'N/A')}")
+    print(f" Category breakdown: {result_2.get('category_breakdown', {})}")
+    print(f" Interpretation: {interpret_vac(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -415,13 +401,13 @@ if __name__ == "__main__":
     }
     result_3 = calculate_indicator(test_path_3, test_semantic_3)
     
-    print(f"\n   Test 3: Multiple features (15% sidewalk + 3% streetlight + 2% bench)")
-    print(f"      Expected VAC: 0.2000")
-    print(f"      Calculated VAC: {result_3.get('value', 'N/A')}")
-    print(f"      Accessibility classes: {result_3.get('n_accessibility_classes', 0)}")
-    print(f"      Category breakdown: {result_3.get('category_breakdown', {})}")
-    print(f"      Dominant category: {result_3.get('dominant_category', 'N/A')}")
-    print(f"      Interpretation: {interpret_vac(result_3.get('value'))}")
+    print(f"\nTest 3: Multiple features (15% sidewalk + 3% streetlight + 2% bench)")
+    print(f" Expected VAC: 0.2000")
+    print(f" Calculated VAC: {result_3.get('value', 'N/A')}")
+    print(f" Accessibility classes: {result_3.get('n_accessibility_classes', 0)}")
+    print(f" Category breakdown: {result_3.get('category_breakdown', {})}")
+    print(f" Dominant category: {result_3.get('dominant_category', 'N/A')}")
+    print(f" Interpretation: {interpret_vac(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -435,12 +421,12 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic_3)
     
-    print(f"\n   Test 4: High accessibility coverage (40% sidewalk)")
-    print(f"      Expected VAC: 0.4000")
-    print(f"      Calculated VAC: {result_4.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_vac(result_4.get('value'))}")
+    print(f"\nTest 4: High accessibility coverage (40% sidewalk)")
+    print(f" Expected VAC: 0.4000")
+    print(f" Calculated VAC: {result_4.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_vac(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
-    print("\n   ✅ Test complete!")
-    print(f"\n   📝 Accessibility categories: {list(ACCESSIBILITY_CATEGORIES.keys())}")
+    print("\n Test complete!")
+    print(f"\n Accessibility categories: {list(ACCESSIBILITY_CATEGORIES.keys())}")

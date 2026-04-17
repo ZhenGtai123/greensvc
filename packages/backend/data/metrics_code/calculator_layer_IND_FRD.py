@@ -1,36 +1,21 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_FRD
+"""Calculator Layer.
+
+Indicator ID:   IND_FRD
 Indicator Name: Fractal Dimension
-Type: TYPE B (Custom Mathematical Formula)
+Type:           TYPE B (Custom Mathematical Formula
 
 Description:
-    The Fractal Dimension (FRD) indicator is a quantitative measure of 
-    morphological complexity and roughness, derived from fractal geometry.
-    It quantifies the visual complexity of scene boundaries and edges.
-    
-    The Box-Counting method is used to estimate the fractal dimension:
-    - Cover the image edges with boxes of size r
-    - Count boxes N(r) containing at least one edge pixel
-    - Repeat for multiple box sizes
-    - Fractal dimension Db = slope of log(N(r)) vs log(1/r)
-    
-    Higher fractal dimension indicates more complex, irregular boundaries.
-    Lower fractal dimension indicates simpler, smoother boundaries.
-    
-Formula: 
-    Db = lim(r→0) [log N(r) / log(1/r)]
-    
-    In practice: Db = slope of linear regression of log(N(r)) vs log(1/r)
-    
-Variables:
-    - Db: Box-counting fractal dimension
-    - N(r): Number of boxes of size r that cover at least one edge pixel
-    - r: Size/scale of the box
+    The Fractal Dimension (FRD) indicator is a quantitative measure of
+    morphological complexity and roughness, derived from fractal geometry. It
+    quantifies the visual complexity of scene boundaries and edges. The
+    Box-Counting method is used to estimate the fractal dimension: - Cover the
+    image edges with boxes of size r - Count boxes N(r) containing at least one
+    edge pixel - Repeat for multiple box sizes - Fractal dimension Db = slope of
+    log(N(r)) vs log(1/r) Higher fractal dimension indicates more complex,
+    irregular boundaries. Lower fractal dimension indicates simpler, smoother
+    boundaries.
 
-Unit: dimensionless
-Range: 1.0 (straight line) to 2.0 (fills the plane)
+Formula: )
 """
 
 import numpy as np
@@ -73,9 +58,9 @@ INDICATOR = {
     "note": "Higher values indicate more complex, irregular visual boundaries"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Algorithm: {INDICATOR['algorithm']}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Algorithm: {INDICATOR['algorithm']}")
 
 
 # =============================================================================
@@ -379,7 +364,7 @@ def explain_fractal_dimension() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Fractal Dimension calculator...")
+    print("\nTesting Fractal Dimension calculator...")
     
     # Test 1: Simple horizontal line (expected: ~1.0)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -390,10 +375,10 @@ if __name__ == "__main__":
     
     result_1 = calculate_indicator(test_path_1)
     
-    print(f"\n   Test 1: Single horizontal line")
-    print(f"      Expected: ~1.0 (straight line)")
-    print(f"      Calculated: {result_1.get('value', 'N/A')}")
-    print(f"      R-squared: {result_1.get('r_squared', 'N/A')}")
+    print(f"\nTest 1: Single horizontal line")
+    print(f" Expected: ~1.0 (straight line)")
+    print(f" Calculated: {result_1.get('value', 'N/A')}")
+    print(f" R-squared: {result_1.get('r_squared', 'N/A')}")
     
     os.remove(test_path_1)
     
@@ -411,11 +396,11 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2)
     
-    print(f"\n   Test 2: Checkerboard pattern")
-    print(f"      Expected: Higher complexity (more edges)")
-    print(f"      Calculated: {result_2.get('value', 'N/A')}")
-    print(f"      R-squared: {result_2.get('r_squared', 'N/A')}")
-    print(f"      Edge density: {result_2.get('edge_density', 'N/A')}%")
+    print(f"\nTest 2: Checkerboard pattern")
+    print(f" Expected: Higher complexity (more edges)")
+    print(f" Calculated: {result_2.get('value', 'N/A')}")
+    print(f" R-squared: {result_2.get('r_squared', 'N/A')}")
+    print(f" Edge density: {result_2.get('edge_density', 'N/A')}%")
     
     os.remove(test_path_2)
     
@@ -428,12 +413,12 @@ if __name__ == "__main__":
     
     result_3 = calculate_indicator(test_path_3)
     
-    print(f"\n   Test 3: Random noise")
-    print(f"      Expected: ~2.0 (maximum complexity)")
-    print(f"      Calculated: {result_3.get('value', 'N/A')}")
-    print(f"      R-squared: {result_3.get('r_squared', 'N/A')}")
-    print(f"      Interpretation: {interpret_fractal_dimension(result_3.get('value'))}")
+    print(f"\nTest 3: Random noise")
+    print(f" Expected: ~2.0 (maximum complexity)")
+    print(f" Calculated: {result_3.get('value', 'N/A')}")
+    print(f" R-squared: {result_3.get('r_squared', 'N/A')}")
+    print(f" Interpretation: {interpret_fractal_dimension(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
-    print("\n   🧹 Test cleanup complete")
+    print("\n Test cleanup complete")

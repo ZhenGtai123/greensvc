@@ -1,29 +1,18 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_TVF
+"""Calculator Layer.
+
+Indicator ID:   IND_TVF
 Indicator Name: Tree View Factor
-Type: TYPE A (ratio mode)
+Type:           TYPE A (ratio mode
 
 Description:
-    The Tree View Factor (TVF) quantifies the proportion of tree canopy pixels 
-    visible in street-level imagery. Unlike the broader Green View Index (GVI) 
-    which includes all vegetation types, TVF specifically focuses on trees, 
-    making it valuable for urban forestry assessment, canopy cover analysis, 
-    and shade provision studies. Trees are particularly important for thermal 
+    The Tree View Factor (TVF) quantifies the proportion of tree canopy pixels
+    visible in street-level imagery. Unlike the broader Green View Index (GVI)
+    which includes all vegetation types, TVF specifically focuses on trees,
+    making it valuable for urban forestry assessment, canopy cover analysis, and
+    shade provision studies. Trees are particularly important for thermal
     comfort, air quality improvement, and urban biodiversity.
 
 Formula: TVF = (Sum(Tree_Pixels) / Sum(Total_Pixels)) × 100
-
-Variables:
-    - Tree_Pixels: Pixels classified as trees (including palm trees)
-    - Total_Pixels: Total number of pixels in the image
-
-References:
-    - First confirmed by: Zhang, L., et al. (2024). Research on Regional 
-      Differences of Residents' Green Space Exposure Based on Street View 
-      Imagery. International Journal of Geoinformatics.
-    - Merged from: IND_TVI, IND_TRA
 """
 
 import numpy as np
@@ -75,21 +64,21 @@ INDICATOR = {
 
 TARGET_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 for class_name in INDICATOR.get('target_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         TARGET_RGB[rgb] = class_name
-        print(f"   ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"   ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
         # Try partial matching to suggest corrections
         for name in semantic_colors.keys():
             if class_name.split(';')[0] in name or name.split(';')[0] in class_name:
-                print(f"      💡 Did you mean: '{name}'?")
+                print(f" Did you mean: '{name}'?")
                 break
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
+print(f"\nCalculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
 
 
 # =============================================================================
@@ -181,7 +170,7 @@ if __name__ == "__main__":
     Test code for standalone execution.
     Creates a synthetic test image and validates the calculator.
     """
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
     
     # Create a synthetic test image (100x100 pixels)
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -202,20 +191,20 @@ if __name__ == "__main__":
     
     # Run calculation
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
     
     # Validate expected result (should be ~35%)
     if result['success']:
         expected_tvf = 35.0  # 25% tree + 10% palm
         actual_tvf = result['value']
-        print(f"   Expected TVF: ~{expected_tvf}%")
-        print(f"   Actual TVF: {actual_tvf}%")
+        print(f" Expected TVF: ~{expected_tvf}%")
+        print(f" Actual TVF: {actual_tvf}%")
         if abs(actual_tvf - expected_tvf) < 1:
-            print("   ✅ Test PASSED")
+            print(" Test PASSED")
         else:
-            print("   ⚠️ Test result differs from expected")
+            print(" ️ Test result differs from expected")
     
     # Cleanup
     import os
     os.remove(test_path)
-    print("   🧹 Test cleanup complete")
+    print(" Test cleanup complete")

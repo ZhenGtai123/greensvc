@@ -1,29 +1,16 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_IMG_CON
+"""Calculator Layer.
+
+Indicator ID:   IND_IMG_CON
 Indicator Name: Image Contrast
-Type: TYPE B (Custom Mathematical Formula - RMS Contrast)
+Type:           TYPE B (Custom Mathematical Formula - RMS Contrast
 
 Description:
-    The Image Contrast (IMG_CON) measures the difference in luminance 
-    or color that makes objects distinguishable within an image. It is 
-    calculated using Root Mean Square (RMS) Contrast, which quantifies 
-    the standard deviation of pixel intensities normalized by the image 
-    dimensions and color channels.
-    
-Formula: 
-    IMG_CON = Sqrt( Sum( (I_bij - I_bar)^2 ) / (3 * M * N) )
-    
-Variables:
-    - I_bij: Intensity value at pixel (i,j) in color channel b
-    - I_bar: Mean intensity across all pixels and all channels
-    - M: Image height (number of rows)
-    - N: Image width (number of columns)
-    - 3: Number of color channels (RGB)
+    The Image Contrast (IMG_CON) measures the difference in luminance or color
+    that makes objects distinguishable within an image. It is calculated using
+    Root Mean Square (RMS) Contrast, which quantifies the standard deviation of
+    pixel intensities normalized by the image dimensions and color channels.
 
-Unit: intensity (0 to ~128 for 8-bit images)
-Range: 0.0 (uniform image) to ~128 (maximum contrast)
+Formula: - RMS Contrast)
 """
 
 import numpy as np
@@ -67,9 +54,9 @@ INDICATOR = {
     "note": "Works on raw image pixels, not semantic segmentation. Higher values indicate more visual contrast."
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE B (RMS Contrast)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE B (RMS Contrast)")
 
 
 # =============================================================================
@@ -324,7 +311,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Image Contrast calculator...")
+    print("\nTesting Image Contrast calculator...")
     
     # Test 1: Uniform image (all same color) - zero contrast
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -335,11 +322,11 @@ if __name__ == "__main__":
     
     result_1 = calculate_indicator(test_path_1)
     
-    print(f"\n   Test 1: Uniform gray image (128, 128, 128)")
-    print(f"      Expected RMS: 0.0000")
-    print(f"      Calculated RMS: {result_1.get('value', 'N/A')}")
-    print(f"      Mean intensity: {result_1.get('mean_intensity', 'N/A')}")
-    print(f"      Interpretation: {interpret_img_con(result_1.get('value'))}")
+    print(f"\nTest 1: Uniform gray image (128, 128, 128)")
+    print(f" Expected RMS: 0.0000")
+    print(f" Calculated RMS: {result_1.get('value', 'N/A')}")
+    print(f" Mean intensity: {result_1.get('mean_intensity', 'N/A')}")
+    print(f" Interpretation: {interpret_img_con(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -353,12 +340,12 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2)
     
-    print(f"\n   Test 2: Half black, half white (maximum contrast)")
-    print(f"      Expected RMS: ~127.5")
-    print(f"      Calculated RMS: {result_2.get('value', 'N/A')}")
-    print(f"      Mean intensity: {result_2.get('mean_intensity', 'N/A')}")
-    print(f"      Michelson: {result_2.get('michelson_contrast', 'N/A')}")
-    print(f"      Interpretation: {interpret_img_con(result_2.get('value'))}")
+    print(f"\nTest 2: Half black, half white (maximum contrast)")
+    print(f" Expected RMS: ~127.5")
+    print(f" Calculated RMS: {result_2.get('value', 'N/A')}")
+    print(f" Mean intensity: {result_2.get('mean_intensity', 'N/A')}")
+    print(f" Michelson: {result_2.get('michelson_contrast', 'N/A')}")
+    print(f" Interpretation: {interpret_img_con(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -372,11 +359,11 @@ if __name__ == "__main__":
     
     result_3 = calculate_indicator(test_path_3)
     
-    print(f"\n   Test 3: Vertical gradient (0 to 255)")
-    print(f"      Calculated RMS: {result_3.get('value', 'N/A')}")
-    print(f"      Mean intensity: {result_3.get('mean_intensity', 'N/A')}")
-    print(f"      Intensity range: {result_3.get('intensity_range', 'N/A')}")
-    print(f"      Interpretation: {interpret_img_con(result_3.get('value'))}")
+    print(f"\nTest 3: Vertical gradient (0 to 255)")
+    print(f" Calculated RMS: {result_3.get('value', 'N/A')}")
+    print(f" Mean intensity: {result_3.get('mean_intensity', 'N/A')}")
+    print(f" Intensity range: {result_3.get('intensity_range', 'N/A')}")
+    print(f" Interpretation: {interpret_img_con(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -390,11 +377,11 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4)
     
-    print(f"\n   Test 4: Low contrast (120 vs 130 gray)")
-    print(f"      Calculated RMS: {result_4.get('value', 'N/A')}")
-    print(f"      Mean intensity: {result_4.get('mean_intensity', 'N/A')}")
-    print(f"      Intensity range: {result_4.get('intensity_range', 'N/A')}")
-    print(f"      Interpretation: {interpret_img_con(result_4.get('value'))}")
+    print(f"\nTest 4: Low contrast (120 vs 130 gray)")
+    print(f" Calculated RMS: {result_4.get('value', 'N/A')}")
+    print(f" Mean intensity: {result_4.get('mean_intensity', 'N/A')}")
+    print(f" Intensity range: {result_4.get('intensity_range', 'N/A')}")
+    print(f" Interpretation: {interpret_img_con(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
@@ -410,16 +397,16 @@ if __name__ == "__main__":
     
     result_5 = calculate_indicator(test_path_5)
     
-    print(f"\n   Test 5: Four color quadrants (R, G, B, Yellow)")
-    print(f"      Calculated RMS: {result_5.get('value', 'N/A')}")
-    print(f"      Mean intensity: {result_5.get('mean_intensity', 'N/A')}")
-    print(f"      Channel stats: {result_5.get('channel_stats', {})}")
-    print(f"      Interpretation: {interpret_img_con(result_5.get('value'))}")
+    print(f"\nTest 5: Four color quadrants (R, G, B, Yellow)")
+    print(f" Calculated RMS: {result_5.get('value', 'N/A')}")
+    print(f" Mean intensity: {result_5.get('mean_intensity', 'N/A')}")
+    print(f" Channel stats: {result_5.get('channel_stats', {})}")
+    print(f" Interpretation: {interpret_img_con(result_5.get('value'))}")
     
     os.remove(test_path_5)
     
-    print("\n   ✅ Test complete!")
-    print("\n   📊 Summary:")
-    print(f"      - Uniform image: RMS = 0 (no contrast)")
-    print(f"      - Half B/W: RMS ≈ 127.5 (maximum contrast)")
-    print(f"      - Gradient: RMS depends on distribution")
+    print("\n Test complete!")
+    print("\n Summary:")
+    print(f" - Uniform image: RMS = 0 (no contrast)")
+    print(f" - Half B/W: RMS ≈ 127.5 (maximum contrast)")
+    print(f" - Gradient: RMS depends on distribution")

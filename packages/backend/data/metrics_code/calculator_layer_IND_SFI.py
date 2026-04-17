@@ -1,19 +1,10 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_SFI
-指标名称: Spatial Feasibility Index (行人空间可行性指数)
-类型: TYPE D (组合类)
+"""Calculator Layer.
 
-说明:
-衡量街景中行人空间优先程度。
-通过人行道像素与车行道（car lane）像素的比值来表征：
-比值越高表示行人空间相对更充足、对机动车道依赖更低。
+Indicator ID:   IND_SFI
+Indicator Name: Spatial Feasibility Index
+Type:           TYPE D
 
-公式: SFI = Wn / Rn
-其中:
-- Wn: Sidewalk pixel count
-- Rn: Car lane pixel count
+Formula: SFI = Wn / Rn
 """
 
 import numpy as np
@@ -22,7 +13,7 @@ from typing import Dict
 
 
 # =============================================================================
-# 指标定义
+# INDICATOR DEFINITION
 # =============================================================================
 INDICATOR = {
     "id": "IND_SFI",
@@ -35,87 +26,60 @@ INDICATOR = {
 
     "calc_type": "composite",
 
-    # 组成部分（按功能分组）
     "component_classes": {
         "Wn_sidewalk": [
-            "sidewalk",           # 人行道
-            "sidewalk;curb",      # 若存在复合标签（可选）
+            "sidewalk",
+            "sidewalk;curb",
         ],
         "Rn_car_lane": [
-            "road",               # 车行道（如无car lane细分，默认使用road）
-            "lane",               # 车道（若存在）
-            "car lane",           # 车行道（若存在）
-            "driveway",           # 车行出入口/车道（可选）
+            "road",               # car lane road
+            "lane",
+            "car lane",
+            "driveway",           # /
         ]
     },
 
-    # 聚合方式
     "aggregation": "ratio"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Aggregation: {INDICATOR.get('aggregation', 'ratio')}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Aggregation: {INDICATOR.get('aggregation', 'ratio')}")
 
 
 # =============================================================================
-# 构建颜色查找表
+# COLOR LOOKUP TABLE
 # =============================================================================
 COMPONENT_RGB = {}
 
-print(f"\n🎯 Color lookup for components:")
+print(f"\nColor lookup for components:")
 for component_name, class_list in INDICATOR.get('component_classes', {}).items():
     COMPONENT_RGB[component_name] = {}
-    print(f"\n   📦 {component_name}:")
+    print(f"\n {component_name}:")
 
     for class_name in class_list:
         if class_name in semantic_colors:
             rgb = semantic_colors[class_name]
             COMPONENT_RGB[component_name][rgb] = class_name
-            print(f"      ✅ {class_name}: RGB{rgb}")
+            print(f" {class_name}: RGB{rgb}")
         else:
-            print(f"      ⚠️ NOT FOUND: {class_name}")
+            print(f" ️ NOT FOUND: {class_name}")
 
-print(f"\n✅ Components configured: {list(COMPONENT_RGB.keys())}")
+print(f"\nComponents configured: {list(COMPONENT_RGB.keys())}")
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Spatial Feasibility Index (行人空间可行性指数)
-
-    TYPE D: 组合类指标
-
-    算法步骤:
-    1. 分别统计 Wn_sidewalk 与 Rn_car_lane 的像素数
-    2. 计算 SFI = Wn / Rn
-    3. 返回总值及分解值
-
-    Args:
-        image_path: 语义分割mask图片路径
-
-    Returns:
-        {
-            'success': True/False,
-            'value': float (SFI),
-            'Wn': int,
-            'Rn': int,
-            'Wn_ratio': float (%),
-            'Rn_ratio': float (%),
-            'total_pixels': int,
-            'class_breakdown': dict
-        }
-    """
     try:
-        # Step 1: 加载图片
+        # Step 1:
         img = Image.open(image_path).convert('RGB')
         pixels = np.array(img)
         h, w, _ = pixels.shape
         total_pixels = h * w
         flat_pixels = pixels.reshape(-1, 3)
 
-        # Step 2: 统计组成部分像素
+        # Step 2:
         component_counts = {"Wn_sidewalk": 0, "Rn_car_lane": 0}
         component_ratios = {"Wn_sidewalk": 0, "Rn_car_lane": 0}
         all_class_counts = {}
@@ -138,7 +102,7 @@ def calculate_indicator(image_path: str) -> Dict:
         Wn = int(component_counts.get("Wn_sidewalk", 0))
         Rn = int(component_counts.get("Rn_car_lane", 0))
 
-        # Step 3: 计算比值
+        # Step 3:
         if Rn == 0:
             value = 0
             note = "Rn (car lane pixels) is zero"
@@ -146,7 +110,7 @@ def calculate_indicator(image_path: str) -> Dict:
             value = Wn / Rn
             note = None
 
-        # Step 4: 返回结果
+        # Step 4:
         result = {
             'success': True,
             'value': round(float(value), 3),
@@ -174,12 +138,9 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 辅助函数
+# HELPER FUNCTIONS
 # =============================================================================
 def interpret_sfi(sfi: float) -> str:
-    """
-    解释SFI的含义
-    """
     if sfi < 0.2:
         return "Very low pedestrian priority"
     elif sfi < 0.5:
@@ -191,10 +152,10 @@ def interpret_sfi(sfi: float) -> str:
 
 
 # =============================================================================
-# 测试代码
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Spatial Feasibility Index calculator...")
+    print("\nTesting Spatial Feasibility Index calculator...")
 
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
 
@@ -207,13 +168,12 @@ if __name__ == "__main__":
 
         result = calculate_indicator(test_path)
 
-        print(f"\n   Test: 30% sidewalk / 60% road => SFI ≈ 0.5")
-        print(f"   Result: {result['value']}")
-        print(f"   Wn: {result['Wn']}, Rn: {result['Rn']}")
-        print(f"   Interpretation: {interpret_sfi(result['value'])}")
+        print(f"\nTest: 30% sidewalk / 60% road => SFI ≈ 0.5")
+        print(f" Result: {result['value']}")
+        print(f" Wn: {result['Wn']}, Rn: {result['Rn']}")
+        print(f" Interpretation: {interpret_sfi(result['value'])}")
 
         import os
         os.remove(test_path)
     else:
-        print("   ⚠️ Required classes not found in semantic_colors")
-
+        print(" ️ Required classes not found in semantic_colors")

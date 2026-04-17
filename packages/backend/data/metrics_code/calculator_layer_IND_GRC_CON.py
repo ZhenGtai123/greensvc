@@ -1,21 +1,10 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_GRC_CON
-指标名称: Grayscale Contrast (GLCM) (灰度对比度-GLCM)
-类型: TYPE C (图像处理类)
+"""Calculator Layer.
 
-说明:
-基于灰度共生矩阵（GLCM）的纹理对比度指标，用于表征相邻像素灰度差异程度。
-对比度越大表示邻域灰度变化越强、纹理越粗糙。
+Indicator ID:   IND_GRC_CON
+Indicator Name: Grayscale Contrast (GLCM) (-GLCM
+Type:           TYPE C
 
-公式:
-GRC_CON = Σ (i - j)^2 × P(i, j)
-其中:
-- P(i, j): 灰度值 i 与 j 在给定位移关系下的共生概率
-
-单位: 无量纲
-范围: >= 0
+Formula: GRC_CON = Σ (i - j)^2 × P(i, j)
 """
 
 import numpy as np
@@ -25,7 +14,7 @@ import os
 
 
 # =============================================================================
-# 指标定义
+# INDICATOR DEFINITION
 # =============================================================================
 INDICATOR = {
     "id": "IND_GRC_CON",
@@ -45,53 +34,27 @@ INDICATOR = {
         "θ": "Direction of offset"
     },
 
-    # TYPE C 特殊配置
+    # TYPE C
     "use_original_image": False,
     "original_image_path": None,
 
-    # GLCM配置
+    # GLCM
     "levels": 32,
     "distance": 1,
     "angles": [0, 45, 90, 135]  # degrees
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Use original image: {INDICATOR.get('use_original_image', False)}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Use original image: {INDICATOR.get('use_original_image', False)}")
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Grayscale Contrast (GLCM) (灰度对比度-GLCM)
-
-    TYPE C: 图像处理类
-
-    算法步骤:
-    1. 加载图像（mask或原始图像）并转灰度
-    2. 量化灰度级（levels）
-    3. 构建GLCM并归一化得到P(i,j)
-    4. 计算对比度 Σ(i-j)^2 × P(i,j)
-    5. 多方向取平均（可选）
-
-    Args:
-        image_path: 图片路径
-
-    Returns:
-        {
-            'success': True/False,
-            'value': float (GRC_CON),
-            'levels': int,
-            'distance': int,
-            'angles': list,
-            'per_angle_contrast': dict,
-            'dimensions': dict
-        }
-    """
     try:
-        # Step 1: 确定实际图片路径
+        # Step 1:
         actual_path = image_path
         image_source = 'mask'
 
@@ -107,7 +70,7 @@ def calculate_indicator(image_path: str) -> Dict:
                             image_source = 'original'
                             break
 
-        # Step 2: 加载并转灰度
+        # Step 2:
         img = Image.open(actual_path).convert('RGB')
         rgb = np.array(img, dtype=np.float64)
         h, w, _ = rgb.shape
@@ -115,7 +78,7 @@ def calculate_indicator(image_path: str) -> Dict:
         gray = 0.299 * rgb[:, :, 0] + 0.587 * rgb[:, :, 1] + 0.114 * rgb[:, :, 2]
         gray = np.clip(gray, 0, 255)
 
-        # Step 3: 量化灰度级
+        # Step 3:
         levels = int(INDICATOR.get('levels', 32))
         if levels < 2:
             levels = 2
@@ -123,7 +86,7 @@ def calculate_indicator(image_path: str) -> Dict:
         q = np.floor(gray / 256.0 * levels).astype(np.int32)
         q[q == levels] = levels - 1
 
-        # Step 4: 构建GLCM并计算对比度
+        # Step 4: GLCM
         d = int(INDICATOR.get('distance', 1))
         angles = INDICATOR.get('angles', [0, 45, 90, 135])
 
@@ -209,12 +172,9 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 辅助函数：对比度解释
+# HELPER FUNCTIONS
 # =============================================================================
 def interpret_grc_con(value: float) -> str:
-    """
-    解释GRC_CON的含义
-    """
     if value < 1:
         return "Very low texture contrast: smooth grayscale surface"
     elif value < 5:
@@ -226,15 +186,13 @@ def interpret_grc_con(value: float) -> str:
 
 
 # =============================================================================
-# 测试代码
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Grayscale Contrast (GLCM) calculator...")
+    print("\nTesting Grayscale Contrast (GLCM) calculator...")
 
-    # 平滑图像：低对比度纹理
     smooth = np.full((128, 128, 3), 128, dtype=np.uint8)
 
-    # 棋盘格：高对比度纹理
     checker = np.zeros((128, 128, 3), dtype=np.uint8)
     block = 8
     for i in range(0, 128, block):
@@ -248,9 +206,9 @@ if __name__ == "__main__":
 
         result = calculate_indicator(test_path)
 
-        print(f"\n   {name}:")
-        print(f"      GRC_CON: {result['value']}")
-        print(f"      Per-angle: {result['per_angle_contrast']}")
-        print(f"      Interpretation: {interpret_grc_con(result['value'])}")
+        print(f"\n{name}:")
+        print(f" GRC_CON: {result['value']}")
+        print(f" Per-angle: {result['per_angle_contrast']}")
+        print(f" Interpretation: {interpret_grc_con(result['value'])}")
 
         os.remove(test_path)

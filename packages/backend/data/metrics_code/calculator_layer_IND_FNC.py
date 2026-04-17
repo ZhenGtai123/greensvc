@@ -1,30 +1,21 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_FNC
+"""Calculator Layer.
+
+Indicator ID:   IND_FNC
 Indicator Name: Fence Ratio
-Type: TYPE A (ratio mode)
+Type:           TYPE A (ratio mode
 
 Description:
-    The Fence Ratio (FNC) quantifies the proportion of fence and railing 
-    pixels visible in street-level imagery. It measures the visual presence 
-    of barrier structures such as fences, railings, and similar enclosures 
-    in the urban landscape. Fences serve various functions including property 
-    demarcation, security, privacy, and pedestrian safety (e.g., along 
-    roadways or elevated areas). The visibility of fences affects visual 
-    permeability, perceived openness, and can indicate the level of 
-    privatization or enclosure in urban spaces. Unlike solid walls, fences 
-    typically allow partial visibility through their structure.
+    The Fence Ratio (FNC) quantifies the proportion of fence and railing pixels
+    visible in street-level imagery. It measures the visual presence of barrier
+    structures such as fences, railings, and similar enclosures in the urban
+    landscape. Fences serve various functions including property demarcation,
+    security, privacy, and pedestrian safety (e.g., along roadways or elevated
+    areas). The visibility of fences affects visual permeability, perceived
+    openness, and can indicate the level of privatization or enclosure in urban
+    spaces. Unlike solid walls, fences typically allow partial visibility
+    through their structure.
 
 Formula: FNC = (Sum(Fence_Pixels) / Sum(Total_Pixels)) × 100
-
-Variables:
-    - Fence_Pixels: Pixels classified as fences, fencing, and railings
-    - Total_Pixels: Total number of pixels in the image
-
-References:
-    - Related to urban enclosure and visual permeability studies
-    - Contributes to understanding of spatial boundaries and accessibility
 """
 
 import numpy as np
@@ -73,21 +64,21 @@ INDICATOR = {
 
 TARGET_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 for class_name in INDICATOR.get('target_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         TARGET_RGB[rgb] = class_name
-        print(f"   ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"   ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
         # Try partial matching to suggest corrections
         for name in semantic_colors.keys():
             if class_name.split(';')[0] in name or name.split(';')[0] in class_name:
-                print(f"      💡 Did you mean: '{name}'?")
+                print(f" Did you mean: '{name}'?")
                 break
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
+print(f"\nCalculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
 
 
 # =============================================================================
@@ -179,7 +170,7 @@ if __name__ == "__main__":
     Test code for standalone execution.
     Creates a synthetic test image and validates the calculator.
     """
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
     
     # Create a synthetic test image (100x100 pixels)
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -200,20 +191,20 @@ if __name__ == "__main__":
     
     # Run calculation
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
     
     # Validate expected result (should be ~12%)
     if result['success']:
         expected_fnc = 12.0  # 7% fence + 5% railing
         actual_fnc = result['value']
-        print(f"   Expected FNC: ~{expected_fnc}%")
-        print(f"   Actual FNC: {actual_fnc}%")
+        print(f" Expected FNC: ~{expected_fnc}%")
+        print(f" Actual FNC: {actual_fnc}%")
         if abs(actual_fnc - expected_fnc) < 1:
-            print("   ✅ Test PASSED")
+            print(" Test PASSED")
         else:
-            print("   ⚠️ Test result differs from expected")
+            print(" ️ Test result differs from expected")
     
     # Cleanup
     import os
     os.remove(test_path)
-    print("   🧹 Test cleanup complete")
+    print(" Test cleanup complete")

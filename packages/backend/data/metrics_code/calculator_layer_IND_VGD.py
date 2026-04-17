@@ -1,28 +1,17 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_VGD
+"""Calculator Layer.
+
+Indicator ID:   IND_VGD
 Indicator Name: Visible Green Distribution
-Type: TYPE B (Custom Mathematical Formula - Spatial Clustering)
+Type:           TYPE B (Custom Mathematical Formula - Spatial Clustering
 
 Description:
-    The Visible Green Distribution (VGD) is a measure of the spatial 
-    clustering of vegetation pixels within an image. It quantifies how 
-    clustered or dispersed the vegetation is spatially. Higher values 
-    indicate more clustered vegetation (e.g., a solid tree canopy), 
-    while lower values indicate more dispersed vegetation (scattered 
-    individual pixels).
-    
-Formula: 
-    VGD = 0.5 * Sum(xi * xj) / xperc
-    
-Variables:
-    - xi, xj: Binary pixel status at adjacent locations i and j (1 if vegetation, 0 otherwise)
-    - Sum(xi * xj): Count of adjacent vegetation pixel pairs
-    - xperc: Percentage of vegetation pixels (vegetation_pixels / total_pixels)
+    The Visible Green Distribution (VGD) is a measure of the spatial clustering
+    of vegetation pixels within an image. It quantifies how clustered or
+    dispersed the vegetation is spatially. Higher values indicate more clustered
+    vegetation (e.g., a solid tree canopy), while lower values indicate more
+    dispersed vegetation (scattered individual pixels).
 
-Unit: index (dimensionless)
-Range: 0.0 (no vegetation or completely dispersed) to high values (highly clustered)
+Formula: - Spatial Clustering)
 """
 
 import numpy as np
@@ -66,9 +55,9 @@ INDICATOR = {
     "note": "Higher values indicate clustered vegetation; lower values indicate dispersed vegetation"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE B (Spatial Clustering)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE B (Spatial Clustering)")
 
 
 # =============================================================================
@@ -383,7 +372,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Visible Green Distribution calculator...")
+    print("\nTesting Visible Green Distribution calculator...")
     
     # Test 1: No vegetation (all sky)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -395,10 +384,10 @@ if __name__ == "__main__":
     test_semantic_1 = {"sky": (135, 206, 235), "tree": (34, 139, 34)}
     result_1 = calculate_indicator(test_path_1, test_semantic_1)
     
-    print(f"\n   Test 1: No vegetation (100% sky)")
-    print(f"      Expected VGD: 0.000")
-    print(f"      Calculated VGD: {result_1.get('value', 'N/A')}")
-    print(f"      Adjacent pairs: {result_1.get('adjacent_pairs', 'N/A')}")
+    print(f"\nTest 1: No vegetation (100% sky)")
+    print(f" Expected VGD: 0.000")
+    print(f" Calculated VGD: {result_1.get('value', 'N/A')}")
+    print(f" Adjacent pairs: {result_1.get('adjacent_pairs', 'N/A')}")
     
     os.remove(test_path_1)
     
@@ -412,11 +401,11 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2, test_semantic_1)
     
-    print(f"\n   Test 2: Clustered vegetation (20x20 solid block)")
-    print(f"      Veg percentage: {result_2.get('veg_percentage', 'N/A')}%")
-    print(f"      Adjacent pairs: {result_2.get('adjacent_pairs', 'N/A')}")
-    print(f"      VGD: {result_2.get('value', 'N/A')}")
-    print(f"      Clustering ratio: {result_2.get('clustering_ratio', 'N/A')}")
+    print(f"\nTest 2: Clustered vegetation (20x20 solid block)")
+    print(f" Veg percentage: {result_2.get('veg_percentage', 'N/A')}%")
+    print(f" Adjacent pairs: {result_2.get('adjacent_pairs', 'N/A')}")
+    print(f" VGD: {result_2.get('value', 'N/A')}")
+    print(f" Clustering ratio: {result_2.get('clustering_ratio', 'N/A')}")
     
     os.remove(test_path_2)
     
@@ -433,11 +422,11 @@ if __name__ == "__main__":
     
     result_3 = calculate_indicator(test_path_3, test_semantic_1)
     
-    print(f"\n   Test 3: Dispersed vegetation (scattered pixels every 5th)")
-    print(f"      Veg percentage: {result_3.get('veg_percentage', 'N/A')}%")
-    print(f"      Adjacent pairs: {result_3.get('adjacent_pairs', 'N/A')}")
-    print(f"      VGD: {result_3.get('value', 'N/A')}")
-    print(f"      Clustering ratio: {result_3.get('clustering_ratio', 'N/A')}")
+    print(f"\nTest 3: Dispersed vegetation (scattered pixels every 5th)")
+    print(f" Veg percentage: {result_3.get('veg_percentage', 'N/A')}%")
+    print(f" Adjacent pairs: {result_3.get('adjacent_pairs', 'N/A')}")
+    print(f" VGD: {result_3.get('value', 'N/A')}")
+    print(f" Clustering ratio: {result_3.get('clustering_ratio', 'N/A')}")
     
     os.remove(test_path_3)
     
@@ -451,21 +440,21 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic_1)
     
-    print(f"\n   Test 4: Large clustered vegetation (50% as solid block)")
-    print(f"      Veg percentage: {result_4.get('veg_percentage', 'N/A')}%")
-    print(f"      Adjacent pairs: {result_4.get('adjacent_pairs', 'N/A')}")
-    print(f"      VGD: {result_4.get('value', 'N/A')}")
-    print(f"      Clustering ratio: {result_4.get('clustering_ratio', 'N/A')}")
-    print(f"      Interpretation: {interpret_vgd(result_4.get('value'), result_4.get('veg_percentage'))}")
+    print(f"\nTest 4: Large clustered vegetation (50% as solid block)")
+    print(f" Veg percentage: {result_4.get('veg_percentage', 'N/A')}%")
+    print(f" Adjacent pairs: {result_4.get('adjacent_pairs', 'N/A')}")
+    print(f" VGD: {result_4.get('value', 'N/A')}")
+    print(f" Clustering ratio: {result_4.get('clustering_ratio', 'N/A')}")
+    print(f" Interpretation: {interpret_vgd(result_4.get('value'), result_4.get('veg_percentage'))}")
     
     os.remove(test_path_4)
     
     # Comparison summary
-    print("\n   📊 Comparison Summary:")
-    print("      Same percentage, different patterns:")
-    print(f"      - Clustered (block): VGD={result_2.get('value', 'N/A')}, Clustering={result_2.get('clustering_ratio', 'N/A')}")
-    print(f"      - Dispersed (scattered): VGD={result_3.get('value', 'N/A')}, Clustering={result_3.get('clustering_ratio', 'N/A')}")
-    print("\n      ✅ Higher VGD = more clustered vegetation")
-    print("      ✅ Clustering ratio > 1 = clustered, < 1 = dispersed")
+    print("\n Comparison Summary:")
+    print(" Same percentage, different patterns:")
+    print(f" - Clustered (block): VGD={result_2.get('value', 'N/A')}, Clustering={result_2.get('clustering_ratio', 'N/A')}")
+    print(f" - Dispersed (scattered): VGD={result_3.get('value', 'N/A')}, Clustering={result_3.get('clustering_ratio', 'N/A')}")
+    print("\n Higher VGD = more clustered vegetation")
+    print(" Clustering ratio > 1 = clustered, < 1 = dispersed")
     
-    print("\n   ✅ Test complete!")
+    print("\n Test complete!")

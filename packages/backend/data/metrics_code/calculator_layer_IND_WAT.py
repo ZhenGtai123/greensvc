@@ -1,32 +1,20 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_WAT
+"""Calculator Layer.
+
+Indicator ID:   IND_WAT
 Indicator Name: Water View Index
-Type: TYPE A (ratio mode)
+Type:           TYPE A (ratio mode
 
 Description:
-    The Water View Index (WAT) quantifies the proportion of water body pixels 
-    visible in street-level imagery. It measures the visual presence of water 
-    features such as rivers, lakes, seas, fountains, swimming pools, and 
-    waterfalls in the urban landscape. Water features contribute to thermal 
-    comfort, aesthetic quality, biodiversity, and psychological well-being 
-    in urban environments. The presence of visible water bodies is associated 
-    with increased property values, improved mental health, and enhanced 
-    urban livability.
+    The Water View Index (WAT) quantifies the proportion of water body pixels
+    visible in street-level imagery. It measures the visual presence of water
+    features such as rivers, lakes, seas, fountains, swimming pools, and
+    waterfalls in the urban landscape. Water features contribute to thermal
+    comfort, aesthetic quality, biodiversity, and psychological well-being in
+    urban environments. The presence of visible water bodies is associated with
+    increased property values, improved mental health, and enhanced urban
+    livability.
 
 Formula: WAT = (Sum(Water_Pixels) / Sum(Total_Pixels)) × 100
-
-Variables:
-    - Water_Pixels: Pixels classified as water bodies (rivers, lakes, seas, 
-                    fountains, pools, waterfalls)
-    - Total_Pixels: Total number of pixels in the image
-
-References:
-    - First confirmed by: Zhang, L., et al. (2024). Research on Regional 
-      Differences of Residents' Green Space Exposure Based on Street View 
-      Imagery. International Journal of Geoinformatics.
-    - Merged from: IND_BLU, IND_WTR
 """
 
 import numpy as np
@@ -83,21 +71,21 @@ INDICATOR = {
 
 TARGET_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 for class_name in INDICATOR.get('target_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         TARGET_RGB[rgb] = class_name
-        print(f"   ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"   ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
         # Try partial matching to suggest corrections
         for name in semantic_colors.keys():
             if class_name.split(';')[0] in name or name.split(';')[0] in class_name:
-                print(f"      💡 Did you mean: '{name}'?")
+                print(f" Did you mean: '{name}'?")
                 break
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
+print(f"\nCalculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
 
 
 # =============================================================================
@@ -190,7 +178,7 @@ if __name__ == "__main__":
     Test code for standalone execution.
     Creates a synthetic test image and validates the calculator.
     """
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
     
     # Create a synthetic test image (100x100 pixels)
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -211,20 +199,20 @@ if __name__ == "__main__":
     
     # Run calculation
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
     
     # Validate expected result (should be ~15%)
     if result['success']:
         expected_wat = 15.0  # 10% water + 5% river
         actual_wat = result['value']
-        print(f"   Expected WAT: ~{expected_wat}%")
-        print(f"   Actual WAT: {actual_wat}%")
+        print(f" Expected WAT: ~{expected_wat}%")
+        print(f" Actual WAT: {actual_wat}%")
         if abs(actual_wat - expected_wat) < 1:
-            print("   ✅ Test PASSED")
+            print(" Test PASSED")
         else:
-            print("   ⚠️ Test result differs from expected")
+            print(" ️ Test result differs from expected")
     
     # Cleanup
     import os
     os.remove(test_path)
-    print("   🧹 Test cleanup complete")
+    print(" Test cleanup complete")

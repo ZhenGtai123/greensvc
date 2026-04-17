@@ -1,37 +1,21 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_DIV
+"""Calculator Layer.
+
+Indicator ID:   IND_DIV
 Indicator Name: Diversity Index
-Type: TYPE B (Custom Mathematical Formula)
+Type:           TYPE B (Custom Mathematical Formula
 
 Description:
-    The Diversity Index (DIV) quantifies the Shannon diversity of visual 
-    elements in street-level imagery using the Hill number with q=1. It 
-    represents the "effective number of species" or equivalent number of 
-    equally-abundant classes that would produce the same entropy.
-    
-    The Hill number (^1D) is calculated as the exponential of Shannon entropy:
-    - ^1D = exp(H) where H = -Σ(pᵢ × ln(pᵢ))
-    
-    This measure is more intuitive than raw entropy because:
-    - It has units of "number of classes"
-    - A scene with 5 equally-distributed classes has ^1D ≈ 5
-    - It directly represents the "effective" diversity
-    
-Formula: 
-    ^1D = exp(-Σ(pᵢ × ln(pᵢ)))
-    
-    Equivalent to: ^1D = exp(H) where H is Shannon entropy (natural log)
-    
-Variables:
-    - ^1D: Diversity (Hill number with q=1)
-    - pᵢ: Proportion of pixels belonging to semantic category i
-    - s: Total number of classes detected
-    - i: Index of the specific class/element
+    The Diversity Index (DIV) quantifies the Shannon diversity of visual
+    elements in street-level imagery using the Hill number with q=1. It
+    represents the "effective number of species" or equivalent number of
+    equally-abundant classes that would produce the same entropy. The Hill
+    number (^1D) is calculated as the exponential of Shannon entropy: - ^1D =
+    exp(H) where H = -Σ(pᵢ × ln(pᵢ)) This measure is more intuitive than raw
+    entropy because: - It has units of "number of classes" - A scene with 5
+    equally-distributed classes has ^1D ≈ 5 - It directly represents the
+    "effective" diversity
 
-Unit: effective number of classes
-Range: 1 (single class) to n (n classes uniformly distributed)
+Formula: )
 """
 
 import numpy as np
@@ -74,9 +58,9 @@ INDICATOR = {
     "note": "Hill number represents 'effective number of classes'; more intuitive than raw entropy"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Unit: {INDICATOR['unit']}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Unit: {INDICATOR['unit']}")
 
 
 # =============================================================================
@@ -281,7 +265,7 @@ def calculate_theoretical_diversity(n_classes: int, distribution: str = 'uniform
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Diversity Index (Hill number) calculator...")
+    print("\nTesting Diversity Index (Hill number) calculator...")
     
     # Test 1: Two classes, equal distribution (expected: ^1D = 2.0)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -294,12 +278,12 @@ if __name__ == "__main__":
         
         result_1 = calculate_indicator(test_path_1)
         
-        print(f"\n   Test 1: 50% grass + 50% sky")
-        print(f"      Expected diversity: 2.0 (2 equally distributed classes)")
-        print(f"      Calculated: {result_1['value']:.3f} effective classes")
-        print(f"      Shannon entropy: {result_1['shannon_entropy']:.3f} nats")
-        print(f"      Evenness: {result_1['evenness']:.3f}")
-        print(f"      Interpretation: {interpret_diversity(result_1['value'], result_1['n_classes'])}")
+        print(f"\nTest 1: 50% grass + 50% sky")
+        print(f" Expected diversity: 2.0 (2 equally distributed classes)")
+        print(f" Calculated: {result_1['value']:.3f} effective classes")
+        print(f" Shannon entropy: {result_1['shannon_entropy']:.3f} nats")
+        print(f" Evenness: {result_1['evenness']:.3f}")
+        print(f" Interpretation: {interpret_diversity(result_1['value'], result_1['n_classes'])}")
         
         os.remove(test_path_1)
     
@@ -319,11 +303,11 @@ if __name__ == "__main__":
         
         result_2 = calculate_indicator(test_path_2)
         
-        print(f"\n   Test 2: 25% each of 4 classes")
-        print(f"      Expected diversity: 4.0 (4 equally distributed classes)")
-        print(f"      Calculated: {result_2['value']:.3f} effective classes")
-        print(f"      Evenness: {result_2['evenness']:.3f}")
-        print(f"      Interpretation: {interpret_diversity(result_2['value'], result_2['n_classes'])}")
+        print(f"\nTest 2: 25% each of 4 classes")
+        print(f" Expected diversity: 4.0 (4 equally distributed classes)")
+        print(f" Calculated: {result_2['value']:.3f} effective classes")
+        print(f" Evenness: {result_2['evenness']:.3f}")
+        print(f" Interpretation: {interpret_diversity(result_2['value'], result_2['n_classes'])}")
         
         os.remove(test_path_2)
     
@@ -338,12 +322,12 @@ if __name__ == "__main__":
         
         result_3 = calculate_indicator(test_path_3)
         
-        print(f"\n   Test 3: 90% sky + 10% tree (unequal)")
-        print(f"      Expected diversity: ~1.38 (2 classes, unequal)")
-        print(f"      Calculated: {result_3['value']:.3f} effective classes")
-        print(f"      Evenness: {result_3['evenness']:.3f}")
-        print(f"      Interpretation: {interpret_diversity(result_3['value'], result_3['n_classes'])}")
+        print(f"\nTest 3: 90% sky + 10% tree (unequal)")
+        print(f" Expected diversity: ~1.38 (2 classes, unequal)")
+        print(f" Calculated: {result_3['value']:.3f} effective classes")
+        print(f" Evenness: {result_3['evenness']:.3f}")
+        print(f" Interpretation: {interpret_diversity(result_3['value'], result_3['n_classes'])}")
         
         os.remove(test_path_3)
     
-    print("\n   🧹 Test cleanup complete")
+    print("\n Test cleanup complete")

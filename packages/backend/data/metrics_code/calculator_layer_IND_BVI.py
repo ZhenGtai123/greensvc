@@ -1,30 +1,19 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_BVI
+"""Calculator Layer.
+
+Indicator ID:   IND_BVI
 Indicator Name: Building View Index
-Type: TYPE A (ratio mode)
+Type:           TYPE A (ratio mode
 
 Description:
-    The Building View Index (BVI) quantifies the proportion of building pixels 
-    visible in street-level imagery. It measures the visual dominance of built 
-    structures in the urban landscape, providing insights into urban density, 
-    enclosure, and the balance between natural and constructed environments.
-    BVI is valuable for urban morphology analysis, visual impact assessment, 
-    and understanding the relationship between built form and perceived 
+    The Building View Index (BVI) quantifies the proportion of building pixels
+    visible in street-level imagery. It measures the visual dominance of built
+    structures in the urban landscape, providing insights into urban density,
+    enclosure, and the balance between natural and constructed environments. BVI
+    is valuable for urban morphology analysis, visual impact assessment, and
+    understanding the relationship between built form and perceived
     environmental quality.
 
 Formula: BVI = (Sum(Building_Pixels) / Sum(Total_Pixels)) × 100
-
-Variables:
-    - Building_Pixels: Pixels classified as buildings (including houses, 
-                       skyscrapers, towers)
-    - Total_Pixels: Total number of pixels in the image
-
-References:
-    - First confirmed by: Liu, Y., & Li, L. (2024). Multi-source Data-driven 
-      Identification of Urban Functional Areas: A Case Study.
-    - Merged from: IND_BLD, IND_BUI, IND_BLR
 """
 
 import numpy as np
@@ -78,21 +67,21 @@ INDICATOR = {
 
 TARGET_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 for class_name in INDICATOR.get('target_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         TARGET_RGB[rgb] = class_name
-        print(f"   ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"   ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
         # Try partial matching to suggest corrections
         for name in semantic_colors.keys():
             if class_name.split(';')[0] in name or name.split(';')[0] in class_name:
-                print(f"      💡 Did you mean: '{name}'?")
+                print(f" Did you mean: '{name}'?")
                 break
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
+print(f"\nCalculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
 
 
 # =============================================================================
@@ -184,7 +173,7 @@ if __name__ == "__main__":
     Test code for standalone execution.
     Creates a synthetic test image and validates the calculator.
     """
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
     
     # Create a synthetic test image (100x100 pixels)
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -210,20 +199,20 @@ if __name__ == "__main__":
     
     # Run calculation
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
     
     # Validate expected result (should be ~35%)
     if result['success']:
         expected_bvi = 35.0  # 20% building + 10% house + 5% skyscraper
         actual_bvi = result['value']
-        print(f"   Expected BVI: ~{expected_bvi}%")
-        print(f"   Actual BVI: {actual_bvi}%")
+        print(f" Expected BVI: ~{expected_bvi}%")
+        print(f" Actual BVI: {actual_bvi}%")
         if abs(actual_bvi - expected_bvi) < 1:
-            print("   ✅ Test PASSED")
+            print(" Test PASSED")
         else:
-            print("   ⚠️ Test result differs from expected")
+            print(" ️ Test result differs from expected")
     
     # Cleanup
     import os
     os.remove(test_path)
-    print("   🧹 Test cleanup complete")
+    print(" Test cleanup complete")

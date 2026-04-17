@@ -1,35 +1,15 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_ENC_TRE
+"""Calculator Layer.
+
+Indicator ID:   IND_ENC_TRE
 Indicator Name: Enclosure by Trees
-Type: TYPE D (Enclosure / Derived Ratio)
+Type:           TYPE D (Enclosure / Derived Ratio
 
 Description:
-    The Enclosure by Trees (ENC_TRE) measures the proportion of the 
-    sky view obstructed specifically by tree canopies. It quantifies 
-    the contribution of vegetation to vertical enclosure, separate 
-    from building enclosure.
-    
-Formula: 
-    ENC_TRE = (1 - SVF_total) - (1 - SVF_buildings)
-    
-    Where:
-    SVF_total = Sky / (Sky + Building + Tree)
-    SVF_buildings = Sky / (Sky + Building)
-    
-    Simplified:
-    ENC_TRE = Tree_Pixels / (Sky_Pixels + Building_Pixels + Tree_Pixels)
-    
-Variables:
-    - Sky_Pixels: Number of pixels classified as sky
-    - Building_Pixels: Number of pixels classified as building
-    - Tree_Pixels: Number of pixels classified as tree/vegetation
-    - SVF_total: Total Sky View Factor
-    - SVF_buildings: Sky View Factor considering only buildings
+    The Enclosure by Trees (ENC_TRE) measures the proportion of the sky view
+    obstructed specifically by tree canopies. It quantifies the contribution of
+    vegetation to vertical enclosure, separate from building enclosure.
 
-Unit: ratio (0 to 1)
-Range: 0.0 (no tree enclosure) to 1.0 (completely enclosed by trees)
+Formula: ENC_TRE = (1 - SVF_total) - (1 - SVF_buildings)
 """
 
 import numpy as np
@@ -73,9 +53,9 @@ INDICATOR = {
     "note": "Higher values indicate more tree canopy enclosure in the vertical visual field"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE D (Enclosure)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE D (Enclosure)")
 
 
 # =============================================================================
@@ -395,7 +375,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Enclosure by Trees calculator...")
+    print("\nTesting Enclosure by Trees calculator...")
     
     # Test 1: Only sky (no enclosure)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -411,11 +391,11 @@ if __name__ == "__main__":
     }
     result_1 = calculate_indicator(test_path_1, test_semantic)
     
-    print(f"\n   Test 1: 100% sky, 0% building, 0% tree")
-    print(f"      Expected ENC_TRE: 0.0000")
-    print(f"      Calculated ENC_TRE: {result_1.get('value', 'N/A')}")
-    print(f"      SVF_total: {result_1.get('svf_total', 'N/A')}")
-    print(f"      Interpretation: {interpret_enc_tre(result_1.get('value'))}")
+    print(f"\nTest 1: 100% sky, 0% building, 0% tree")
+    print(f" Expected ENC_TRE: 0.0000")
+    print(f" Calculated ENC_TRE: {result_1.get('value', 'N/A')}")
+    print(f" SVF_total: {result_1.get('svf_total', 'N/A')}")
+    print(f" Interpretation: {interpret_enc_tre(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -430,12 +410,12 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2, test_semantic)
     
-    print(f"\n   Test 2: 33.3% sky, 33.3% building, 33.3% tree")
-    print(f"      Expected ENC_TRE: ~0.3333")
-    print(f"      Calculated ENC_TRE: {result_2.get('value', 'N/A')}")
-    print(f"      SVF_total: {result_2.get('svf_total', 'N/A')}")
-    print(f"      ENC_buildings: {result_2.get('enc_buildings', 'N/A')}")
-    print(f"      Interpretation: {interpret_enc_tre(result_2.get('value'))}")
+    print(f"\nTest 2: 33.3% sky, 33.3% building, 33.3% tree")
+    print(f" Expected ENC_TRE: ~0.3333")
+    print(f" Calculated ENC_TRE: {result_2.get('value', 'N/A')}")
+    print(f" SVF_total: {result_2.get('svf_total', 'N/A')}")
+    print(f" ENC_buildings: {result_2.get('enc_buildings', 'N/A')}")
+    print(f" Interpretation: {interpret_enc_tre(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -449,12 +429,12 @@ if __name__ == "__main__":
     
     result_3 = calculate_indicator(test_path_3, test_semantic)
     
-    print(f"\n   Test 3: 50% sky, 0% building, 50% tree")
-    print(f"      Expected ENC_TRE: 0.5000")
-    print(f"      Calculated ENC_TRE: {result_3.get('value', 'N/A')}")
-    print(f"      SVF_total: {result_3.get('svf_total', 'N/A')}")
-    print(f"      SVF_buildings: {result_3.get('svf_buildings', 'N/A')}")
-    print(f"      Interpretation: {interpret_enc_tre(result_3.get('value'))}")
+    print(f"\nTest 3: 50% sky, 0% building, 50% tree")
+    print(f" Expected ENC_TRE: 0.5000")
+    print(f" Calculated ENC_TRE: {result_3.get('value', 'N/A')}")
+    print(f" SVF_total: {result_3.get('svf_total', 'N/A')}")
+    print(f" SVF_buildings: {result_3.get('svf_buildings', 'N/A')}")
+    print(f" Interpretation: {interpret_enc_tre(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -469,12 +449,12 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic)
     
-    print(f"\n   Test 4: 20% sky, 10% building, 70% tree")
-    print(f"      Expected ENC_TRE: 0.7000")
-    print(f"      Calculated ENC_TRE: {result_4.get('value', 'N/A')}")
-    print(f"      SVF_total: {result_4.get('svf_total', 'N/A')}")
-    print(f"      ENC_buildings: {result_4.get('enc_buildings', 'N/A')}")
-    print(f"      Interpretation: {interpret_enc_tre(result_4.get('value'))}")
+    print(f"\nTest 4: 20% sky, 10% building, 70% tree")
+    print(f" Expected ENC_TRE: 0.7000")
+    print(f" Calculated ENC_TRE: {result_4.get('value', 'N/A')}")
+    print(f" SVF_total: {result_4.get('svf_total', 'N/A')}")
+    print(f" ENC_buildings: {result_4.get('enc_buildings', 'N/A')}")
+    print(f" Interpretation: {interpret_enc_tre(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
@@ -488,17 +468,17 @@ if __name__ == "__main__":
     
     result_5 = calculate_indicator(test_path_5, test_semantic)
     
-    print(f"\n   Test 5: 50% sky, 50% building, 0% tree")
-    print(f"      Expected ENC_TRE: 0.0000")
-    print(f"      Calculated ENC_TRE: {result_5.get('value', 'N/A')}")
-    print(f"      SVF_total: {result_5.get('svf_total', 'N/A')}")
-    print(f"      ENC_buildings: {result_5.get('enc_buildings', 'N/A')}")
-    print(f"      Interpretation: {interpret_enc_tre(result_5.get('value'))}")
+    print(f"\nTest 5: 50% sky, 50% building, 0% tree")
+    print(f" Expected ENC_TRE: 0.0000")
+    print(f" Calculated ENC_TRE: {result_5.get('value', 'N/A')}")
+    print(f" SVF_total: {result_5.get('svf_total', 'N/A')}")
+    print(f" ENC_buildings: {result_5.get('enc_buildings', 'N/A')}")
+    print(f" Interpretation: {interpret_enc_tre(result_5.get('value'))}")
     
     os.remove(test_path_5)
     
-    print("\n   ✅ Test complete!")
-    print("\n   📊 Key Relationships:")
-    print("      ENC_TRE = (1 - SVF_total) - (1 - SVF_buildings)")
-    print("      ENC_TRE = Tree / (Sky + Building + Tree)")
-    print("      ENC_TRE + ENC_BLD + SVF_total = 1.0 (in vertical view)")
+    print("\n Test complete!")
+    print("\n Key Relationships:")
+    print(" ENC_TRE = (1 - SVF_total) - (1 - SVF_buildings)")
+    print(" ENC_TRE = Tree / (Sky + Building + Tree)")
+    print(" ENC_TRE + ENC_BLD + SVF_total = 1.0 (in vertical view)")

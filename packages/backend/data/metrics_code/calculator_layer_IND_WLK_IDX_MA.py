@@ -1,32 +1,24 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_WLK_IDX_MA
-指标名称: Walkability Index (Ma et al.) / Walkability (Ma) (步行性指数-马等)
-类型: TYPE B (two_class_ratio模式)
+"""Calculator Layer.
 
-说明:
-该指标用于表征“视觉步行性”，定义为：
-行人设施要素（fence + sidewalk）与机动车道路要素（road）之间的像素比值。
+Indicator ID:   IND_WLK_IDX_MA
+Indicator Name: Walkability Index (Ma et al.) / Walkability (Ma) (-
+Type:           TYPE B (two_class_ratio
 
-公式:
-IND_WLK_IDX_MA = (P_Fence + P_Sidewalk) / P_Road
-其中 P_x 为要素 x 的像素比例（在同一图像中比值等价于像素计数比值）。
+Formula: IND_WLK_IDX_MA = (P_Fence + P_Sidewalk) / P_Road
 """
 
 import numpy as np
 from PIL import Image
 from typing import Dict
 
-# semantic_colors 来自 input_layer.py（与其他指标文件保持一致）
+# semantic_colors input_layer.py
 from input_layer import semantic_colors
 
 
 # =============================================================================
-# 指标定义 - 【核心配置】
+# INDICATOR DEFINITION -
 # =============================================================================
 INDICATOR = {
-    # 基本信息
     "id": "IND_WLK_IDX_MA",
     "name": "Walkability Index (Ma et al.)",
     "unit": "ratio",
@@ -35,16 +27,14 @@ INDICATOR = {
     "definition": "A visual walkability index calculated as the ratio of pedestrian facility pixels (sidewalks + fences) to road pixels.",
     "category": "CAT_CMP",
 
-    # TYPE B 配置（分子/分母类别）
+    # TYPE B /
     "calc_type": "two_class_ratio",  # ratio / inverse_ratio / two_class_ratio
 
-    # 分子类别（行人设施）
     "numerator_classes": [
         "fence",
         "sidewalk",
     ],
 
-    # 分母类别（道路）
     "denominator_classes": [
         "road",
     ]
@@ -52,63 +42,43 @@ INDICATOR = {
 
 
 # =============================================================================
-# 构建颜色查找表
+# COLOR LOOKUP TABLE
 # =============================================================================
 NUM_RGB = {}
 DEN_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 
-print("   ▶ Numerator classes:")
+print(" ▶ Numerator classes:")
 for class_name in INDICATOR.get('numerator_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         NUM_RGB[rgb] = class_name
-        print(f"     ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"     ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
 
-print("   ▶ Denominator classes:")
+print(" ▶ Denominator classes:")
 for class_name in INDICATOR.get('denominator_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         DEN_RGB[rgb] = class_name
-        print(f"     ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"     ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
 
 print(
-    f"\n✅ Calculator ready: {INDICATOR['id']} "
+    f"\nCalculator ready: {INDICATOR['id']} "
     f"(NUM={len(NUM_RGB)} classes matched, DEN={len(DEN_RGB)} classes matched)"
 )
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Walkability Index (Ma et al.) (IND_WLK_IDX_MA)
-
-    TYPE B - two_class_ratio模式:
-        value = numerator_pixels / denominator_pixels
-
-    注意:
-    - 当 road_pixels = 0 时，分母为0，value 返回 None（不可计算）。
-
-    Returns:
-        {
-            'success': True/False,
-            'value': float or None,
-            'numerator_pixels': int,
-            'denominator_pixels': int,
-            'total_pixels': int,
-            'numerator_breakdown': dict,
-            'denominator_breakdown': dict
-        }
-    """
     try:
-        # Step 1: 加载图片
+        # Step 1:
         img = Image.open(image_path).convert('RGB')
         pixels = np.array(img)
         h, w, _ = pixels.shape
@@ -116,7 +86,7 @@ def calculate_indicator(image_path: str) -> Dict:
 
         flat_pixels = pixels.reshape(-1, 3)
 
-        # Step 2: 统计分子像素（fence + sidewalk）
+        # Step 2: fence + sidewalk
         numerator_count = 0
         numerator_counts = {}
 
@@ -127,7 +97,7 @@ def calculate_indicator(image_path: str) -> Dict:
                 numerator_counts[class_name] = count
                 numerator_count += count
 
-        # Step 3: 统计分母像素（road）
+        # Step 3: road
         denominator_count = 0
         denominator_counts = {}
 
@@ -138,7 +108,7 @@ def calculate_indicator(image_path: str) -> Dict:
                 denominator_counts[class_name] = count
                 denominator_count += count
 
-        # Step 4: 计算比值
+        # Step 4:
         if denominator_count == 0:
             value = None
         else:
@@ -163,10 +133,10 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 测试代码 (可选)
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
 
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
 
@@ -184,7 +154,7 @@ if __name__ == "__main__":
     Image.fromarray(test_img).save(test_path)
 
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
 
     import os
     os.remove(test_path)

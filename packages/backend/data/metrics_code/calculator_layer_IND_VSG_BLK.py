@@ -1,24 +1,10 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_VSG_BLK
-指标名称: Visible Street Greenery (Block Level) (街区可见街道绿量)
-类型: TYPE D (组合类)
+"""Calculator Layer.
 
-说明:
-计算街区周边街道街景绿量的加权平均值，并引入距离衰减。
-权重由街道中心线长度与距离衰减项共同决定：
-距离越近、街道越长，对街区绿量贡献越大。
+Indicator ID:   IND_VSG_BLK
+Indicator Name: Visible Street Greenery (Block Level
+Type:           TYPE D
 
-公式:
-Gn = Σ(Gi * Li * Di^α) / Σ(Li * Di^α)
-
-其中:
-- Gn: 街区可见绿量
-- Gi: 周边街道街景可见绿量（如GVI）
-- Li: 街道中心线长度
-- Di: 街道到街区的距离
-- α: 距离衰减参数（通常为负值表示随距离衰减）
+Formula: Gn = Σ(Gi * Li * Di^α) / Σ(Li * Di^α)
 """
 
 import numpy as np
@@ -26,7 +12,7 @@ from typing import Dict, List
 
 
 # =============================================================================
-# 指标定义
+# INDICATOR DEFINITION
 # =============================================================================
 INDICATOR = {
     "id": "IND_VSG_BLK",
@@ -39,55 +25,26 @@ INDICATOR = {
 
     "calc_type": "composite",
 
-    # 组成部分（按功能分组）
     "components": [
         "Gi",
         "Li",
         "Di"
     ],
 
-    # 聚合方式
     "aggregation": "distance_decay_weighted_mean",
 
-    # 距离衰减参数
     "alpha": -1.0
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Aggregation: {INDICATOR.get('aggregation', 'distance_decay_weighted_mean')}")
-print(f"   Alpha: {INDICATOR.get('alpha', -1.0)}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Aggregation: {INDICATOR.get('aggregation', 'distance_decay_weighted_mean')}")
+print(f" Alpha: {INDICATOR.get('alpha', -1.0)}")
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(Gi: List[float], Li: List[float], Di: List[float], alpha: float = None) -> Dict:
-    """
-    计算 Visible Street Greenery (Block Level) (街区可见街道绿量)
-
-    TYPE D: 组合类指标
-
-    算法步骤:
-    1. 输入周边街道的Gi、Li、Di数组
-    2. 按权重 w_i = Li * Di^α 计算加权
-    3. 计算 Gn = Σ(Gi * w_i) / Σ(w_i)
-
-    Args:
-        Gi: list，周边街道可见绿量值
-        Li: list，周边街道中心线长度
-        Di: list，街道到街区距离
-        alpha: 距离衰减参数（默认使用INDICATOR['alpha']）
-
-    Returns:
-        {
-            'success': True/False,
-            'value': float (Gn),
-            'alpha': float,
-            'n_streets': int,
-            'weights': list,
-            'weighted_components': dict
-        }
-    """
     try:
         a = float(alpha) if alpha is not None else float(INDICATOR.get('alpha', -1.0))
 
@@ -105,12 +62,10 @@ def calculate_indicator(Gi: List[float], Li: List[float], Di: List[float], alpha
                 'note': 'Input lists must have the same non-zero length'
             }
 
-        # 避免距离为0导致Di^α异常
         Di_safe = np.where(Di_arr <= 0, np.nan, Di_arr)
 
         weights = Li_arr * (Di_safe ** a)
 
-        # 剔除无效权重（Di<=0 或 产生nan/inf）
         valid = np.isfinite(weights) & np.isfinite(Gi_arr) & np.isfinite(Li_arr) & np.isfinite(Di_arr)
         Gi_v = Gi_arr[valid]
         Li_v = Li_arr[valid]
@@ -158,12 +113,9 @@ def calculate_indicator(Gi: List[float], Li: List[float], Di: List[float], alpha
 
 
 # =============================================================================
-# 辅助函数
+# HELPER FUNCTIONS
 # =============================================================================
 def interpret_vsg_blk(value: float) -> str:
-    """
-    解释Gn的含义
-    """
     if value < 0.1:
         return "Very low visible greenery around block"
     elif value < 0.25:
@@ -175,12 +127,11 @@ def interpret_vsg_blk(value: float) -> str:
 
 
 # =============================================================================
-# 测试代码
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Visible Street Greenery (Block Level) calculator...")
+    print("\nTesting Visible Street Greenery (Block Level) calculator...")
 
-    # 三条街道示例
     Gi_test = [0.30, 0.50, 0.10]
     Li_test = [120, 80, 200]
     Di_test = [30, 60, 15]
@@ -188,10 +139,10 @@ if __name__ == "__main__":
 
     result = calculate_indicator(Gi_test, Li_test, Di_test, alpha_test)
 
-    print("\n   Test inputs:")
-    print(f"      Gi: {Gi_test}")
-    print(f"      Li: {Li_test}")
-    print(f"      Di: {Di_test}")
-    print(f"      alpha: {alpha_test}")
-    print(f"      Gn: {result['value']}")
-    print(f"      Interpretation: {interpret_vsg_blk(result['value'])}")
+    print("\nTest inputs:")
+    print(f" Gi: {Gi_test}")
+    print(f" Li: {Li_test}")
+    print(f" Di: {Di_test}")
+    print(f" alpha: {alpha_test}")
+    print(f" Gn: {result['value']}")
+    print(f" Interpretation: {interpret_vsg_blk(result['value'])}")

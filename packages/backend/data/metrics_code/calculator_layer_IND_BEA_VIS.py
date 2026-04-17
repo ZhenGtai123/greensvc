@@ -1,27 +1,16 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_BEA_VIS
+"""Calculator Layer.
+
+Indicator ID:   IND_BEA_VIS
 Indicator Name: Visual Beauty Score
-Type: TYPE E (Composite / Weighted Formula)
+Type:           TYPE E (Composite / Weighted Formula
 
 Description:
-    The Visual Beauty Score (BEA_VIS) is a perceptual score indicating 
-    how beautiful or aesthetically pleasing a street scene appears. It 
-    combines multiple sub-indices (Water Index, Color Tone, and Plant 
-    Richness) using empirically derived weights from perceptual studies.
-    
-Formula: 
-    SV = 1.04165 + 2.00634 × WI + 0.49522 × C + 0.23200 × PR
-    
-Variables:
-    - SV: Scenic View (Visual Beauty/Aesthetic judgment)
-    - WI: Water Index (ratio of water pixels)
-    - C: Overall color tone (colorfulness measure)
-    - PR: Plant richness (ratio of plant/vegetation pixels)
+    The Visual Beauty Score (BEA_VIS) is a perceptual score indicating how
+    beautiful or aesthetically pleasing a street scene appears. It combines
+    multiple sub-indices (Water Index, Color Tone, and Plant Richness) using
+    empirically derived weights from perceptual studies.
 
-Unit: score (unbounded, typically 1.0 to 4.0+)
-Range: Minimum ~1.04 (no water, no color, no plants) to higher values
+Formula: )
 """
 
 import numpy as np
@@ -73,9 +62,9 @@ INDICATOR = {
     "note": "Based on perceptual studies correlating visual features with aesthetic preferences"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE E (Composite / Weighted Formula)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE E (Composite / Weighted Formula)")
 
 
 # =============================================================================
@@ -432,7 +421,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Visual Beauty Score calculator...")
+    print("\nTesting Visual Beauty Score calculator...")
     
     # Test 1: Low beauty (gray urban scene)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -451,10 +440,10 @@ if __name__ == "__main__":
     }
     result_1 = calculate_indicator(test_path_1, test_semantic)
     
-    print(f"\n   Test 1: Gray uniform image (low beauty)")
-    print(f"      Visual Beauty Score: {result_1.get('value', 'N/A')}")
-    print(f"      WI: {result_1.get('water_index', 'N/A')}, C: {result_1.get('color_tone', 'N/A')}, PR: {result_1.get('plant_richness', 'N/A')}")
-    print(f"      Interpretation: {interpret_bea_vis(result_1.get('value'))}")
+    print(f"\nTest 1: Gray uniform image (low beauty)")
+    print(f" Visual Beauty Score: {result_1.get('value', 'N/A')}")
+    print(f" WI: {result_1.get('water_index', 'N/A')}, C: {result_1.get('color_tone', 'N/A')}, PR: {result_1.get('plant_richness', 'N/A')}")
+    print(f" Interpretation: {interpret_bea_vis(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -468,11 +457,11 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2, test_semantic)
     
-    print(f"\n   Test 2: 50% sky + 50% trees (green scene)")
-    print(f"      Visual Beauty Score: {result_2.get('value', 'N/A')}")
-    print(f"      WI: {result_2.get('water_index', 'N/A')}, C: {result_2.get('color_tone', 'N/A')}, PR: {result_2.get('plant_richness', 'N/A')}")
-    print(f"      PR contribution: {result_2.get('contribution_PR', 'N/A')}")
-    print(f"      Interpretation: {interpret_bea_vis(result_2.get('value'))}")
+    print(f"\nTest 2: 50% sky + 50% trees (green scene)")
+    print(f" Visual Beauty Score: {result_2.get('value', 'N/A')}")
+    print(f" WI: {result_2.get('water_index', 'N/A')}, C: {result_2.get('color_tone', 'N/A')}, PR: {result_2.get('plant_richness', 'N/A')}")
+    print(f" PR contribution: {result_2.get('contribution_PR', 'N/A')}")
+    print(f" Interpretation: {interpret_bea_vis(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -487,11 +476,11 @@ if __name__ == "__main__":
     
     result_3 = calculate_indicator(test_path_3, test_semantic)
     
-    print(f"\n   Test 3: 30% sky + 40% water + 30% trees (scenic view)")
-    print(f"      Visual Beauty Score: {result_3.get('value', 'N/A')}")
-    print(f"      WI: {result_3.get('water_index', 'N/A')}, C: {result_3.get('color_tone', 'N/A')}, PR: {result_3.get('plant_richness', 'N/A')}")
-    print(f"      Contributions - WI: {result_3.get('contribution_WI', 'N/A')}, C: {result_3.get('contribution_C', 'N/A')}, PR: {result_3.get('contribution_PR', 'N/A')}")
-    print(f"      Interpretation: {interpret_bea_vis(result_3.get('value'))}")
+    print(f"\nTest 3: 30% sky + 40% water + 30% trees (scenic view)")
+    print(f" Visual Beauty Score: {result_3.get('value', 'N/A')}")
+    print(f" WI: {result_3.get('water_index', 'N/A')}, C: {result_3.get('color_tone', 'N/A')}, PR: {result_3.get('plant_richness', 'N/A')}")
+    print(f" Contributions - WI: {result_3.get('contribution_WI', 'N/A')}, C: {result_3.get('contribution_C', 'N/A')}, PR: {result_3.get('contribution_PR', 'N/A')}")
+    print(f" Interpretation: {interpret_bea_vis(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -507,17 +496,17 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic)
     
-    print(f"\n   Test 4: Colorful scene (sky, flowers, water, trees)")
-    print(f"      Visual Beauty Score: {result_4.get('value', 'N/A')}")
-    print(f"      WI: {result_4.get('water_index', 'N/A')}, C: {result_4.get('color_tone', 'N/A')}, PR: {result_4.get('plant_richness', 'N/A')}")
-    print(f"      Saturation: {result_4.get('saturation', 'N/A')}")
-    print(f"      Interpretation: {interpret_bea_vis(result_4.get('value'))}")
+    print(f"\nTest 4: Colorful scene (sky, flowers, water, trees)")
+    print(f" Visual Beauty Score: {result_4.get('value', 'N/A')}")
+    print(f" WI: {result_4.get('water_index', 'N/A')}, C: {result_4.get('color_tone', 'N/A')}, PR: {result_4.get('plant_richness', 'N/A')}")
+    print(f" Saturation: {result_4.get('saturation', 'N/A')}")
+    print(f" Interpretation: {interpret_bea_vis(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
-    print("\n   ✅ Test complete!")
-    print("\n   📊 Formula Coefficients:")
-    print("      Intercept: 1.04165 (base value)")
-    print("      WI weight: 2.00634 (highest - water has strongest impact)")
-    print("      C weight: 0.49522 (moderate - color matters)")
-    print("      PR weight: 0.23200 (lower - plants contribute positively)")
+    print("\n Test complete!")
+    print("\n Formula Coefficients:")
+    print(" Intercept: 1.04165 (base value)")
+    print(" WI weight: 2.00634 (highest - water has strongest impact)")
+    print(" C weight: 0.49522 (moderate - color matters)")
+    print(" PR weight: 0.23200 (lower - plants contribute positively)")

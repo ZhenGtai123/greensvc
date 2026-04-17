@@ -1,20 +1,10 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_SPD
-指标名称: Spatial Division (空间分割度)
-类型: TYPE D (组合类)
+"""Calculator Layer.
 
-说明:
-衡量活动空间中由分割性要素造成的空间破碎程度。
-通过统计道路、路径、墙体、台阶、柱等“分割性元素”的面积占比并进行求和，
-刻画原本连续、完整空间被切割的程度。
+Indicator ID:   IND_SPD
+Indicator Name: Spatial Division
+Type:           TYPE D
 
-公式:
-SPD = Sum(road + path + wall + stair + pillar)
-
-单位: %
-范围: 0 (空间高度连续) → 100 (空间高度破碎)
+Formula: SPD = Sum(road + path + wall + stair + pillar)
 """
 
 import numpy as np
@@ -23,7 +13,7 @@ from typing import Dict
 
 
 # =============================================================================
-# 指标定义
+# INDICATOR DEFINITION
 # =============================================================================
 INDICATOR = {
     "id": "IND_SPD",
@@ -36,7 +26,6 @@ INDICATOR = {
 
     "calc_type": "composite",
 
-    # 组成部分（按空间分割功能分组）
     "component_classes": {
         "roads": [
             "road"
@@ -55,65 +44,40 @@ INDICATOR = {
         ]
     },
 
-    # 聚合方式
     "aggregation": "sum"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Aggregation: {INDICATOR.get('aggregation', 'sum')}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Aggregation: {INDICATOR.get('aggregation', 'sum')}")
 
 
 # =============================================================================
-# 构建颜色查找表
+# COLOR LOOKUP TABLE
 # =============================================================================
 COMPONENT_RGB = {}
 
-print(f"\n🎯 Color lookup for spatial division components:")
+print(f"\nColor lookup for spatial division components:")
 for component_name, class_list in INDICATOR.get('component_classes', {}).items():
     COMPONENT_RGB[component_name] = {}
-    print(f"\n   📦 {component_name}:")
+    print(f"\n {component_name}:")
 
     for class_name in class_list:
         if class_name in semantic_colors:
             rgb = semantic_colors[class_name]
             COMPONENT_RGB[component_name][rgb] = class_name
-            print(f"      ✅ {class_name}: RGB{rgb}")
+            print(f" {class_name}: RGB{rgb}")
         else:
-            print(f"      ⚠️ NOT FOUND: {class_name}")
+            print(f" ️ NOT FOUND: {class_name}")
 
-print(f"\n✅ Components configured: {list(COMPONENT_RGB.keys())}")
+print(f"\nComponents configured: {list(COMPONENT_RGB.keys())}")
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Spatial Division (空间分割度)
-
-    TYPE D: 组合类指标
-
-    算法步骤:
-    1. 分别统计各类分割性元素（road/path/wall/stair/pillar）的像素数
-    2. 将所有分割性元素像素求和
-    3. 计算其占总像素的比例（%）
-
-    Args:
-        image_path: 语义分割mask图片路径
-
-    Returns:
-        {
-            'success': True/False,
-            'value': float (SPD, %),
-            'total_pixels': int,
-            'division_pixels': int,
-            'component_pixels': dict,
-            'component_ratios': dict,
-            'class_breakdown': dict
-        }
-    """
     try:
-        # Step 1: 加载图片
+        # Step 1:
         img = Image.open(image_path).convert('RGB')
         pixels = np.array(img)
         h, w, _ = pixels.shape
@@ -124,7 +88,7 @@ def calculate_indicator(image_path: str) -> Dict:
         component_ratios = {}
         all_class_counts = {}
 
-        # Step 2: 统计各组成部分
+        # Step 2:
         for component_name, rgb_map in COMPONENT_RGB.items():
             component_total = 0
 
@@ -140,7 +104,7 @@ def calculate_indicator(image_path: str) -> Dict:
                 (component_total / total_pixels) * 100, 3
             ) if total_pixels > 0 else 0
 
-        # Step 3: 聚合
+        # Step 3:
         division_pixels = sum(component_counts.values())
         value = (division_pixels / total_pixels) * 100 if total_pixels > 0 else 0
 
@@ -166,12 +130,9 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 辅助函数
+# HELPER FUNCTIONS
 # =============================================================================
 def interpret_spd(value: float) -> str:
-    """
-    解释Spatial Division的含义
-    """
     if value < 10:
         return "Very low division: highly continuous space"
     elif value < 25:
@@ -185,10 +146,10 @@ def interpret_spd(value: float) -> str:
 
 
 # =============================================================================
-# 测试代码
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Spatial Division calculator...")
+    print("\nTesting Spatial Division calculator...")
 
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
 
@@ -204,10 +165,10 @@ if __name__ == "__main__":
 
     result = calculate_indicator(test_path)
 
-    print(f"\n   Test: 30% road + 15% wall + 10% path = 55% division")
-    print(f"   Result: {result['value']}%")
-    print(f"   Components: {result['component_ratios']}")
-    print(f"   Level: {result['division_level']}")
+    print(f"\nTest: 30% road + 15% wall + 10% path = 55% division")
+    print(f" Result: {result['value']}%")
+    print(f" Components: {result['component_ratios']}")
+    print(f" Level: {result['division_level']}")
 
     import os
     os.remove(test_path)

@@ -1,28 +1,17 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_TRF
+"""Calculator Layer.
+
+Indicator ID:   IND_TRF
 Indicator Name: Traffic Recognition
-Type: TYPE A (Simple Pixel Ratio)
+Type:           TYPE A (Simple Pixel Ratio
 
 Description:
-    The Traffic Recognition (TRF) indicator measures the proportion of 
-    the visual field occupied by traffic guidance elements and pedestrian 
-    paths. This indicator reflects the visibility and presence of traffic 
-    infrastructure that supports navigation, safety, and pedestrian 
+    The Traffic Recognition (TRF) indicator measures the proportion of the
+    visual field occupied by traffic guidance elements and pedestrian paths.
+    This indicator reflects the visibility and presence of traffic
+    infrastructure that supports navigation, safety, and pedestrian
     accessibility in urban environments.
-    
-Formula: 
-    TR = (P_traffic_signal + P_sidewalk + P_railway) / P_all
-    
-Variables:
-    - P_traffic_signal: Traffic signal/light pixels
-    - P_sidewalk: Sidewalk pixels
-    - P_railway: Railway pixels
-    - P_all: Total pixels in image
 
-Unit: ratio (0 to 1)
-Range: 0.0 (no traffic elements) to 1.0 (all traffic elements)
+Formula: TR = (P_traffic_signal + P_sidewalk + P_railway) / P_all
 """
 
 import numpy as np
@@ -65,9 +54,9 @@ INDICATOR = {
     "note": "Higher values indicate more visible traffic guidance and pedestrian infrastructure"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE A (Simple Pixel Ratio)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE A (Simple Pixel Ratio)")
 
 
 # =============================================================================
@@ -343,7 +332,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Traffic Recognition calculator...")
+    print("\nTesting Traffic Recognition calculator...")
     
     # Test 1: No traffic elements (all sky)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -355,10 +344,10 @@ if __name__ == "__main__":
     test_semantic_1 = {"sky": (135, 206, 235)}
     result_1 = calculate_indicator(test_path_1, test_semantic_1)
     
-    print(f"\n   Test 1: No traffic elements (100% sky)")
-    print(f"      Expected TRF: 0.0000")
-    print(f"      Calculated TRF: {result_1.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_trf(result_1.get('value'))}")
+    print(f"\nTest 1: No traffic elements (100% sky)")
+    print(f" Expected TRF: 0.0000")
+    print(f" Calculated TRF: {result_1.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_trf(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -373,11 +362,11 @@ if __name__ == "__main__":
     test_semantic_2 = {"road": (128, 128, 128), "sidewalk": (200, 200, 200)}
     result_2 = calculate_indicator(test_path_2, test_semantic_2)
     
-    print(f"\n   Test 2: 20% sidewalk coverage")
-    print(f"      Expected TRF: 0.2000")
-    print(f"      Calculated TRF: {result_2.get('value', 'N/A')}")
-    print(f"      Category breakdown: {result_2.get('category_breakdown', {})}")
-    print(f"      Interpretation: {interpret_trf(result_2.get('value'))}")
+    print(f"\nTest 2: 20% sidewalk coverage")
+    print(f" Expected TRF: 0.2000")
+    print(f" Calculated TRF: {result_2.get('value', 'N/A')}")
+    print(f" Category breakdown: {result_2.get('category_breakdown', {})}")
+    print(f" Interpretation: {interpret_trf(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -399,13 +388,13 @@ if __name__ == "__main__":
     }
     result_3 = calculate_indicator(test_path_3, test_semantic_3)
     
-    print(f"\n   Test 3: Multiple elements (15% sidewalk + 3% traffic light + 2% railway)")
-    print(f"      Expected TRF: 0.2000")
-    print(f"      Calculated TRF: {result_3.get('value', 'N/A')}")
-    print(f"      Traffic classes: {result_3.get('n_traffic_classes', 0)}")
-    print(f"      Category breakdown: {result_3.get('category_breakdown', {})}")
-    print(f"      Dominant category: {result_3.get('dominant_category', 'N/A')}")
-    print(f"      Interpretation: {interpret_trf(result_3.get('value'))}")
+    print(f"\nTest 3: Multiple elements (15% sidewalk + 3% traffic light + 2% railway)")
+    print(f" Expected TRF: 0.2000")
+    print(f" Calculated TRF: {result_3.get('value', 'N/A')}")
+    print(f" Traffic classes: {result_3.get('n_traffic_classes', 0)}")
+    print(f" Category breakdown: {result_3.get('category_breakdown', {})}")
+    print(f" Dominant category: {result_3.get('dominant_category', 'N/A')}")
+    print(f" Interpretation: {interpret_trf(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -419,12 +408,12 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic_3)
     
-    print(f"\n   Test 4: High traffic coverage (40% sidewalk)")
-    print(f"      Expected TRF: 0.4000")
-    print(f"      Calculated TRF: {result_4.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_trf(result_4.get('value'))}")
+    print(f"\nTest 4: High traffic coverage (40% sidewalk)")
+    print(f" Expected TRF: 0.4000")
+    print(f" Calculated TRF: {result_4.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_trf(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
-    print("\n   ✅ Test complete!")
-    print(f"\n   📝 Traffic categories: {list(TRAFFIC_CATEGORIES.keys())}")
+    print("\n Test complete!")
+    print(f"\n Traffic categories: {list(TRAFFIC_CATEGORIES.keys())}")

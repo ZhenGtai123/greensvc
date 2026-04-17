@@ -1,37 +1,17 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_PCI
+"""Calculator Layer.
+
+Indicator ID:   IND_PCI
 Indicator Name: Public-Facility Convenience Index
-Type: TYPE A (Simple Pixel Ratio)
+Type:           TYPE A (Simple Pixel Ratio
 
 Description:
-    The Public-Facility Convenience Index (PCI) measures the proportion of 
-    the visual field occupied by public service facilities. This indicator 
-    reflects street convenience by quantifying the presence of amenities 
-    such as benches, lights, trash cans, and other public facilities that 
-    enhance pedestrian experience and usability of urban spaces.
-    
-Formula: 
-    PCI = (P_chair + P_toilet + P_bench + P_stool + P_trashcan + 
-           P_table + P_armchair + P_light + P_streetlight + 
-           P_bulletinboard) / P_all
-    
-Variables:
-    - P_chair: Chair pixels
-    - P_toilet: Toilet pixels
-    - P_bench: Bench pixels
-    - P_stool: Stool pixels
-    - P_trashcan: Trash can pixels
-    - P_table: Table pixels
-    - P_armchair: Armchair pixels
-    - P_light: Light pixels
-    - P_streetlight: Street light pixels
-    - P_bulletinboard: Bulletin board pixels
-    - P_all: Total pixels in image
+    The Public-Facility Convenience Index (PCI) measures the proportion of the
+    visual field occupied by public service facilities. This indicator reflects
+    street convenience by quantifying the presence of amenities such as benches,
+    lights, trash cans, and other public facilities that enhance pedestrian
+    experience and usability of urban spaces.
 
-Unit: ratio (0 to 1)
-Range: 0.0 (no public facilities) to 1.0 (all public facilities)
+Formula: PCI = (P_chair + P_toilet + P_bench + P_stool + P_trashcan +
 """
 
 import numpy as np
@@ -81,9 +61,9 @@ INDICATOR = {
     "note": "Higher values indicate more public amenities visible in the scene"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE A (Simple Pixel Ratio)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE A (Simple Pixel Ratio)")
 
 
 # =============================================================================
@@ -336,7 +316,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Public-Facility Convenience Index calculator...")
+    print("\nTesting Public-Facility Convenience Index calculator...")
     
     # Test 1: No facilities (all sky)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -348,10 +328,10 @@ if __name__ == "__main__":
     test_semantic_1 = {"sky": (135, 206, 235)}
     result_1 = calculate_indicator(test_path_1, test_semantic_1)
     
-    print(f"\n   Test 1: No facilities (100% sky)")
-    print(f"      Expected PCI: 0.0000")
-    print(f"      Calculated PCI: {result_1.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_pci(result_1.get('value'))}")
+    print(f"\nTest 1: No facilities (100% sky)")
+    print(f" Expected PCI: 0.0000")
+    print(f" Calculated PCI: {result_1.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_pci(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -366,11 +346,11 @@ if __name__ == "__main__":
     test_semantic_2 = {"road": (128, 128, 128), "bench": (139, 90, 43)}
     result_2 = calculate_indicator(test_path_2, test_semantic_2)
     
-    print(f"\n   Test 2: 5% bench coverage")
-    print(f"      Expected PCI: 0.0500")
-    print(f"      Calculated PCI: {result_2.get('value', 'N/A')}")
-    print(f"      Facility classes: {result_2.get('facility_classes_found', {})}")
-    print(f"      Interpretation: {interpret_pci(result_2.get('value'))}")
+    print(f"\nTest 2: 5% bench coverage")
+    print(f" Expected PCI: 0.0500")
+    print(f" Calculated PCI: {result_2.get('value', 'N/A')}")
+    print(f" Facility classes: {result_2.get('facility_classes_found', {})}")
+    print(f" Interpretation: {interpret_pci(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -392,12 +372,12 @@ if __name__ == "__main__":
     }
     result_3 = calculate_indicator(test_path_3, test_semantic_3)
     
-    print(f"\n   Test 3: Multiple facilities (3% bench + 2% streetlight + 1% trashcan)")
-    print(f"      Expected PCI: 0.0600")
-    print(f"      Calculated PCI: {result_3.get('value', 'N/A')}")
-    print(f"      Facility classes: {result_3.get('n_facility_classes', 0)}")
-    print(f"      Breakdown: {result_3.get('facility_classes_found', {})}")
-    print(f"      Interpretation: {interpret_pci(result_3.get('value'))}")
+    print(f"\nTest 3: Multiple facilities (3% bench + 2% streetlight + 1% trashcan)")
+    print(f" Expected PCI: 0.0600")
+    print(f" Calculated PCI: {result_3.get('value', 'N/A')}")
+    print(f" Facility classes: {result_3.get('n_facility_classes', 0)}")
+    print(f" Breakdown: {result_3.get('facility_classes_found', {})}")
+    print(f" Interpretation: {interpret_pci(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -411,12 +391,12 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic_3)
     
-    print(f"\n   Test 4: High facility coverage (10% bench)")
-    print(f"      Expected PCI: 0.1000")
-    print(f"      Calculated PCI: {result_4.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_pci(result_4.get('value'))}")
+    print(f"\nTest 4: High facility coverage (10% bench)")
+    print(f" Expected PCI: 0.1000")
+    print(f" Calculated PCI: {result_4.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_pci(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
-    print("\n   ✅ Test complete!")
-    print("\n   📝 Facility keywords used:", FACILITY_KEYWORDS[:5], "...")
+    print("\n Test complete!")
+    print("\n Facility keywords used:", FACILITY_KEYWORDS[:5], "...")

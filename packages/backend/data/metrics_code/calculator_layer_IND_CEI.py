@@ -1,26 +1,17 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_CEI
+"""Calculator Layer.
+
+Indicator ID:   IND_CEI
 Indicator Name: Ceiling View Index
-Type: TYPE A (Simple Pixel Ratio)
+Type:           TYPE A (Simple Pixel Ratio
 
 Description:
-    The Ceiling View Index (CEI) measures the proportion of the visual 
-    field occupied by ceilings, specifically the underside of viaducts, 
-    overpasses, bridges, and similar overhead structures. This indicator 
-    reflects the degree to which overhead infrastructure affects the 
-    visual experience in urban environments.
-    
-Formula: 
-    CEI = Pixel_Ceiling / Total_Pixels
-    
-Variables:
-    - Pixel_Ceiling: Number of pixels classified as ceiling/bridge underside
-    - Total_Pixels: Total number of pixels in the image
+    The Ceiling View Index (CEI) measures the proportion of the visual field
+    occupied by ceilings, specifically the underside of viaducts, overpasses,
+    bridges, and similar overhead structures. This indicator reflects the degree
+    to which overhead infrastructure affects the visual experience in urban
+    environments.
 
-Unit: ratio (0 to 1)
-Range: 0.0 (no ceiling visible) to 1.0 (entirely ceiling)
+Formula: CEI = Pixel_Ceiling / Total_Pixels
 """
 
 import numpy as np
@@ -61,9 +52,9 @@ INDICATOR = {
     "note": "Measures visibility of overhead structures like viaducts, bridges, overpasses"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE A (Simple Pixel Ratio)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE A (Simple Pixel Ratio)")
 
 
 # =============================================================================
@@ -294,7 +285,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Ceiling View Index calculator...")
+    print("\nTesting Ceiling View Index calculator...")
     
     # Test 1: No ceiling (all sky)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -306,10 +297,10 @@ if __name__ == "__main__":
     test_semantic_1 = {"sky": (135, 206, 235), "bridge": (100, 100, 100)}
     result_1 = calculate_indicator(test_path_1, test_semantic_1)
     
-    print(f"\n   Test 1: No ceiling (100% sky)")
-    print(f"      Expected CEI: 0.0000")
-    print(f"      Calculated CEI: {result_1.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_cei(result_1.get('value'))}")
+    print(f"\nTest 1: No ceiling (100% sky)")
+    print(f" Expected CEI: 0.0000")
+    print(f" Calculated CEI: {result_1.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_cei(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -323,11 +314,11 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2, test_semantic_1)
     
-    print(f"\n   Test 2: 30% bridge coverage")
-    print(f"      Expected CEI: 0.3000")
-    print(f"      Calculated CEI: {result_2.get('value', 'N/A')}")
-    print(f"      Ceiling classes: {result_2.get('ceiling_classes_found', {})}")
-    print(f"      Interpretation: {interpret_cei(result_2.get('value'))}")
+    print(f"\nTest 2: 30% bridge coverage")
+    print(f" Expected CEI: 0.3000")
+    print(f" Calculated CEI: {result_2.get('value', 'N/A')}")
+    print(f" Ceiling classes: {result_2.get('ceiling_classes_found', {})}")
+    print(f" Interpretation: {interpret_cei(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -347,12 +338,12 @@ if __name__ == "__main__":
     }
     result_3 = calculate_indicator(test_path_3, test_semantic_3)
     
-    print(f"\n   Test 3: Multiple ceiling types (20% bridge + 5% viaduct)")
-    print(f"      Expected CEI: 0.2500")
-    print(f"      Calculated CEI: {result_3.get('value', 'N/A')}")
-    print(f"      Ceiling classes: {result_3.get('n_ceiling_classes', 0)}")
-    print(f"      Classes found: {result_3.get('ceiling_classes_found', {})}")
-    print(f"      Interpretation: {interpret_cei(result_3.get('value'))}")
+    print(f"\nTest 3: Multiple ceiling types (20% bridge + 5% viaduct)")
+    print(f" Expected CEI: 0.2500")
+    print(f" Calculated CEI: {result_3.get('value', 'N/A')}")
+    print(f" Ceiling classes: {result_3.get('n_ceiling_classes', 0)}")
+    print(f" Classes found: {result_3.get('ceiling_classes_found', {})}")
+    print(f" Interpretation: {interpret_cei(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -366,12 +357,12 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic_1)
     
-    print(f"\n   Test 4: High ceiling coverage (70% bridge)")
-    print(f"      Expected CEI: 0.7000")
-    print(f"      Calculated CEI: {result_4.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_cei(result_4.get('value'))}")
+    print(f"\nTest 4: High ceiling coverage (70% bridge)")
+    print(f" Expected CEI: 0.7000")
+    print(f" Calculated CEI: {result_4.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_cei(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
-    print("\n   ✅ Test complete!")
-    print(f"\n   📝 Ceiling keywords: {CEILING_KEYWORDS[:5]}... and more")
+    print("\n Test complete!")
+    print(f"\n Ceiling keywords: {CEILING_KEYWORDS[:5]}... and more")

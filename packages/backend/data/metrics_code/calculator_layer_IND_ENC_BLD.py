@@ -1,32 +1,16 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_ENC_BLD
+"""Calculator Layer.
+
+Indicator ID:   IND_ENC_BLD
 Indicator Name: Enclosure by Buildings
-Type: TYPE D (Enclosure / Derived Ratio)
+Type:           TYPE D (Enclosure / Derived Ratio
 
 Description:
-    The Enclosure by Buildings (ENC_BLD) measures the proportion of 
-    the sky view obstructed specifically by building structures. It 
-    quantifies how much of the vertical visual field is blocked by 
-    buildings, providing insights into urban density and spatial 
-    enclosure from an architectural perspective.
-    
-Formula: 
-    ENC_BLD = 1 - SVF_buildings
-    
-    Where:
-    SVF_buildings = Sky_Pixels / (Sky_Pixels + Building_Pixels)
-    
-    Simplified:
-    ENC_BLD = Building_Pixels / (Sky_Pixels + Building_Pixels)
-    
-Variables:
-    - Sky_Pixels: Number of pixels classified as sky
-    - Building_Pixels: Number of pixels classified as building-related
+    The Enclosure by Buildings (ENC_BLD) measures the proportion of the sky view
+    obstructed specifically by building structures. It quantifies how much of
+    the vertical visual field is blocked by buildings, providing insights into
+    urban density and spatial enclosure from an architectural perspective.
 
-Unit: ratio (0 to 1)
-Range: 0.0 (no building enclosure) to 1.0 (completely enclosed by buildings)
+Formula: ENC_BLD = 1 - SVF_buildings
 """
 
 import numpy as np
@@ -77,9 +61,9 @@ INDICATOR = {
     "note": "Higher values indicate more building enclosure, reducing sky visibility"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE D (Enclosure)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE D (Enclosure)")
 
 
 # =============================================================================
@@ -352,7 +336,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Enclosure by Buildings calculator...")
+    print("\nTesting Enclosure by Buildings calculator...")
     
     # Test 1: No buildings (all sky)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -364,11 +348,11 @@ if __name__ == "__main__":
     test_semantic_1 = {"sky": (135, 206, 235), "building": (128, 64, 64)}
     result_1 = calculate_indicator(test_path_1, test_semantic_1)
     
-    print(f"\n   Test 1: 100% sky, 0% building")
-    print(f"      Expected ENC_BLD: 0.0000")
-    print(f"      Calculated ENC_BLD: {result_1.get('value', 'N/A')}")
-    print(f"      SVF_buildings: {result_1.get('svf_buildings', 'N/A')}")
-    print(f"      Interpretation: {interpret_enc_bld(result_1.get('value'))}")
+    print(f"\nTest 1: 100% sky, 0% building")
+    print(f" Expected ENC_BLD: 0.0000")
+    print(f" Calculated ENC_BLD: {result_1.get('value', 'N/A')}")
+    print(f" SVF_buildings: {result_1.get('svf_buildings', 'N/A')}")
+    print(f" Interpretation: {interpret_enc_bld(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -382,11 +366,11 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2, test_semantic_1)
     
-    print(f"\n   Test 2: 50% sky, 50% building")
-    print(f"      Expected ENC_BLD: 0.5000")
-    print(f"      Calculated ENC_BLD: {result_2.get('value', 'N/A')}")
-    print(f"      SVF_buildings: {result_2.get('svf_buildings', 'N/A')}")
-    print(f"      Interpretation: {interpret_enc_bld(result_2.get('value'))}")
+    print(f"\nTest 2: 50% sky, 50% building")
+    print(f" Expected ENC_BLD: 0.5000")
+    print(f" Calculated ENC_BLD: {result_2.get('value', 'N/A')}")
+    print(f" SVF_buildings: {result_2.get('svf_buildings', 'N/A')}")
+    print(f" Interpretation: {interpret_enc_bld(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -400,11 +384,11 @@ if __name__ == "__main__":
     
     result_3 = calculate_indicator(test_path_3, test_semantic_1)
     
-    print(f"\n   Test 3: 30% sky, 70% building")
-    print(f"      Expected ENC_BLD: 0.7000")
-    print(f"      Calculated ENC_BLD: {result_3.get('value', 'N/A')}")
-    print(f"      SVF_buildings: {result_3.get('svf_buildings', 'N/A')}")
-    print(f"      Interpretation: {interpret_enc_bld(result_3.get('value'))}")
+    print(f"\nTest 3: 30% sky, 70% building")
+    print(f" Expected ENC_BLD: 0.7000")
+    print(f" Calculated ENC_BLD: {result_3.get('value', 'N/A')}")
+    print(f" SVF_buildings: {result_3.get('svf_buildings', 'N/A')}")
+    print(f" Interpretation: {interpret_enc_bld(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -417,11 +401,11 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic_1)
     
-    print(f"\n   Test 4: 0% sky, 100% building")
-    print(f"      Expected ENC_BLD: 1.0000")
-    print(f"      Calculated ENC_BLD: {result_4.get('value', 'N/A')}")
-    print(f"      SVF_buildings: {result_4.get('svf_buildings', 'N/A')}")
-    print(f"      Interpretation: {interpret_enc_bld(result_4.get('value'))}")
+    print(f"\nTest 4: 0% sky, 100% building")
+    print(f" Expected ENC_BLD: 1.0000")
+    print(f" Calculated ENC_BLD: {result_4.get('value', 'N/A')}")
+    print(f" SVF_buildings: {result_4.get('svf_buildings', 'N/A')}")
+    print(f" Interpretation: {interpret_enc_bld(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
@@ -441,17 +425,17 @@ if __name__ == "__main__":
     }
     result_5 = calculate_indicator(test_path_5, test_semantic_5)
     
-    print(f"\n   Test 5: 40% sky, 30% building + 30% house = 60% total building")
-    print(f"      Expected ENC_BLD: 0.6000")
-    print(f"      Calculated ENC_BLD: {result_5.get('value', 'N/A')}")
-    print(f"      Building classes: {result_5.get('n_building_classes', 0)}")
-    print(f"      Building breakdown: {result_5.get('building_classes_found', {})}")
-    print(f"      Interpretation: {interpret_enc_bld(result_5.get('value'))}")
+    print(f"\nTest 5: 40% sky, 30% building + 30% house = 60% total building")
+    print(f" Expected ENC_BLD: 0.6000")
+    print(f" Calculated ENC_BLD: {result_5.get('value', 'N/A')}")
+    print(f" Building classes: {result_5.get('n_building_classes', 0)}")
+    print(f" Building breakdown: {result_5.get('building_classes_found', {})}")
+    print(f" Interpretation: {interpret_enc_bld(result_5.get('value'))}")
     
     os.remove(test_path_5)
     
-    print("\n   ✅ Test complete!")
-    print("\n   📊 Relationship:")
-    print("      ENC_BLD + SVF_buildings = 1.0")
-    print("      High ENC_BLD = Low sky visibility (urban canyon)")
-    print("      Low ENC_BLD = High sky visibility (open area)")
+    print("\n Test complete!")
+    print("\n Relationship:")
+    print(" ENC_BLD + SVF_buildings = 1.0")
+    print(" High ENC_BLD = Low sky visibility (urban canyon)")
+    print(" Low ENC_BLD = High sky visibility (open area)")

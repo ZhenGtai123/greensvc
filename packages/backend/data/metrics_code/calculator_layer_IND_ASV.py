@@ -1,35 +1,23 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_ASV
+"""Calculator Layer.
+
+Indicator ID:   IND_ASV
 Indicator Name: Artificial Surface Visibility
-Type: TYPE A (ratio mode)
+Type:           TYPE A (ratio mode
 
 Description:
-    The Artificial Surface Visibility (ASV) quantifies the proportion of 
-    artificial (man-made) surface pixels visible in street-level imagery. 
-    It measures the visual presence of constructed, paved, and impervious 
-    surfaces in the urban landscape, including roads, sidewalks, paths, 
-    floors, stairs, bridges, and other built infrastructure. This indicator 
-    provides insight into the level of urbanization and hardscape dominance 
-    in streetscapes. High ASV values indicate highly urbanized, 
-    infrastructure-heavy environments, while lower values suggest more 
-    natural or green-dominated landscapes. ASV is inversely related to 
-    vegetation coverage and is important for understanding urban heat 
-    island effects, stormwater runoff potential, and overall urban 
-    environmental quality.
+    The Artificial Surface Visibility (ASV) quantifies the proportion of
+    artificial (man-made) surface pixels visible in street-level imagery. It
+    measures the visual presence of constructed, paved, and impervious surfaces
+    in the urban landscape, including roads, sidewalks, paths, floors, stairs,
+    bridges, and other built infrastructure. This indicator provides insight
+    into the level of urbanization and hardscape dominance in streetscapes. High
+    ASV values indicate highly urbanized, infrastructure-heavy environments,
+    while lower values suggest more natural or green-dominated landscapes. ASV
+    is inversely related to vegetation coverage and is important for
+    understanding urban heat island effects, stormwater runoff potential, and
+    overall urban environmental quality.
 
 Formula: ASV = (Sum(Artificial_Surface_Pixels) / Sum(Total_Pixels)) × 100
-
-Variables:
-    - Artificial_Surface_Pixels: Pixels classified as man-made surfaces
-                                  (roads, sidewalks, paths, floors, stairs, etc.)
-    - Total_Pixels: Total number of pixels in the image
-
-References:
-    - Related to impervious surface and urbanization studies
-    - Contributes to understanding of urban environmental quality
-    - Supports assessment of stormwater management and heat island effects
 """
 
 import numpy as np
@@ -87,21 +75,21 @@ INDICATOR = {
 
 TARGET_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 for class_name in INDICATOR.get('target_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         TARGET_RGB[rgb] = class_name
-        print(f"   ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"   ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
         # Try partial matching to suggest corrections
         for name in semantic_colors.keys():
             if class_name.split(';')[0] in name or name.split(';')[0] in class_name:
-                print(f"      💡 Did you mean: '{name}'?")
+                print(f" Did you mean: '{name}'?")
                 break
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
+print(f"\nCalculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
 
 
 # =============================================================================
@@ -193,7 +181,7 @@ if __name__ == "__main__":
     Test code for standalone execution.
     Creates a synthetic test image and validates the calculator.
     """
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
     
     # Create a synthetic test image (100x100 pixels)
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -224,20 +212,20 @@ if __name__ == "__main__":
     
     # Run calculation
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
     
     # Validate expected result (should be ~25%)
     if result['success']:
         expected_asv = 25.0  # 10% road + 8% sidewalk + 5% path + 2% stairs
         actual_asv = result['value']
-        print(f"   Expected ASV: ~{expected_asv}%")
-        print(f"   Actual ASV: {actual_asv}%")
+        print(f" Expected ASV: ~{expected_asv}%")
+        print(f" Actual ASV: {actual_asv}%")
         if abs(actual_asv - expected_asv) < 1:
-            print("   ✅ Test PASSED")
+            print(" Test PASSED")
         else:
-            print("   ⚠️ Test result differs from expected")
+            print(" ️ Test result differs from expected")
     
     # Cleanup
     import os
     os.remove(test_path)
-    print("   🧹 Test cleanup complete")
+    print(" Test cleanup complete")

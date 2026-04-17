@@ -1,35 +1,16 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_SVF_DEC
+"""Calculator Layer.
+
+Indicator ID:   IND_SVF_DEC
 Indicator Name: Sky View Factor Decrease
-Type: TYPE D (Derived Ratio)
+Type:           TYPE D (Derived Ratio
 
 Description:
-    The Sky View Factor Decrease (SVF_DEC) measures the reduction in 
-    Sky View Factor specifically attributed to vegetation/trees. It 
-    quantifies how much the tree canopy reduces sky visibility compared 
-    to a scenario with only buildings (no vegetation).
-    
-Formula: 
-    SVF_DEC = SVFS - SVFP
-    
-    Where:
-    SVFS (Simulation-based SVF) = Sky / (Sky + Building)  [without trees]
-    SVFP (Photographic SVF) = Sky / (Sky + Building + Tree)  [with trees]
-    
-    Simplified:
-    SVF_DEC = Sky/(Sky+Building) - Sky/(Sky+Building+Tree)
-    
-Variables:
-    - SVFS: Simulation-based Sky View Factor (hypothetical, without vegetation)
-    - SVFP: Photographic Sky View Factor (actual, with vegetation)
-    - Sky_Pixels: Number of pixels classified as sky
-    - Building_Pixels: Number of pixels classified as building
-    - Tree_Pixels: Number of pixels classified as tree/vegetation
+    The Sky View Factor Decrease (SVF_DEC) measures the reduction in Sky View
+    Factor specifically attributed to vegetation/trees. It quantifies how much
+    the tree canopy reduces sky visibility compared to a scenario with only
+    buildings (no vegetation).
 
-Unit: ratio (0 to 1)
-Range: 0.0 (no SVF decrease from trees) to <1.0 (significant decrease)
+Formula: SVF_DEC = SVFS - SVFP
 """
 
 import numpy as np
@@ -73,9 +54,9 @@ INDICATOR = {
     "note": "Higher values indicate trees significantly reduce sky visibility"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE D (Derived Ratio)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE D (Derived Ratio)")
 
 
 # =============================================================================
@@ -387,7 +368,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Sky View Factor Decrease calculator...")
+    print("\nTesting Sky View Factor Decrease calculator...")
     
     # Test 1: Only sky (no trees, no buildings)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -403,11 +384,11 @@ if __name__ == "__main__":
     }
     result_1 = calculate_indicator(test_path_1, test_semantic)
     
-    print(f"\n   Test 1: 100% sky, 0% building, 0% tree")
-    print(f"      Expected SVF_DEC: 0.0000 (no trees to reduce SVF)")
-    print(f"      Calculated SVF_DEC: {result_1.get('value', 'N/A')}")
-    print(f"      SVFS: {result_1.get('svfs', 'N/A')}, SVFP: {result_1.get('svfp', 'N/A')}")
-    print(f"      Interpretation: {interpret_svf_dec(result_1.get('value'))}")
+    print(f"\nTest 1: 100% sky, 0% building, 0% tree")
+    print(f" Expected SVF_DEC: 0.0000 (no trees to reduce SVF)")
+    print(f" Calculated SVF_DEC: {result_1.get('value', 'N/A')}")
+    print(f" SVFS: {result_1.get('svfs', 'N/A')}, SVFP: {result_1.get('svfp', 'N/A')}")
+    print(f" Interpretation: {interpret_svf_dec(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -421,11 +402,11 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2, test_semantic)
     
-    print(f"\n   Test 2: 50% sky, 50% building, 0% tree")
-    print(f"      Expected SVF_DEC: 0.0000 (no trees)")
-    print(f"      Calculated SVF_DEC: {result_2.get('value', 'N/A')}")
-    print(f"      SVFS: {result_2.get('svfs', 'N/A')}, SVFP: {result_2.get('svfp', 'N/A')}")
-    print(f"      Interpretation: {interpret_svf_dec(result_2.get('value'))}")
+    print(f"\nTest 2: 50% sky, 50% building, 0% tree")
+    print(f" Expected SVF_DEC: 0.0000 (no trees)")
+    print(f" Calculated SVF_DEC: {result_2.get('value', 'N/A')}")
+    print(f" SVFS: {result_2.get('svfs', 'N/A')}, SVFP: {result_2.get('svfp', 'N/A')}")
+    print(f" Interpretation: {interpret_svf_dec(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -439,11 +420,11 @@ if __name__ == "__main__":
     
     result_3 = calculate_indicator(test_path_3, test_semantic)
     
-    print(f"\n   Test 3: 50% sky, 0% building, 50% tree")
-    print(f"      Expected SVF_DEC: 0.5000 (SVFS=1.0, SVFP=0.5)")
-    print(f"      Calculated SVF_DEC: {result_3.get('value', 'N/A')}")
-    print(f"      SVFS: {result_3.get('svfs', 'N/A')}, SVFP: {result_3.get('svfp', 'N/A')}")
-    print(f"      Interpretation: {interpret_svf_dec(result_3.get('value'))}")
+    print(f"\nTest 3: 50% sky, 0% building, 50% tree")
+    print(f" Expected SVF_DEC: 0.5000 (SVFS=1.0, SVFP=0.5)")
+    print(f" Calculated SVF_DEC: {result_3.get('value', 'N/A')}")
+    print(f" SVFS: {result_3.get('svfs', 'N/A')}, SVFP: {result_3.get('svfp', 'N/A')}")
+    print(f" Interpretation: {interpret_svf_dec(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -462,12 +443,12 @@ if __name__ == "__main__":
     # SVFP = 40/(40+30+30) = 40/100 = 0.4
     # SVF_DEC = 0.5714 - 0.4 = 0.1714
     
-    print(f"\n   Test 4: 40% sky, 30% building, 30% tree")
-    print(f"      Expected SVF_DEC: ~0.1714")
-    print(f"      Calculated SVF_DEC: {result_4.get('value', 'N/A')}")
-    print(f"      SVFS: {result_4.get('svfs', 'N/A')}, SVFP: {result_4.get('svfp', 'N/A')}")
-    print(f"      Relative decrease: {result_4.get('relative_decrease_pct', 'N/A')}%")
-    print(f"      Interpretation: {interpret_svf_dec(result_4.get('value'))}")
+    print(f"\nTest 4: 40% sky, 30% building, 30% tree")
+    print(f" Expected SVF_DEC: ~0.1714")
+    print(f" Calculated SVF_DEC: {result_4.get('value', 'N/A')}")
+    print(f" SVFS: {result_4.get('svfs', 'N/A')}, SVFP: {result_4.get('svfp', 'N/A')}")
+    print(f" Relative decrease: {result_4.get('relative_decrease_pct', 'N/A')}%")
+    print(f" Interpretation: {interpret_svf_dec(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
@@ -486,18 +467,18 @@ if __name__ == "__main__":
     # SVFP = 20/(20+20+60) = 20/100 = 0.2
     # SVF_DEC = 0.5 - 0.2 = 0.3
     
-    print(f"\n   Test 5: 20% sky, 20% building, 60% tree (dense canopy)")
-    print(f"      Expected SVF_DEC: 0.3000")
-    print(f"      Calculated SVF_DEC: {result_5.get('value', 'N/A')}")
-    print(f"      SVFS: {result_5.get('svfs', 'N/A')}, SVFP: {result_5.get('svfp', 'N/A')}")
-    print(f"      Relative decrease: {result_5.get('relative_decrease_pct', 'N/A')}%")
-    print(f"      Interpretation: {interpret_svf_dec(result_5.get('value'))}")
+    print(f"\nTest 5: 20% sky, 20% building, 60% tree (dense canopy)")
+    print(f" Expected SVF_DEC: 0.3000")
+    print(f" Calculated SVF_DEC: {result_5.get('value', 'N/A')}")
+    print(f" SVFS: {result_5.get('svfs', 'N/A')}, SVFP: {result_5.get('svfp', 'N/A')}")
+    print(f" Relative decrease: {result_5.get('relative_decrease_pct', 'N/A')}%")
+    print(f" Interpretation: {interpret_svf_dec(result_5.get('value'))}")
     
     os.remove(test_path_5)
     
-    print("\n   ✅ Test complete!")
-    print("\n   📊 Key Relationships:")
-    print("      SVF_DEC = SVFS - SVFP")
-    print("      SVFS = Sky / (Sky + Building)  [without trees]")
-    print("      SVFP = Sky / (Sky + Building + Tree)  [with trees]")
-    print("      Higher SVF_DEC = Trees have greater impact on sky visibility")
+    print("\n Test complete!")
+    print("\n Key Relationships:")
+    print(" SVF_DEC = SVFS - SVFP")
+    print(" SVFS = Sky / (Sky + Building) [without trees]")
+    print(" SVFP = Sky / (Sky + Building + Tree) [with trees]")
+    print(" Higher SVF_DEC = Trees have greater impact on sky visibility")

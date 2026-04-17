@@ -1,35 +1,19 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_CPX
+"""Calculator Layer.
+
+Indicator ID:   IND_CPX
 Indicator Name: Visual Complexity
-Type: TYPE B (Custom Mathematical Formula)
+Type:           TYPE B (Custom Mathematical Formula
 
 Description:
-    The Visual Complexity (CPX) indicator quantifies the information entropy 
-    of a visual scene using Shannon entropy. It measures the complexity and 
-    diversity of semantic class distribution in street-level imagery.
-    
-    Higher entropy values indicate more complex scenes with diverse elements 
-    distributed more uniformly. Lower entropy indicates simpler scenes 
-    dominated by fewer classes.
-    
-    Visual complexity is related to:
-    - Scene interest and engagement
-    - Wayfinding difficulty
-    - Cognitive load
-    - Aesthetic richness
-    
-Formula: 
-    H = -Σ(pᵢ × log₂(pᵢ))
-    
-Variables:
-    - H: Shannon entropy (information entropy) of the visual scene
-    - pᵢ: Proportion of pixels belonging to semantic category i
-    - Σ: Sum over all semantic categories in the image
+    The Visual Complexity (CPX) indicator quantifies the information entropy of
+    a visual scene using Shannon entropy. It measures the complexity and
+    diversity of semantic class distribution in street-level imagery. Higher
+    entropy values indicate more complex scenes with diverse elements
+    distributed more uniformly. Lower entropy indicates simpler scenes dominated
+    by fewer classes. Visual complexity is related to: - Scene interest and
+    engagement - Wayfinding difficulty - Cognitive load - Aesthetic richness
 
-Unit: bits
-Range: 0 (single class) to log₂(n) (n classes uniformly distributed)
+Formula: )
 """
 
 import numpy as np
@@ -70,9 +54,9 @@ INDICATOR = {
     "note": "Uses all semantic classes from the configuration; neutral target direction as optimal complexity depends on context"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Unit: {INDICATOR['unit']}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Unit: {INDICATOR['unit']}")
 
 
 # =============================================================================
@@ -264,7 +248,7 @@ def calculate_theoretical_max(n_classes: int) -> float:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Visual Complexity (Shannon Entropy) calculator...")
+    print("\nTesting Visual Complexity (Shannon Entropy) calculator...")
     
     # Test 1: Two classes, equal distribution (expected: ~1.0 bits)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -277,11 +261,11 @@ if __name__ == "__main__":
         
         result_1 = calculate_indicator(test_path_1)
         
-        print(f"\n   Test 1: 50% grass + 50% sky")
-        print(f"      Expected entropy: ~1.0 bits (2 classes, equal)")
-        print(f"      Calculated: {result_1['value']} bits")
-        print(f"      Normalized: {result_1['normalized_entropy']}")
-        print(f"      Interpretation: {interpret_complexity(result_1['value'], result_1['n_classes'])}")
+        print(f"\nTest 1: 50% grass + 50% sky")
+        print(f" Expected entropy: ~1.0 bits (2 classes, equal)")
+        print(f" Calculated: {result_1['value']} bits")
+        print(f" Normalized: {result_1['normalized_entropy']}")
+        print(f" Interpretation: {interpret_complexity(result_1['value'], result_1['n_classes'])}")
         
         os.remove(test_path_1)
     
@@ -301,11 +285,11 @@ if __name__ == "__main__":
         
         result_2 = calculate_indicator(test_path_2)
         
-        print(f"\n   Test 2: 25% each of 4 classes")
-        print(f"      Expected entropy: ~2.0 bits (4 classes, equal)")
-        print(f"      Calculated: {result_2['value']} bits")
-        print(f"      Normalized: {result_2['normalized_entropy']}")
-        print(f"      Interpretation: {interpret_complexity(result_2['value'], result_2['n_classes'])}")
+        print(f"\nTest 2: 25% each of 4 classes")
+        print(f" Expected entropy: ~2.0 bits (4 classes, equal)")
+        print(f" Calculated: {result_2['value']} bits")
+        print(f" Normalized: {result_2['normalized_entropy']}")
+        print(f" Interpretation: {interpret_complexity(result_2['value'], result_2['n_classes'])}")
         
         os.remove(test_path_2)
     
@@ -320,12 +304,12 @@ if __name__ == "__main__":
         
         result_3 = calculate_indicator(test_path_3)
         
-        print(f"\n   Test 3: 90% sky + 10% tree (unequal)")
-        print(f"      Expected entropy: ~0.47 bits (2 classes, unequal)")
-        print(f"      Calculated: {result_3['value']} bits")
-        print(f"      Normalized: {result_3['normalized_entropy']}")
-        print(f"      Interpretation: {interpret_complexity(result_3['value'], result_3['n_classes'])}")
+        print(f"\nTest 3: 90% sky + 10% tree (unequal)")
+        print(f" Expected entropy: ~0.47 bits (2 classes, unequal)")
+        print(f" Calculated: {result_3['value']} bits")
+        print(f" Normalized: {result_3['normalized_entropy']}")
+        print(f" Interpretation: {interpret_complexity(result_3['value'], result_3['n_classes'])}")
         
         os.remove(test_path_3)
     
-    print("\n   🧹 Test cleanup complete")
+    print("\n Test cleanup complete")

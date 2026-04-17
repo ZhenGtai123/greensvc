@@ -1,21 +1,10 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_VSD
-指标名称: Vegetation Structural Diversity (植被结构多样性)
-类型: TYPE B (数学公式类)
+"""Calculator Layer.
 
-说明:
-衡量植被垂直层次（tree, shrub, herb）的结构多样性。
-基于语义分割像素统计，采用Shannon-Wiener指数计算：
-层次类型越丰富、分布越均匀，指数越高。
+Indicator ID:   IND_VSD
+Indicator Name: Vegetation Structural Diversity
+Type:           TYPE B
 
-公式:
-VSD = - Σ(pᵢ × ln(pᵢ))
-其中 pᵢ = 某类植被像素数 / 植被总像素数
-
-单位: 无量纲
-范围: 0 (单一层次) 到 ln(n) (n个层次均匀分布)
+Formula: )
 """
 
 import numpy as np
@@ -24,7 +13,7 @@ from typing import Dict
 
 
 # =============================================================================
-# 指标定义
+# INDICATOR DEFINITION
 # =============================================================================
 INDICATOR = {
     "id": "IND_VSD",
@@ -44,49 +33,23 @@ INDICATOR = {
     }
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Vegetation Structural Diversity (植被结构多样性) - Shannon-Wiener
-
-    TYPE B: 自定义数学公式
-
-    算法步骤:
-    1. 统计图像中 tree / shrub / herb 的像素数
-    2. 计算每个类别概率 pᵢ = count_i / total_veg
-    3. 计算 VSD = -Σ(pᵢ × ln(pᵢ))
-
-    Args:
-        image_path: 语义分割mask图片路径
-
-    Returns:
-        {
-            'success': True/False,
-            'value': float (VSD),
-            'n_layers': int,
-            'max_possible_entropy': float (理论最大值 ln(n)),
-            'normalized_entropy': float (归一化 0-1),
-            'total_pixels': int,
-            'matched_pixels': int,
-            'unmatched_pixels': int,
-            'layer_distribution': dict
-        }
-    """
     try:
-        # Step 1: 加载图片
+        # Step 1:
         img = Image.open(image_path).convert('RGB')
         pixels = np.array(img)
         h, w, _ = pixels.shape
         total_pixels = h * w
         flat_pixels = pixels.reshape(-1, 3)
 
-        # Step 2: 统计 tree / shrub / herb 像素数
+        # Step 2: tree / shrub / herb
         target_layers = ['tree', 'shrub', 'herb']
         layer_counts = {}
 
@@ -116,16 +79,16 @@ def calculate_indicator(image_path: str) -> Dict:
                 'note': 'No vegetation layers detected in image'
             }
 
-        # Step 3: 计算概率分布
+        # Step 3:
         probabilities = [count / total_veg for count in layer_counts.values()]
 
-        # Step 4: 计算 Shannon-Wiener 指数（自然对数 ln）
+        # Step 4: Shannon-Wiener ln
         vsd = 0.0
         for p in probabilities:
             if p > 0:
                 vsd -= p * np.log(p)
 
-        # Step 5: 计算额外指标
+        # Step 5:
         n_layers = len(layer_counts)
         max_entropy = np.log(n_layers) if n_layers > 1 else 0
         normalized_entropy = vsd / max_entropy if max_entropy > 0 else 0
@@ -154,12 +117,9 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 辅助函数：指数解释
+# HELPER FUNCTIONS
 # =============================================================================
 def interpret_vsd(vsd: float, n_layers: int) -> str:
-    """
-    解释VSD的含义
-    """
     if n_layers <= 1:
         return "Very low diversity: dominated by a single vegetation layer"
 
@@ -177,12 +137,12 @@ def interpret_vsd(vsd: float, n_layers: int) -> str:
 
 
 # =============================================================================
-# 测试代码
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Vegetation Structural Diversity calculator...")
+    print("\nTesting Vegetation Structural Diversity calculator...")
 
-    # 创建测试图片 - 1/3 tree, 1/3 shrub, 1/3 herb
+    # - 1/3 tree, 1/3 shrub, 1/3 herb
     test_img = np.zeros((90, 90, 3), dtype=np.uint8)
 
     if all(k in semantic_colors for k in ['tree', 'shrub', 'herb']):
@@ -195,13 +155,13 @@ if __name__ == "__main__":
 
         result = calculate_indicator(test_path)
 
-        print("   Test: 1/3 tree + 1/3 shrub + 1/3 herb")
-        print("   Expected: ln(3) ≈ 1.099 (uniform distribution)")
-        print(f"   Result: {result['value']}")
-        print(f"   Layers: {result['n_layers']}")
-        print(f"   Interpretation: {interpret_vsd(result['value'], result['n_layers'])}")
+        print(" Test: 1/3 tree + 1/3 shrub + 1/3 herb")
+        print(" Expected: ln(3) ≈ 1.099 (uniform distribution)")
+        print(f" Result: {result['value']}")
+        print(f" Layers: {result['n_layers']}")
+        print(f" Interpretation: {interpret_vsd(result['value'], result['n_layers'])}")
 
         import os
         os.remove(test_path)
     else:
-        print("   ⚠️ Required classes not found in semantic_colors")
+        print(" ️ Required classes not found in semantic_colors")

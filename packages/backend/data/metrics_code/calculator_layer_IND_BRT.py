@@ -1,22 +1,8 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_BRT
-指标名称: Perceived Brightness Score (亮度感知评分)
-类型: TYPE E (深度学习类)
+"""Calculator Layer.
 
-说明:
-使用Siamese CNN 模型输出的softmax置信度来量化场景的主观亮度感知。
-常见设置为亮度等级分类（如 Dark / Medium / Bright），并用softmax概率作为置信度或得分。
-
-由于需要预训练模型，此示例提供两种实现：
-1. 完整实现（需要PyTorch和模型文件）
-2. 占位符实现（基于简单亮度规则的估算，用于测试流程）
-
-⚠️ 注意:
-- 完整实现需要安装 PyTorch: pip install torch torchvision
-- 需要预训练Siamese CNN模型文件
-- 可能需要GPU支持
+Indicator ID:   IND_BRT
+Indicator Name: Perceived Brightness Score
+Type:           TYPE E
 """
 
 import numpy as np
@@ -26,7 +12,7 @@ import os
 
 
 # =============================================================================
-# 指标定义
+# INDICATOR DEFINITION
 # =============================================================================
 INDICATOR = {
     "id": "IND_BRT",
@@ -39,10 +25,9 @@ INDICATOR = {
 
     "calc_type": "deep_learning",
 
-    # 模型配置（完整实现时使用）
     "model_config": {
         "model_type": "SiameseCNN",
-        "model_path": "./models/brightness_siamese.pth",  # 需要预训练模型
+        "model_path": "./models/brightness_siamese.pth",
         "input_size": (224, 224),
         "normalize": True,
         "mean": [0.485, 0.456, 0.406],
@@ -51,20 +36,19 @@ INDICATOR = {
         "label_map": ["Dark", "Medium", "Bright"]
     },
 
-    # 输出配置
     "output_type": "classification",
     "output_range": [0, 1],
 
-    # 占位符模式（无模型时使用）
+    # PLACEHOLDER MODE
     "use_placeholder": True
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Mode: {'Placeholder (rule-based)' if INDICATOR.get('use_placeholder', True) else 'Deep Learning'}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Mode: {'Placeholder (rule-based)' if INDICATOR.get('use_placeholder', True) else 'Deep Learning'}")
 
 
 # =============================================================================
-# 检测深度学习环境
+# DEEP LEARNING ENVIRONMENT
 # =============================================================================
 TORCH_AVAILABLE = False
 try:
@@ -73,23 +57,16 @@ try:
     import torchvision.transforms as transforms
     from torchvision import models
     TORCH_AVAILABLE = True
-    print(f"   PyTorch: Available (version {torch.__version__})")
+    print(f" PyTorch: Available (version {torch.__version__})")
 except ImportError:
-    print(f"   PyTorch: Not installed")
-    print(f"   To enable full DL mode: pip install torch torchvision")
+    print(f" PyTorch: Not installed")
+    print(f" To enable full DL mode: pip install torch torchvision")
 
 
 # =============================================================================
-# Siamese CNN (示例结构，占位)
+# Siamese CNN
 # =============================================================================
 class SiameseCNN(nn.Module):
-    """
-    Siamese CNN 示例结构：
-    - 两个分支共享权重（这里以ResNet18 backbone 为例）
-    - 输入为 (img, anchor) 或 (img1, img2)
-    - 输出为分类logits（Bright/Dark/Medium）
-    说明：实际训练结构可能不同，此处仅作为可加载权重的示例骨架。
-    """
     def __init__(self, num_classes: int = 3):
         super().__init__()
         backbone = models.resnet18(pretrained=False)
@@ -108,31 +85,9 @@ class SiameseCNN(nn.Module):
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Perceived Brightness Score (亮度感知评分)
-
-    TYPE E: 深度学习类
-
-    根据配置选择实现方式:
-    - 占位符模式: 基于平均亮度的简单估算（映射为0-1置信度）
-    - 完整模式: Siamese CNN 分类softmax输出
-
-    Args:
-        image_path: 图片路径（建议使用原始图片）
-
-    Returns:
-        {
-            'success': True/False,
-            'value': float (0-1),
-            'method': str,
-            'confidence': float,
-            'predicted_class': str/int,
-            'softmax': dict (可选)
-        }
-    """
     use_placeholder = INDICATOR.get('use_placeholder', True)
 
     if use_placeholder or not TORCH_AVAILABLE:
@@ -142,16 +97,6 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 def calculate_placeholder(image_path: str) -> Dict:
-    """
-    占位符实现：基于平均亮度估算主观亮度感知
-
-    算法:
-    1. 转灰度并计算平均亮度 mean_gray (0-255)
-    2. 将 mean_gray 线性映射到 0-1 作为亮度得分
-    3. 构造一个伪softmax分布（Dark/Medium/Bright）用于流程测试
-
-    注意: 仅用于测试流程，不是真正的深度学习预测
-    """
     try:
         img = Image.open(image_path).convert('RGB')
         rgb = np.array(img, dtype=np.float64)
@@ -159,11 +104,10 @@ def calculate_placeholder(image_path: str) -> Dict:
         gray = 0.299 * rgb[:, :, 0] + 0.587 * rgb[:, :, 1] + 0.114 * rgb[:, :, 2]
         mean_gray = float(np.mean(gray))
 
-        # 0-1得分
         score = mean_gray / 255.0
         score = max(0.0, min(1.0, score))
 
-        # 伪softmax（用三角形隶属函数）
+        # softmax
         # Dark centered at 40, Medium at 128, Bright at 220
         def tri(x, c, w):
             d = abs(x - c)
@@ -204,13 +148,6 @@ def calculate_placeholder(image_path: str) -> Dict:
 
 
 def calculate_deep_learning(image_path: str) -> Dict:
-    """
-    完整实现：使用预训练 Siamese CNN 分类模型输出softmax置信度
-
-    需要:
-    - PyTorch
-    - 预训练模型文件（输出 logits, shape [1, num_classes]）
-    """
     try:
         model_config = INDICATOR.get('model_config', {})
         model_path = model_config.get('model_path', '')
@@ -274,8 +211,8 @@ def calculate_deep_learning(image_path: str) -> Dict:
                 k = str(i)
             softmax[k] = round(float(probs_list[i]), 4)
 
-        # 也可将“Brightness Score”定义为Bright类别的概率
-        # 若无Bright类别，退回使用max conf
+        # Brightness Score Bright
+        # Bright max conf
         if isinstance(label_map, (list, tuple)) and "Bright" in label_map:
             bright_idx = label_map.index("Bright")
             value = float(probs_list[bright_idx])
@@ -303,10 +240,9 @@ def calculate_deep_learning(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 辅助函数
+# HELPER FUNCTIONS
 # =============================================================================
 def interpret_brightness(score: float) -> str:
-    """解释亮度感知评分（0-1）"""
     if score < 0.2:
         return "Very dark appearance"
     elif score < 0.4:
@@ -320,10 +256,10 @@ def interpret_brightness(score: float) -> str:
 
 
 # =============================================================================
-# 测试代码
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Perceived Brightness Score calculator...")
+    print("\nTesting Perceived Brightness Score calculator...")
 
     dark = np.zeros((120, 120, 3), dtype=np.uint8) + 20
     mid = np.zeros((120, 120, 3), dtype=np.uint8) + 128
@@ -335,13 +271,13 @@ if __name__ == "__main__":
 
         result = calculate_indicator(test_path)
 
-        print(f"\n   {name}:")
-        print(f"      Score: {result['value']} (0-1)")
-        print(f"      Method: {result['method']}")
+        print(f"\n{name}:")
+        print(f" Score: {result['value']} (0-1)")
+        print(f" Method: {result['method']}")
         if 'mean_gray' in result:
-            print(f"      Mean gray: {result['mean_gray']}")
+            print(f" Mean gray: {result['mean_gray']}")
         if 'predicted_class' in result:
-            print(f"      Pred: {result['predicted_class']} (conf={result.get('confidence')})")
-        print(f"      Interpretation: {interpret_brightness(result['value'])}")
+            print(f" Pred: {result['predicted_class']} (conf={result.get('confidence')})")
+        print(f" Interpretation: {interpret_brightness(result['value'])}")
 
         os.remove(test_path)

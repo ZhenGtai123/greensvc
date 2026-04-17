@@ -1,23 +1,8 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_CSI
-指标名称: Color Saturation Index (颜色饱和度指数)
-类型: TYPE C (图像处理类)
+"""Calculator Layer.
 
-说明:
-基于RGB通道计算叶色（整体色彩）鲜艳程度/饱和程度。
-采用rgyb（red-green / yellow-blue）分量构造色彩强度：
-CSI = sigma_rgyb + 0.3 * mu_rgyb
-
-其中:
-rg = R - G
-yb = 0.5*(R + G) - B
-sigma_rgyb = sqrt(std(rg)^2 + std(yb)^2)
-mu_rgyb    = sqrt(mean(rg)^2 + mean(yb)^2)
-
-单位: intensity
-范围: >= 0 （数值越大表示颜色越鲜艳/饱和）
+Indicator ID:   IND_CSI
+Indicator Name: Color Saturation Index
+Type:           TYPE C
 """
 
 import numpy as np
@@ -27,7 +12,7 @@ import os
 
 
 # =============================================================================
-# 指标定义
+# INDICATOR DEFINITION
 # =============================================================================
 INDICATOR = {
     "id": "IND_CSI",
@@ -49,50 +34,22 @@ INDICATOR = {
         "mu_rgyb": "sqrt(mean(rg)^2 + mean(yb)^2)"
     },
 
-    # TYPE C 特殊配置
+    # TYPE C
     "use_original_image": False,
     "original_image_path": None
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Use original image: {INDICATOR.get('use_original_image', False)}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Use original image: {INDICATOR.get('use_original_image', False)}")
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Color Saturation Index (颜色饱和度指数)
-
-    TYPE C: 图像处理类
-
-    算法步骤:
-    1. 加载图像（mask或原始图像）
-    2. 计算rg与yb分量
-    3. 计算sigma_rgyb与mu_rgyb
-    4. 计算CSI = sigma_rgyb + 0.3 * mu_rgyb
-
-    Args:
-        image_path: 图片路径
-
-    Returns:
-        {
-            'success': True/False,
-            'value': float (CSI),
-            'sigma_rgyb': float,
-            'mu_rgyb': float,
-            'rg_stats': dict,
-            'yb_stats': dict,
-            'dimensions': dict,
-            'total_pixels': int,
-            'image_source': str,
-            'actual_path': str
-        }
-    """
     try:
-        # Step 1: 确定实际图片路径
+        # Step 1:
         actual_path = image_path
         image_source = 'mask'
 
@@ -108,7 +65,7 @@ def calculate_indicator(image_path: str) -> Dict:
                             image_source = 'original'
                             break
 
-        # Step 2: 加载图片
+        # Step 2:
         img = Image.open(actual_path).convert('RGB')
         pixels = np.array(img, dtype=np.float64)
 
@@ -119,11 +76,11 @@ def calculate_indicator(image_path: str) -> Dict:
         G = pixels[:, :, 1]
         B = pixels[:, :, 2]
 
-        # Step 3: 计算 rgyb 分量
+        # Step 3: rgyb
         rg = R - G
         yb = 0.5 * (R + G) - B
 
-        # Step 4: 计算 sigma_rgyb 与 mu_rgyb
+        # Step 4: sigma_rgyb mu_rgyb
         rg_mean = float(np.mean(rg))
         yb_mean = float(np.mean(yb))
         rg_std = float(np.std(rg))
@@ -132,7 +89,7 @@ def calculate_indicator(image_path: str) -> Dict:
         sigma_rgyb = float(np.sqrt(rg_std ** 2 + yb_std ** 2))
         mu_rgyb = float(np.sqrt(rg_mean ** 2 + yb_mean ** 2))
 
-        # Step 5: 计算 CSI
+        # Step 5: CSI
         csi = sigma_rgyb + 0.3 * mu_rgyb
 
         return {
@@ -167,12 +124,9 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 辅助函数：CSI解释
+# HELPER FUNCTIONS CSI
 # =============================================================================
 def interpret_csi(csi: float) -> str:
-    """
-    解释CSI值的含义
-    """
     if csi < 10:
         return "Low saturation: muted colors"
     elif csi < 25:
@@ -186,15 +140,13 @@ def interpret_csi(csi: float) -> str:
 
 
 # =============================================================================
-# 测试代码
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Color Saturation Index calculator...")
+    print("\nTesting Color Saturation Index calculator...")
 
-    # 低饱和：灰色
     test_gray = np.full((100, 100, 3), 128, dtype=np.uint8)
 
-    # 高饱和：红绿蓝块
     test_vivid = np.zeros((120, 120, 3), dtype=np.uint8)
     test_vivid[0:40, :, :] = [255, 0, 0]
     test_vivid[40:80, :, :] = [0, 255, 0]
@@ -206,10 +158,10 @@ if __name__ == "__main__":
 
         result = calculate_indicator(test_path)
 
-        print(f"\n   {name}:")
-        print(f"      CSI: {result['value']}")
-        print(f"      sigma_rgyb: {result['sigma_rgyb']}")
-        print(f"      mu_rgyb: {result['mu_rgyb']}")
-        print(f"      Interpretation: {interpret_csi(result['value'])}")
+        print(f"\n{name}:")
+        print(f" CSI: {result['value']}")
+        print(f" sigma_rgyb: {result['sigma_rgyb']}")
+        print(f" mu_rgyb: {result['mu_rgyb']}")
+        print(f" Interpretation: {interpret_csi(result['value'])}")
 
         os.remove(test_path)

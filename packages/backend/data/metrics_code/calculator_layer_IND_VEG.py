@@ -1,34 +1,22 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_VEG
+"""Calculator Layer.
+
+Indicator ID:   IND_VEG
 Indicator Name: Vegetation Ratio
-Type: TYPE A (ratio mode)
+Type:           TYPE A (ratio mode
 
 Description:
-    The Vegetation Ratio (VEG) quantifies the proportion of all vegetation 
-    pixels visible in street-level imagery. It provides a comprehensive 
-    measure of the visual presence of all plant life in the urban landscape, 
-    including trees, grass, shrubs, flowers, and palms. Vegetation is 
-    fundamental to urban ecosystem health, providing critical ecosystem 
-    services such as air quality improvement, carbon sequestration, 
-    stormwater management, urban heat island mitigation, and biodiversity 
-    support. The VEG indicator captures the total green coverage visible 
-    from the pedestrian perspective, reflecting the overall "greenness" 
-    of streetscapes and contributing to human well-being, psychological 
-    restoration, and aesthetic quality of urban environments.
+    The Vegetation Ratio (VEG) quantifies the proportion of all vegetation
+    pixels visible in street-level imagery. It provides a comprehensive measure
+    of the visual presence of all plant life in the urban landscape, including
+    trees, grass, shrubs, flowers, and palms. Vegetation is fundamental to urban
+    ecosystem health, providing critical ecosystem services such as air quality
+    improvement, carbon sequestration, stormwater management, urban heat island
+    mitigation, and biodiversity support. The VEG indicator captures the total
+    green coverage visible from the pedestrian perspective, reflecting the
+    overall "greenness" of streetscapes and contributing to human well-being,
+    psychological restoration, and aesthetic quality of urban environments.
 
 Formula: VEG = (Sum(Vegetation_Pixels) / Sum(Total_Pixels)) × 100
-
-Variables:
-    - Vegetation_Pixels: Pixels classified as any type of vegetation
-                         (trees, grass, plants, flowers, palms)
-    - Total_Pixels: Total number of pixels in the image
-
-References:
-    - Related to Green View Index (GVI) studies
-    - Contributes to understanding of urban green infrastructure
-    - Supports assessment of ecosystem services provision
 """
 
 import numpy as np
@@ -80,21 +68,21 @@ INDICATOR = {
 
 TARGET_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 for class_name in INDICATOR.get('target_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         TARGET_RGB[rgb] = class_name
-        print(f"   ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"   ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
         # Try partial matching to suggest corrections
         for name in semantic_colors.keys():
             if class_name.split(';')[0] in name or name.split(';')[0] in class_name:
-                print(f"      💡 Did you mean: '{name}'?")
+                print(f" Did you mean: '{name}'?")
                 break
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
+print(f"\nCalculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
 
 
 # =============================================================================
@@ -186,7 +174,7 @@ if __name__ == "__main__":
     Test code for standalone execution.
     Creates a synthetic test image and validates the calculator.
     """
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
     
     # Create a synthetic test image (100x100 pixels)
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -217,20 +205,20 @@ if __name__ == "__main__":
     
     # Run calculation
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
     
     # Validate expected result (should be ~25%)
     if result['success']:
         expected_veg = 25.0  # 10% tree + 8% grass + 5% plant + 2% flower
         actual_veg = result['value']
-        print(f"   Expected VEG: ~{expected_veg}%")
-        print(f"   Actual VEG: {actual_veg}%")
+        print(f" Expected VEG: ~{expected_veg}%")
+        print(f" Actual VEG: {actual_veg}%")
         if abs(actual_veg - expected_veg) < 1:
-            print("   ✅ Test PASSED")
+            print(" Test PASSED")
         else:
-            print("   ⚠️ Test result differs from expected")
+            print(" ️ Test result differs from expected")
     
     # Cleanup
     import os
     os.remove(test_path)
-    print("   🧹 Test cleanup complete")
+    print(" Test cleanup complete")

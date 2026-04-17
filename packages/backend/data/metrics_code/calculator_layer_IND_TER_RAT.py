@@ -1,33 +1,24 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_TER_RAT
-指标名称: Terrain Ratio (地形占比)
-类型: TYPE A (ratio模式)
+"""Calculator Layer.
 
-说明:
-统计图像中代表“地形 / 地表”的像素比例，
-包括山体（mountain）、岩石（rock）与裸土（earth），
-不包含道路、人行道等人工硬质铺装，
-用于衡量场景中自然地形要素的可视占比。
+Indicator ID:   IND_TER_RAT
+Indicator Name: Terrain Ratio
+Type:           TYPE A (ratio
 
-公式:
-IND_TER_RAT = (Mountain + Rock + Earth) / Total Pixels × 100
+Formula: IND_TER_RAT = (Mountain + Rock + Earth) / Total Pixels × 100
 """
 
 import numpy as np
 from PIL import Image
 from typing import Dict
 
-# semantic_colors 来自 input_layer.py（与其他指标文件保持一致）
+# semantic_colors input_layer.py
 from input_layer import semantic_colors
 
 
 # =============================================================================
-# 指标定义 - 【核心配置】
+# INDICATOR DEFINITION -
 # =============================================================================
 INDICATOR = {
-    # 基本信息
     "id": "IND_TER_RAT",
     "name": "Terrain Ratio",
     "unit": "%",
@@ -36,60 +27,53 @@ INDICATOR = {
     "definition": "The proportion of pixels representing natural terrain or ground surfaces, excluding roads and sidewalks.",
     "category": "CAT_CMP",
 
-    # TYPE A 配置
+    # TYPE A
     "calc_type": "ratio",  # ratio / inverse_ratio / two_class_ratio
 
-    # 目标语义类别 - 【必须与 Excel 的 Name 列完全一致】
+    # - Excel Name
     "target_classes": [
-        "mountain;mount",   # 山体
-        "rock",             # 岩石
-        "earth",            # 裸土 / 地表
+        "mountain;mount",
+        "rock",
+        "earth",            # /
     ]
 }
 
 
 # =============================================================================
-# 构建颜色查找表 (从 input_layer.py 的 semantic_colors 获取)
+# COLOR LOOKUP TABLE ( input_layer.py semantic_colors )
 # =============================================================================
 TARGET_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 for class_name in INDICATOR.get('target_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         TARGET_RGB[rgb] = class_name
-        print(f"   ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"   ⚠️ NOT FOUND: {class_name}")
-        # 尝试部分匹配（与其他指标文件保持一致）
+        print(f" ️ NOT FOUND: {class_name}")
         for name in semantic_colors.keys():
             if class_name.split(';')[0] in name or name.split(';')[0] in class_name:
-                print(f"      💡 Did you mean: '{name}'?")
+                print(f" Did you mean: '{name}'?")
                 break
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
+print(f"\nCalculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Terrain Ratio (IND_TER_RAT)
-
-    TYPE A - ratio模式: 目标像素 / 总像素 × 100
-    """
     try:
-        # Step 1: 加载图片
+        # Step 1:
         img = Image.open(image_path).convert('RGB')
         pixels = np.array(img)
         h, w, _ = pixels.shape
         total_pixels = h * w
 
-        # 展平像素数组
         flat_pixels = pixels.reshape(-1, 3)
 
-        # Step 2: 统计目标类别像素
+        # Step 2:
         target_count = 0
         class_counts = {}
 
@@ -101,10 +85,10 @@ def calculate_indicator(image_path: str) -> Dict:
                 class_counts[class_name] = int(count)
                 target_count += count
 
-        # Step 3: 计算指标值
+        # Step 3:
         value = (target_count / total_pixels) * 100 if total_pixels > 0 else 0
 
-        # Step 4: 返回结果
+        # Step 4:
         return {
             'success': True,
             'value': round(value, 3),
@@ -122,10 +106,10 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 测试代码 (可选)
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
 
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
 
@@ -142,7 +126,7 @@ if __name__ == "__main__":
     Image.fromarray(test_img).save(test_path)
 
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
 
     import os
     os.remove(test_path)

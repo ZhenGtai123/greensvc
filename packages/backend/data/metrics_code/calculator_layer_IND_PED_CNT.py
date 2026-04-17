@@ -1,22 +1,8 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_PED_CNT
-指标名称: Pedestrian Count (行人数量)
-类型: TYPE E (深度学习类)
+"""Calculator Layer.
 
-说明:
-使用实例分割模型（Mask R-CNN）检测图像中“people/pedestrian”实例数量，
-输出行人/人的绝对计数（count）。
-
-由于需要预训练模型，此示例提供两种实现：
-1. 完整实现（需要PyTorch + torchvision，并使用预训练Mask R-CNN）
-2. 占位符实现（用于测试流程：若输入为语义mask，则用person像素块近似计数）
-
-⚠️ 注意:
-- 完整实现需要安装 PyTorch: pip install torch torchvision
-- 使用 torchvision 的预训练 Mask R-CNN（COCO）即可直接运行
-- 需要原始RGB图像（不要用语义mask），否则检测效果会很差
+Indicator ID:   IND_PED_CNT
+Indicator Name: Pedestrian Count
+Type:           TYPE E
 """
 
 import numpy as np
@@ -26,7 +12,7 @@ import os
 
 
 # =============================================================================
-# 指标定义
+# INDICATOR DEFINITION
 # =============================================================================
 INDICATOR = {
     "id": "IND_PED_CNT",
@@ -39,26 +25,25 @@ INDICATOR = {
 
     "calc_type": "deep_learning",
 
-    # 模型配置
     "model_config": {
         "model_type": "MaskRCNN_ResNet50_FPN",
-        "score_threshold": 0.5,    # 置信度阈值
-        "nms_iou_threshold": 0.5,  # torchvision内部已做NMS，这里仅作为记录
+        "score_threshold": 0.5,
+        "nms_iou_threshold": 0.5,  # torchvisionNMS
         "max_detections": 100,
-        "input_size": None,        # Mask R-CNN无需强制resize；可保持原始分辨率
+        "input_size": None,        # Mask R-CNNresize
         "person_class_id": 1       # COCO: person=1
     },
 
-    # 占位符模式（无DL环境时使用）
+    # PLACEHOLDER MODE DL
     "use_placeholder": True
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Mode: {'Placeholder (mask-based)' if INDICATOR.get('use_placeholder', True) else 'Deep Learning'}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Mode: {'Placeholder (mask-based)' if INDICATOR.get('use_placeholder', True) else 'Deep Learning'}")
 
 
 # =============================================================================
-# 检测深度学习环境
+# DEEP LEARNING ENVIRONMENT
 # =============================================================================
 TORCH_AVAILABLE = False
 try:
@@ -66,38 +51,16 @@ try:
     import torchvision.transforms as transforms
     from torchvision.models.detection import maskrcnn_resnet50_fpn
     TORCH_AVAILABLE = True
-    print(f"   PyTorch: Available (version {torch.__version__})")
+    print(f" PyTorch: Available (version {torch.__version__})")
 except ImportError:
-    print(f"   PyTorch: Not installed")
-    print(f"   To enable full DL mode: pip install torch torchvision")
+    print(f" PyTorch: Not installed")
+    print(f" To enable full DL mode: pip install torch torchvision")
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Pedestrian Count (行人数量)
-
-    TYPE E: 深度学习类
-
-    根据配置选择实现方式:
-    - 占位符模式: 若输入是语义分割mask，使用person像素连通域近似“实例数”
-    - 完整模式: Mask R-CNN 实例分割检测 person 类别并计数
-
-    Args:
-        image_path: 图片路径（完整模式必须为原始RGB图像）
-
-    Returns:
-        {
-            'success': True/False,
-            'value': int (行人数),
-            'method': str,
-            'count': int,
-            'confidence': dict/None,
-            'detections': list (可选)
-        }
-    """
     use_placeholder = INDICATOR.get('use_placeholder', True)
 
     if use_placeholder or not TORCH_AVAILABLE:
@@ -107,23 +70,13 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 def calculate_placeholder(image_path: str) -> Dict:
-    """
-    占位符实现：基于语义mask的person连通域近似计数
-
-    前提:
-    - 输入为语义分割mask（RGB编码），且 semantic_colors 中存在 'person' 或 'person;individual;someone;somebody;...'
-    - 用二值person像素掩膜的连通域数量近似“实例数”
-
-    注意:
-    - 这不是实例分割，连通域计数对遮挡/粘连很敏感，仅用于测试流程
-    """
     try:
         img = Image.open(image_path).convert('RGB')
         pixels = np.array(img)
         h, w, _ = pixels.shape
         flat = pixels.reshape(-1, 3)
 
-        # 尝试找person类
+        # person
         person_keys = [
             "person",
             "person;individual;someone;somebody;...",
@@ -148,7 +101,7 @@ def calculate_placeholder(image_path: str) -> Dict:
 
         mask = np.all(flat == person_rgb, axis=1).reshape(h, w).astype(np.uint8)
 
-        # 连通域计数（8邻域）- 纯numpy BFS
+        # 8 - numpy BFS
         visited = np.zeros_like(mask, dtype=np.uint8)
         count = 0
 
@@ -188,26 +141,19 @@ def calculate_placeholder(image_path: str) -> Dict:
 
 
 def calculate_deep_learning(image_path: str) -> Dict:
-    """
-    完整实现：使用 torchvision 预训练 Mask R-CNN (COCO) 检测 person 并计数
-
-    输出:
-    - count: 满足 score_threshold 的 person 检测实例数
-    """
     try:
         cfg = INDICATOR.get('model_config', {})
         score_thr = float(cfg.get('score_threshold', 0.5))
         max_det = int(cfg.get('max_detections', 100))
         person_id = int(cfg.get('person_class_id', 1))
 
-        # 加载模型（COCO预训练）
+        # COCO
         model = maskrcnn_resnet50_fpn(pretrained=True)
         model.eval()
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model = model.to(device)
 
-        # 图像预处理
         img = Image.open(image_path).convert('RGB')
         img_tensor = transforms.ToTensor()(img).to(device)
 
@@ -217,7 +163,7 @@ def calculate_deep_learning(image_path: str) -> Dict:
         labels = outputs.get('labels', torch.tensor([])).detach().cpu().numpy().tolist()
         scores = outputs.get('scores', torch.tensor([])).detach().cpu().numpy().tolist()
 
-        # 过滤 person & threshold
+        # person & threshold
         detections = []
         for lab, sc in zip(labels, scores):
             if int(lab) == person_id and float(sc) >= score_thr:
@@ -238,7 +184,7 @@ def calculate_deep_learning(image_path: str) -> Dict:
                 'mean_score': round(float(np.mean(detections)), 3) if count > 0 else 0,
                 'max_score': round(float(np.max(detections)), 3) if count > 0 else 0
             },
-            'detections': [{'score': round(float(s), 4)} for s in detections[:10]]  # 仅返回前10个得分
+            'detections': [{'score': round(float(s), 4)} for s in detections[:10]]  # 10
         }
 
     except Exception as e:
@@ -251,10 +197,9 @@ def calculate_deep_learning(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 辅助函数
+# HELPER FUNCTIONS
 # =============================================================================
 def interpret_ped_count(count: int) -> str:
-    """解释行人数量"""
     if count == 0:
         return "No pedestrians detected"
     elif count <= 3:
@@ -266,23 +211,22 @@ def interpret_ped_count(count: int) -> str:
 
 
 # =============================================================================
-# 测试代码
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Pedestrian Count calculator...")
+    print("\nTesting Pedestrian Count calculator...")
 
-    # 占位符模式无法在无person语义mask的情况下生成可靠测试
-    # 这里用纯黑图进行流程测试（应返回0）
+    # PLACEHOLDER MODEpersonmask
     test_img = np.zeros((128, 128, 3), dtype=np.uint8)
     test_path = "/tmp/test_ped_cnt.png"
     Image.fromarray(test_img).save(test_path)
 
     result = calculate_indicator(test_path)
 
-    print(f"\n   Test: blank image")
-    print(f"      Count: {result.get('value')}")
-    print(f"      Method: {result.get('method')}")
+    print(f"\nTest: blank image")
+    print(f" Count: {result.get('value')}")
+    print(f" Method: {result.get('method')}")
     if result.get('success'):
-        print(f"      Interpretation: {interpret_ped_count(int(result.get('value') or 0))}")
+        print(f" Interpretation: {interpret_ped_count(int(result.get('value') or 0))}")
 
     os.remove(test_path)

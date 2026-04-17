@@ -1,40 +1,19 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_SHA
+"""Calculator Layer.
+
+Indicator ID:   IND_SHA
 Indicator Name: Shade Coverage
-Type: TYPE B (Custom Mathematical Formula)
+Type:           TYPE B (Custom Mathematical Formula
 
 Description:
-    The Shade Coverage (SHA) indicator calculates the proportion of a 
-    specific area or visual frame that is protected from direct solar 
-    radiation. Since semantic segmentation images do not contain actual
-    shadow projection information, we calculate shade coverage based on
-    sky visibility - areas where sky is NOT visible are considered shaded.
-    
-    SHA = 1 - VF_sky
-    
-    Where VF_sky is the weighted sky visibility factor using horizontal
-    bands adapted from the original fisheye View Factor formula.
-    
-Adapted Formula for Perspective Images:
-    SHA = 1 - VF_sky
-    
-    VF_sky = sum(w_i * sky_i/t_i) / sum(w_i)
-    
-    w_i = (n - i + 1) / n  (linear, top-weighted)
-    
-Variables:
-    - SHA: Shade Coverage ratio
-    - VF_sky: Weighted sky visibility factor
-    - n: Total number of horizontal bands
-    - i: Index of the specific band (1 = top, n = bottom)
-    - sky_i: Number of sky pixels in band i
-    - t_i: Total number of pixels in band i
-    - w_i: Position-based weight for band i (higher for top bands)
+    The Shade Coverage (SHA) indicator calculates the proportion of a specific
+    area or visual frame that is protected from direct solar radiation. Since
+    semantic segmentation images do not contain actual shadow projection
+    information, we calculate shade coverage based on sky visibility - areas
+    where sky is NOT visible are considered shaded. SHA = 1 - VF_sky Where
+    VF_sky is the weighted sky visibility factor using horizontal bands adapted
+    from the original fisheye View Factor formula.
 
-Unit: ratio (0 to 1)
-Range: 0.0 (no shade, full sky) to 1.0 (complete shade, no sky)
+Formula: )
 """
 
 import numpy as np
@@ -80,9 +59,9 @@ INDICATOR = {
     "note": "SHA = 1 - VF_sky; Higher values indicate more shade coverage"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Algorithm: {INDICATOR['algorithm']}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Algorithm: {INDICATOR['algorithm']}")
 
 
 # =============================================================================
@@ -379,8 +358,8 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Shade Coverage calculator...")
-    print("   Formula: SHA = 1 - VF_sky")
+    print("\nTesting Shade Coverage calculator...")
+    print(" Formula: SHA = 1 - VF_sky")
     
     # Test 1: Full sky (no shade)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -393,10 +372,10 @@ if __name__ == "__main__":
     test_semantic = {"sky": (135, 206, 235)}
     result_1 = calculate_indicator(test_path_1, test_semantic)
     
-    print(f"\n   Test 1: Full sky (100% sky)")
-    print(f"      Expected SHA: 0.000 (no shade)")
-    print(f"      Calculated SHA: {result_1.get('value', 'N/A')}")
-    print(f"      VF_sky: {result_1.get('vf_sky', 'N/A')}")
+    print(f"\nTest 1: Full sky (100% sky)")
+    print(f" Expected SHA: 0.000 (no shade)")
+    print(f" Calculated SHA: {result_1.get('value', 'N/A')}")
+    print(f" VF_sky: {result_1.get('vf_sky', 'N/A')}")
     
     os.remove(test_path_1)
     
@@ -410,10 +389,10 @@ if __name__ == "__main__":
     test_semantic_2 = {"tree": (34, 139, 34)}
     result_2 = calculate_indicator(test_path_2, test_semantic_2)
     
-    print(f"\n   Test 2: No sky (100% tree)")
-    print(f"      Expected SHA: 1.000 (full shade)")
-    print(f"      Calculated SHA: {result_2.get('value', 'N/A')}")
-    print(f"      VF_sky: {result_2.get('vf_sky', 'N/A')}")
+    print(f"\nTest 2: No sky (100% tree)")
+    print(f" Expected SHA: 1.000 (full shade)")
+    print(f" Calculated SHA: {result_2.get('value', 'N/A')}")
+    print(f" VF_sky: {result_2.get('vf_sky', 'N/A')}")
     
     os.remove(test_path_2)
     
@@ -428,11 +407,11 @@ if __name__ == "__main__":
     test_semantic_3 = {"sky": (135, 206, 235), "tree": (34, 139, 34)}
     result_3 = calculate_indicator(test_path_3, test_semantic_3)
     
-    print(f"\n   Test 3: 50% sky at TOP, 50% tree at bottom")
-    print(f"      Expected: SHA < 0.5 (sky at top has higher weight)")
-    print(f"      Calculated SHA: {result_3.get('value', 'N/A')}")
-    print(f"      VF_sky: {result_3.get('vf_sky', 'N/A')}")
-    print(f"      Simple sky ratio: {result_3.get('simple_sky_ratio', 'N/A')}")
+    print(f"\nTest 3: 50% sky at TOP, 50% tree at bottom")
+    print(f" Expected: SHA < 0.5 (sky at top has higher weight)")
+    print(f" Calculated SHA: {result_3.get('value', 'N/A')}")
+    print(f" VF_sky: {result_3.get('vf_sky', 'N/A')}")
+    print(f" Simple sky ratio: {result_3.get('simple_sky_ratio', 'N/A')}")
     
     os.remove(test_path_3)
     
@@ -447,16 +426,16 @@ if __name__ == "__main__":
     test_semantic_4 = {"sky": (135, 206, 235), "tree": (34, 139, 34)}
     result_4 = calculate_indicator(test_path_4, test_semantic_4)
     
-    print(f"\n   Test 4: 50% tree at TOP, 50% sky at bottom")
-    print(f"      Expected: SHA > 0.5 (tree at top blocks high-weight sky)")
-    print(f"      Calculated SHA: {result_4.get('value', 'N/A')}")
-    print(f"      VF_sky: {result_4.get('vf_sky', 'N/A')}")
-    print(f"      Simple sky ratio: {result_4.get('simple_sky_ratio', 'N/A')}")
-    print(f"      Interpretation: {interpret_shade_coverage(result_4.get('value'))}")
+    print(f"\nTest 4: 50% tree at TOP, 50% sky at bottom")
+    print(f" Expected: SHA > 0.5 (tree at top blocks high-weight sky)")
+    print(f" Calculated SHA: {result_4.get('value', 'N/A')}")
+    print(f" VF_sky: {result_4.get('vf_sky', 'N/A')}")
+    print(f" Simple sky ratio: {result_4.get('simple_sky_ratio', 'N/A')}")
+    print(f" Interpretation: {interpret_shade_coverage(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
-    print("\n   ✅ Test complete!")
-    print("\n   📝 Note: SHA = 1 - VF_sky")
-    print("      - When sky is visible -> low SHA (less shade)")
-    print("      - When sky is blocked -> high SHA (more shade)")
+    print("\n Test complete!")
+    print("\n Note: SHA = 1 - VF_sky")
+    print(" - When sky is visible -> low SHA (less shade)")
+    print(" - When sky is blocked -> high SHA (more shade)")

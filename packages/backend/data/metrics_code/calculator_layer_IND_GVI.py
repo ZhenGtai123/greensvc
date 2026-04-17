@@ -1,28 +1,17 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_GVI
+"""Calculator Layer.
+
+Indicator ID:   IND_GVI
 Indicator Name: Green View Index
-Type: TYPE A (ratio mode)
+Type:           TYPE A (ratio mode
 
 Description:
-    The Green View Index (GVI) quantifies the proportion of green vegetation 
-    pixels visible in street-level imagery. It is one of the most widely used 
-    indicators in urban greenery assessment, with 151 confirmations in the 
-    literature. GVI is calculated by summing all pixels classified as vegetation 
+    The Green View Index (GVI) quantifies the proportion of green vegetation
+    pixels visible in street-level imagery. It is one of the most widely used
+    indicators in urban greenery assessment, with 151 confirmations in the
+    literature. GVI is calculated by summing all pixels classified as vegetation
     types and dividing by the total number of pixels.
 
 Formula: GVI = (Sum(Green_Pixels) / Sum(Total_Pixels)) × 100
-
-Variables:
-    - Green_Pixels: Pixels classified as vegetation (tree, grass, plant, etc.)
-    - Total_Pixels: Total number of pixels in the image
-
-References:
-    - First confirmed by: Zhao, X., & Lin, G. (2024). Research on the Perception 
-      Evaluation of Urban Green Spaces Using Panoramic Images and Deep Learning.
-    - Merged from: IND_PGV, IND_GCI, IND_GSI, IND_SGV, IND_GVE, IND_GLR, IND_GVR, 
-      IND_SVG, IND_CGVI, IND_GVI_BAI, IND_GVI_PAT, IND_PGC, IND_GVI_DIR
 """
 
 import numpy as np
@@ -79,21 +68,21 @@ INDICATOR = {
 
 TARGET_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 for class_name in INDICATOR.get('target_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         TARGET_RGB[rgb] = class_name
-        print(f"   ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"   ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
         # Try partial matching to suggest corrections
         for name in semantic_colors.keys():
             if class_name.split(';')[0] in name or name.split(';')[0] in class_name:
-                print(f"      💡 Did you mean: '{name}'?")
+                print(f" Did you mean: '{name}'?")
                 break
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
+print(f"\nCalculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
 
 
 # =============================================================================
@@ -185,7 +174,7 @@ if __name__ == "__main__":
     Test code for standalone execution.
     Creates a synthetic test image and validates the calculator.
     """
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
     
     # Create a synthetic test image (100x100 pixels)
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -206,20 +195,20 @@ if __name__ == "__main__":
     
     # Run calculation
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
     
     # Validate expected result (should be ~50%)
     if result['success']:
         expected_gvi = 50.0  # 30% grass + 20% tree
         actual_gvi = result['value']
-        print(f"   Expected GVI: ~{expected_gvi}%")
-        print(f"   Actual GVI: {actual_gvi}%")
+        print(f" Expected GVI: ~{expected_gvi}%")
+        print(f" Actual GVI: {actual_gvi}%")
         if abs(actual_gvi - expected_gvi) < 1:
-            print("   ✅ Test PASSED")
+            print(" Test PASSED")
         else:
-            print("   ⚠️ Test result differs from expected")
+            print(" ️ Test result differs from expected")
     
     # Cleanup
     import os
     os.remove(test_path)
-    print("   🧹 Test cleanup complete")
+    print(" Test cleanup complete")

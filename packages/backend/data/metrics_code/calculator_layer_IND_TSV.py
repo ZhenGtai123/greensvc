@@ -1,30 +1,16 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_TSV
+"""Calculator Layer.
+
+Indicator ID:   IND_TSV
 Indicator Name: Tree-Sky View Factor
-Type: TYPE C (Component Ratio)
+Type:           TYPE C (Component Ratio
 
 Description:
-    The Tree-Sky View Factor (TSV) measures the ratio of plants/trees to 
-    the sky in vertical space as seen from a street view image. This 
-    indicator reflects the balance between vegetation coverage and open 
-    sky visibility, providing insights into urban canopy density and 
-    vertical green space distribution.
-    
-Formula: 
-    TSV = Area_tree / Area_sky
-    
-Variables:
-    - Area_tree: Total pixels occupied by tree/vegetation elements
-    - Area_sky: Total pixels occupied by sky elements
+    The Tree-Sky View Factor (TSV) measures the ratio of plants/trees to the sky
+    in vertical space as seen from a street view image. This indicator reflects
+    the balance between vegetation coverage and open sky visibility, providing
+    insights into urban canopy density and vertical green space distribution.
 
-Unit: ratio (unbounded, typically 0 to >10)
-Range: 
-    - 0.0: No trees (only sky or no sky)
-    - 1.0: Equal tree and sky coverage
-    - >1.0: More trees than sky
-    - Undefined: When sky = 0 (returns special value)
+Formula: TSV = Area_tree / Area_sky
 """
 
 import numpy as np
@@ -66,9 +52,9 @@ INDICATOR = {
     "note": "When sky = 0, returns special value (inf or max_value)"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Type: TYPE C (Component Ratio)")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Type: TYPE C (Component Ratio)")
 
 
 # =============================================================================
@@ -325,7 +311,7 @@ def explain_formula() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Tree-Sky View Factor calculator...")
+    print("\nTesting Tree-Sky View Factor calculator...")
     
     # Test 1: Only sky (no trees)
     test_img_1 = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -337,10 +323,10 @@ if __name__ == "__main__":
     test_semantic_1 = {"sky": (135, 206, 235)}
     result_1 = calculate_indicator(test_path_1, test_semantic_1)
     
-    print(f"\n   Test 1: Only sky (100% sky, 0% tree)")
-    print(f"      Expected TSV: 0.000")
-    print(f"      Calculated TSV: {result_1.get('value', 'N/A')}")
-    print(f"      Interpretation: {interpret_tsv(result_1.get('value'))}")
+    print(f"\nTest 1: Only sky (100% sky, 0% tree)")
+    print(f" Expected TSV: 0.000")
+    print(f" Calculated TSV: {result_1.get('value', 'N/A')}")
+    print(f" Interpretation: {interpret_tsv(result_1.get('value'))}")
     
     os.remove(test_path_1)
     
@@ -354,11 +340,11 @@ if __name__ == "__main__":
     test_semantic_2 = {"tree": (34, 139, 34), "sky": (135, 206, 235)}
     result_2 = calculate_indicator(test_path_2, test_semantic_2)
     
-    print(f"\n   Test 2: Only trees (0% sky, 100% tree)")
-    print(f"      Expected TSV: 999.0 (max_value, no sky)")
-    print(f"      Calculated TSV: {result_2.get('value', 'N/A')}")
-    print(f"      Sky is zero: {result_2.get('sky_is_zero', 'N/A')}")
-    print(f"      Interpretation: {interpret_tsv(result_2.get('value'))}")
+    print(f"\nTest 2: Only trees (0% sky, 100% tree)")
+    print(f" Expected TSV: 999.0 (max_value, no sky)")
+    print(f" Calculated TSV: {result_2.get('value', 'N/A')}")
+    print(f" Sky is zero: {result_2.get('sky_is_zero', 'N/A')}")
+    print(f" Interpretation: {interpret_tsv(result_2.get('value'))}")
     
     os.remove(test_path_2)
     
@@ -372,11 +358,11 @@ if __name__ == "__main__":
     
     result_3 = calculate_indicator(test_path_3, test_semantic_2)
     
-    print(f"\n   Test 3: Equal tree and sky (50% each)")
-    print(f"      Expected TSV: 1.000")
-    print(f"      Calculated TSV: {result_3.get('value', 'N/A')}")
-    print(f"      Tree: {result_3.get('tree_pct', 0):.1f}%, Sky: {result_3.get('sky_pct', 0):.1f}%")
-    print(f"      Interpretation: {interpret_tsv(result_3.get('value'))}")
+    print(f"\nTest 3: Equal tree and sky (50% each)")
+    print(f" Expected TSV: 1.000")
+    print(f" Calculated TSV: {result_3.get('value', 'N/A')}")
+    print(f" Tree: {result_3.get('tree_pct', 0):.1f}%, Sky: {result_3.get('sky_pct', 0):.1f}%")
+    print(f" Interpretation: {interpret_tsv(result_3.get('value'))}")
     
     os.remove(test_path_3)
     
@@ -390,11 +376,11 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4, test_semantic_2)
     
-    print(f"\n   Test 4: More trees (75% tree, 25% sky)")
-    print(f"      Expected TSV: 3.000 (75/25)")
-    print(f"      Calculated TSV: {result_4.get('value', 'N/A')}")
-    print(f"      Tree: {result_4.get('tree_pct', 0):.1f}%, Sky: {result_4.get('sky_pct', 0):.1f}%")
-    print(f"      Interpretation: {interpret_tsv(result_4.get('value'))}")
+    print(f"\nTest 4: More trees (75% tree, 25% sky)")
+    print(f" Expected TSV: 3.000 (75/25)")
+    print(f" Calculated TSV: {result_4.get('value', 'N/A')}")
+    print(f" Tree: {result_4.get('tree_pct', 0):.1f}%, Sky: {result_4.get('sky_pct', 0):.1f}%")
+    print(f" Interpretation: {interpret_tsv(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
@@ -408,16 +394,16 @@ if __name__ == "__main__":
     
     result_5 = calculate_indicator(test_path_5, test_semantic_2)
     
-    print(f"\n   Test 5: More sky (20% tree, 80% sky)")
-    print(f"      Expected TSV: 0.250 (20/80)")
-    print(f"      Calculated TSV: {result_5.get('value', 'N/A')}")
-    print(f"      Tree: {result_5.get('tree_pct', 0):.1f}%, Sky: {result_5.get('sky_pct', 0):.1f}%")
-    print(f"      Interpretation: {interpret_tsv(result_5.get('value'))}")
+    print(f"\nTest 5: More sky (20% tree, 80% sky)")
+    print(f" Expected TSV: 0.250 (20/80)")
+    print(f" Calculated TSV: {result_5.get('value', 'N/A')}")
+    print(f" Tree: {result_5.get('tree_pct', 0):.1f}%, Sky: {result_5.get('sky_pct', 0):.1f}%")
+    print(f" Interpretation: {interpret_tsv(result_5.get('value'))}")
     
     os.remove(test_path_5)
     
-    print("\n   ✅ Test complete!")
-    print("\n   📝 Note: TSV = tree_pixels / sky_pixels")
-    print("      - TSV < 1: Sky dominates")
-    print("      - TSV = 1: Balanced")
-    print("      - TSV > 1: Trees dominate")
+    print("\n Test complete!")
+    print("\n Note: TSV = tree_pixels / sky_pixels")
+    print(" - TSV < 1: Sky dominates")
+    print(" - TSV = 1: Balanced")
+    print(" - TSV > 1: Trees dominate")

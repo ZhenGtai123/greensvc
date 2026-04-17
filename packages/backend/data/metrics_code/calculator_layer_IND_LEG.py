@@ -1,22 +1,8 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-指标ID: IND_LEG
-指标名称: Legibility Index (可读性指数)
-类型: TYPE E (深度学习类)
+"""Calculator Layer.
 
-说明:
-使用深度学习分类模型的置信度来量化空间可读性（Legibility）。
-通常认为：模型对场景类别判断越“自信”（softmax最大概率越高），空间越容易被识别与组织。
-
-由于需要预训练模型，此示例提供两种实现：
-1. 完整实现（需要PyTorch和模型文件）
-2. 占位符实现（基于简单规则的估算，用于测试流程）
-
-⚠️ 注意:
-- 完整实现需要安装 PyTorch: pip install torch torchvision
-- 需要预训练分类模型文件（输出类别 logits）
-- 可能需要GPU支持
+Indicator ID:   IND_LEG
+Indicator Name: Legibility Index
+Type:           TYPE E
 """
 
 import numpy as np
@@ -26,7 +12,7 @@ import os
 
 
 # =============================================================================
-# 指标定义
+# INDICATOR DEFINITION
 # =============================================================================
 INDICATOR = {
     "id": "IND_LEG",
@@ -39,32 +25,30 @@ INDICATOR = {
 
     "calc_type": "deep_learning",
 
-    # 模型配置（完整实现时使用）
     "model_config": {
         "model_type": "ResNet50",
-        "model_path": "./models/legibility_resnet50_cls.pth",  # 需要预训练模型（分类）
+        "model_path": "./models/legibility_resnet50_cls.pth",
         "input_size": (224, 224),
         "normalize": True,
         "mean": [0.485, 0.456, 0.406],
         "std": [0.229, 0.224, 0.225],
-        "num_classes": 10,  # 需与你的训练类别数一致
-        "label_map": None   # 可选：类别名称列表/字典
+        "num_classes": 10,
+        "label_map": None   # /
     },
 
-    # 输出配置
     "output_type": "classification",
-    "output_range": [0, 1],  # 置信度范围
+    "output_range": [0, 1],
 
-    # 占位符模式（无模型时使用）
+    # PLACEHOLDER MODE
     "use_placeholder": True
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Mode: {'Placeholder (rule-based)' if INDICATOR.get('use_placeholder', True) else 'Deep Learning'}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Mode: {'Placeholder (rule-based)' if INDICATOR.get('use_placeholder', True) else 'Deep Learning'}")
 
 
 # =============================================================================
-# 检测深度学习环境
+# DEEP LEARNING ENVIRONMENT
 # =============================================================================
 TORCH_AVAILABLE = False
 try:
@@ -72,38 +56,16 @@ try:
     import torchvision.transforms as transforms
     from torchvision import models
     TORCH_AVAILABLE = True
-    print(f"   PyTorch: Available (version {torch.__version__})")
+    print(f" PyTorch: Available (version {torch.__version__})")
 except ImportError:
-    print(f"   PyTorch: Not installed")
-    print(f"   To enable full DL mode: pip install torch torchvision")
+    print(f" PyTorch: Not installed")
+    print(f" To enable full DL mode: pip install torch torchvision")
 
 
 # =============================================================================
-# 计算函数
+# CALCULATION FUNCTION
 # =============================================================================
 def calculate_indicator(image_path: str) -> Dict:
-    """
-    计算 Legibility Index (可读性指数)
-
-    TYPE E: 深度学习类
-
-    根据配置选择实现方式:
-    - 占位符模式: 基于图像信息密度（压缩比/边缘强度）的简单估算
-    - 完整模式: 使用预训练分类CNN输出softmax置信度
-
-    Args:
-        image_path: 图片路径（建议使用原始图片而非mask）
-
-    Returns:
-        {
-            'success': True/False,
-            'value': float (可读性置信度 0-1),
-            'method': str,
-            'confidence': float,
-            'predicted_class': int/str (如适用),
-            'topk': list (如适用)
-        }
-    """
     use_placeholder = INDICATOR.get('use_placeholder', True)
 
     if use_placeholder or not TORCH_AVAILABLE:
@@ -113,18 +75,6 @@ def calculate_indicator(image_path: str) -> Dict:
 
 
 def calculate_placeholder(image_path: str) -> Dict:
-    """
-    占位符实现：基于规则的可读性估算
-
-    思路:
-    - 可读性高的空间往往具有更清晰的结构与更低的视觉噪声
-    - 用两个可计算代理量进行估计：
-      1) 边缘强度（Laplacian方差）越高 → 结构更明确（正向）
-      2) JPEG压缩比越高 → 信息密度/复杂度越高（负向，用于惩罚）
-    - 最终将得分映射到0-1范围
-
-    注意: 仅用于测试流程，不是真正的深度学习预测
-    """
     try:
         img = Image.open(image_path).convert('RGB')
         rgb = np.array(img, dtype=np.float64)
@@ -132,7 +82,7 @@ def calculate_placeholder(image_path: str) -> Dict:
         h, w, _ = rgb.shape
         total_pixels = h * w
 
-        # 1) 边缘强度：Laplacian方差（简单3x3核）
+        # 1) Laplacian 3x3
         gray = 0.299 * rgb[:, :, 0] + 0.587 * rgb[:, :, 1] + 0.114 * rgb[:, :, 2]
 
         lap_kernel = np.array([[0, 1, 0],
@@ -147,18 +97,16 @@ def calculate_placeholder(image_path: str) -> Dict:
 
         edge_var = float(np.var(lap))
 
-        # 2) 近似信息密度：随机子采样估算“可压缩性”（用灰度标准差代理压缩比惩罚）
-        # 这里避免写临时JPEG文件（保持占位符轻量）
+        # JPEG
         gray_std = float(np.std(gray))
 
-        # 3) 映射到0-1：结构清晰(+)与复杂噪声(-)
-        # 经验性压缩：log尺度稳定
-        edge_score = np.log1p(edge_var)  # 越大越清晰
-        noise_penalty = np.log1p(gray_std)  # 越大越复杂
+        # 3) 0-1 (+)(-)
+        edge_score = np.log1p(edge_var)
+        noise_penalty = np.log1p(gray_std)
 
         raw = edge_score - 0.6 * noise_penalty
 
-        # Sigmoid映射到0-1
+        # Sigmoid0-1
         leg = 1.0 / (1.0 + np.exp(-raw))
 
         return {
@@ -185,13 +133,6 @@ def calculate_placeholder(image_path: str) -> Dict:
 
 
 def calculate_deep_learning(image_path: str) -> Dict:
-    """
-    完整实现：使用预训练深度学习分类模型输出softmax置信度
-
-    需要:
-    - PyTorch
-    - 预训练分类模型文件（输出 logits, shape [1, num_classes]）
-    """
     try:
         model_config = INDICATOR.get('model_config', {})
         model_path = model_config.get('model_path', '')
@@ -288,10 +229,9 @@ def calculate_deep_learning(image_path: str) -> Dict:
 
 
 # =============================================================================
-# 辅助函数
+# HELPER FUNCTIONS
 # =============================================================================
 def interpret_legibility(score: float) -> str:
-    """解释可读性评分（0-1）"""
     if score < 0.2:
         return "Very low legibility: hard to identify/organize"
     elif score < 0.4:
@@ -305,12 +245,11 @@ def interpret_legibility(score: float) -> str:
 
 
 # =============================================================================
-# 测试代码
+# TEST CODE
 # =============================================================================
 if __name__ == "__main__":
-    print("\n🧪 Testing Legibility Index calculator...")
+    print("\nTesting Legibility Index calculator...")
 
-    # 简单测试：灰色块 vs 随机噪声（噪声可读性应更低）
     simple = np.full((120, 120, 3), 128, dtype=np.uint8)
     noisy = np.random.randint(0, 256, (120, 120, 3), dtype=np.uint8)
 
@@ -320,11 +259,11 @@ if __name__ == "__main__":
 
         result = calculate_indicator(test_path)
 
-        print(f"\n   {name}:")
-        print(f"      Score: {result['value']} (0-1)")
-        print(f"      Method: {result['method']}")
+        print(f"\n{name}:")
+        print(f" Score: {result['value']} (0-1)")
+        print(f" Method: {result['method']}")
         if 'edge_variance' in result:
-            print(f"      EdgeVar: {result['edge_variance']}, GrayStd: {result['gray_std']}")
-        print(f"      Interpretation: {interpret_legibility(result['value'])}")
+            print(f" EdgeVar: {result['edge_variance']}, GrayStd: {result['gray_std']}")
+        print(f" Interpretation: {interpret_legibility(result['value'])}")
 
         os.remove(test_path)

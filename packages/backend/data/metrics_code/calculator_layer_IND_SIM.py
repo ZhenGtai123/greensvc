@@ -1,32 +1,18 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_SIM
-Indicator Name: Similarity (Gini-Simpson Index)
-Type: TYPE B (Custom Mathematical Formula)
+"""Calculator Layer.
+
+Indicator ID:   IND_SIM
+Indicator Name: Similarity (Gini-Simpson Index
+Type:           TYPE B (Custom Mathematical Formula
 
 Description:
-    The Similarity (SIM) indicator quantifies the uniformity and repetition
-    of visual elements within a given environment. It is based on the
-    Gini-Simpson Index, which measures the probability that two randomly
-    selected pixels belong to different semantic categories.
-    
-    Lower values indicate higher similarity (pixels concentrated in few classes).
-    Higher values indicate lower similarity (pixels evenly distributed).
-    
-Formula: 
-    SIM = 1 - Σ[nᵢ × (nᵢ - 1)] / [N × (N - 1)]
-    
-    Simplified (for large N):
-    SIM ≈ 1 - Σ(pᵢ²)
-    
-Variables:
-    - nᵢ: Number of pixels in category i
-    - N: Total number of pixels
-    - pᵢ: Proportion of pixels in category i (= nᵢ/N)
+    The Similarity (SIM) indicator quantifies the uniformity and repetition of
+    visual elements within a given environment. It is based on the Gini-Simpson
+    Index, which measures the probability that two randomly selected pixels
+    belong to different semantic categories. Lower values indicate higher
+    similarity (pixels concentrated in few classes). Higher values indicate
+    lower similarity (pixels evenly distributed).
 
-Unit: dimensionless (index)
-Range: 0 (all pixels in one class) to 1-1/s (s equally distributed classes)
+Formula: )
 """
 
 import numpy as np
@@ -68,9 +54,9 @@ INDICATOR = {
     "note": "Lower values = higher similarity/uniformity; Higher values = lower similarity/more diversity"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Formula: {INDICATOR['formula']}")
-print(f"   Algorithm: {INDICATOR['algorithm']}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Formula: {INDICATOR['formula']}")
+print(f" Algorithm: {INDICATOR['algorithm']}")
 
 
 # =============================================================================
@@ -312,7 +298,7 @@ def explain_similarity_index() -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Similarity Index calculator...")
+    print("\nTesting Similarity Index calculator...")
     
     # Test 1: Single class (expected: 0.0)
     test_img_1 = np.ones((100, 100, 3), dtype=np.uint8) * 128
@@ -322,11 +308,11 @@ if __name__ == "__main__":
     
     result_1 = calculate_indicator(test_path_1)
     
-    print(f"\n   Test 1: Single uniform color")
-    print(f"      Expected: 0.000 (perfect similarity)")
-    print(f"      Calculated: {result_1.get('value', 'N/A')}")
-    print(f"      Simpson Index: {result_1.get('simpson_index', 'N/A')}")
-    print(f"      Classes: {result_1.get('n_classes', 'N/A')}")
+    print(f"\nTest 1: Single uniform color")
+    print(f" Expected: 0.000 (perfect similarity)")
+    print(f" Calculated: {result_1.get('value', 'N/A')}")
+    print(f" Simpson Index: {result_1.get('simpson_index', 'N/A')}")
+    print(f" Classes: {result_1.get('n_classes', 'N/A')}")
     
     os.remove(test_path_1)
     
@@ -340,11 +326,11 @@ if __name__ == "__main__":
     
     result_2 = calculate_indicator(test_path_2)
     
-    print(f"\n   Test 2: Two equal classes (50/50)")
-    print(f"      Expected: ~0.500")
-    print(f"      Calculated: {result_2.get('value', 'N/A')}")
-    print(f"      Theoretical Max: {calculate_theoretical_max(2):.3f}")
-    print(f"      Evenness: {result_2.get('evenness', 'N/A')}")
+    print(f"\nTest 2: Two equal classes (50/50)")
+    print(f" Expected: ~0.500")
+    print(f" Calculated: {result_2.get('value', 'N/A')}")
+    print(f" Theoretical Max: {calculate_theoretical_max(2):.3f}")
+    print(f" Evenness: {result_2.get('evenness', 'N/A')}")
     
     os.remove(test_path_2)
     
@@ -360,11 +346,11 @@ if __name__ == "__main__":
     
     result_3 = calculate_indicator(test_path_3)
     
-    print(f"\n   Test 3: Four equal classes (25/25/25/25)")
-    print(f"      Expected: ~0.750")
-    print(f"      Calculated: {result_3.get('value', 'N/A')}")
-    print(f"      Theoretical Max: {calculate_theoretical_max(4):.3f}")
-    print(f"      Evenness: {result_3.get('evenness', 'N/A')}")
+    print(f"\nTest 3: Four equal classes (25/25/25/25)")
+    print(f" Expected: ~0.750")
+    print(f" Calculated: {result_3.get('value', 'N/A')}")
+    print(f" Theoretical Max: {calculate_theoretical_max(4):.3f}")
+    print(f" Evenness: {result_3.get('evenness', 'N/A')}")
     
     os.remove(test_path_3)
     
@@ -378,12 +364,12 @@ if __name__ == "__main__":
     
     result_4 = calculate_indicator(test_path_4)
     
-    print(f"\n   Test 4: Unequal classes (90/10)")
-    print(f"      Expected: ~0.18 (high similarity)")
-    print(f"      Calculated: {result_4.get('value', 'N/A')}")
-    print(f"      Dominance: {result_4.get('dominance', 'N/A')}")
-    print(f"      Interpretation: {interpret_similarity(result_4.get('value'))}")
+    print(f"\nTest 4: Unequal classes (90/10)")
+    print(f" Expected: ~0.18 (high similarity)")
+    print(f" Calculated: {result_4.get('value', 'N/A')}")
+    print(f" Dominance: {result_4.get('dominance', 'N/A')}")
+    print(f" Interpretation: {interpret_similarity(result_4.get('value'))}")
     
     os.remove(test_path_4)
     
-    print("\n   🧹 Test cleanup complete")
+    print("\n Test cleanup complete")

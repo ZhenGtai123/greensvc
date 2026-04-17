@@ -1,38 +1,20 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_VEN
+"""Calculator Layer.
+
+Indicator ID:   IND_VEN
 Indicator Name: Visual Enclosure
-Type: TYPE A (Ratio Mode - Multi-class)
+Type:           TYPE A (Ratio Mode - Multi-class
 
 Description:
-    The Visual Enclosure (VEN) indicator quantifies the degree of spatial 
-    enclosure created by vertical elements in street-level imagery. It measures 
-    how much of the visual field is occupied by buildings, walls, trees, and 
-    other vertical structures that block the view.
-    
-    High visual enclosure creates a sense of defined space and intimacy, 
-    while low enclosure creates openness and expansiveness. The optimal 
-    level depends on context - some environments benefit from enclosure 
-    (intimate urban spaces) while others need openness (parks, plazas).
+    The Visual Enclosure (VEN) indicator quantifies the degree of spatial
+    enclosure created by vertical elements in street-level imagery. It measures
+    how much of the visual field is occupied by buildings, walls, trees, and
+    other vertical structures that block the view. High visual enclosure creates
+    a sense of defined space and intimacy, while low enclosure creates openness
+    and expansiveness. The optimal level depends on context - some environments
+    benefit from enclosure (intimate urban spaces) while others need openness
+    (parks, plazas).
 
-Formula: 
-    VEN = (Pixels_Vertical_Elements / Pixels_Total) × 100
-    
-Alternative Formula:
-    VEN ≈ 100 - Sky_View_Factor (SVF)
-
-Variables:
-    - Pixels_Vertical_Elements: Sum of pixels classified as buildings, walls, 
-      trees, and other vertical structures
-    - Pixels_Total: Total number of pixels in the image
-
-Target Classes (Vertical Elements):
-    1. Buildings: building, house, skyscraper, hovel/hut/shack
-    2. Walls & Barriers: wall, fence, railing, bannister/balustrade
-    3. Trees & Vegetation: tree, palm tree, plants
-    4. Vertical Infrastructure: column/pillar, pole, tower, streetlight, 
-       signboard, awning, booth/kiosk
+Formula: VEN = (Pixels_Vertical_Elements / Pixels_Total) × 100
 """
 
 import numpy as np
@@ -125,9 +107,9 @@ INDICATOR = {
     "note": "Measures visual enclosure; neutral target direction as optimal level depends on urban context"
 }
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
-print(f"   Type: TYPE A (ratio)")
-print(f"   Target direction: {INDICATOR['target_direction']}")
+print(f"\nCalculator ready: {INDICATOR['id']} - {INDICATOR['name']}")
+print(f" Type: TYPE A (ratio)")
+print(f" Target direction: {INDICATOR['target_direction']}")
 
 
 # =============================================================================
@@ -136,24 +118,24 @@ print(f"   Target direction: {INDICATOR['target_direction']}")
 TARGET_RGB = {}
 TARGET_RGB_BY_CATEGORY = {}
 
-print(f"\n🎯 Building color lookup for vertical element classes:")
+print(f"\nBuilding color lookup for vertical element classes:")
 
 # Build lookup by category
 for category, class_list in INDICATOR.get('target_classes', {}).items():
     TARGET_RGB_BY_CATEGORY[category] = {}
-    print(f"\n   📦 {category}:")
+    print(f"\n {category}:")
     
     for class_name in class_list:
         if class_name in semantic_colors:
             rgb = semantic_colors[class_name]
             TARGET_RGB[rgb] = class_name
             TARGET_RGB_BY_CATEGORY[category][rgb] = class_name
-            print(f"      ✅ {class_name}: RGB{rgb}")
+            print(f" {class_name}: RGB{rgb}")
         else:
-            print(f"      ⚠️ NOT FOUND: {class_name}")
+            print(f" ️ NOT FOUND: {class_name}")
 
 total_classes = len(TARGET_RGB)
-print(f"\n✅ Total vertical element classes loaded: {total_classes}")
+print(f"\nTotal vertical element classes loaded: {total_classes}")
 
 
 # =============================================================================
@@ -292,7 +274,7 @@ def interpret_enclosure(value: float) -> str:
 if __name__ == "__main__":
     import os
     
-    print("\n🧪 Testing Visual Enclosure calculator...")
+    print("\nTesting Visual Enclosure calculator...")
     
     # Create test image with known composition
     # 40% building + 15% wall + 15% tree + 10% pole = 80% vertical elements
@@ -324,15 +306,15 @@ if __name__ == "__main__":
     
     result = calculate_indicator(test_path)
     
-    print(f"\n   Test composition: 40% building + 15% wall + 15% tree + 10% pole + 20% sky")
-    print(f"   Expected enclosure: ~80%")
-    print(f"   Calculated: {result['value']}%")
-    print(f"   Estimated SVF: {result.get('estimated_svf', 'N/A')}%")
-    print(f"\n   Category breakdown:")
+    print(f"\nTest composition: 40% building + 15% wall + 15% tree + 10% pole + 20% sky")
+    print(f" Expected enclosure: ~80%")
+    print(f" Calculated: {result['value']}%")
+    print(f" Estimated SVF: {result.get('estimated_svf', 'N/A')}%")
+    print(f"\nCategory breakdown:")
     for cat, val in result.get('category_ratios', {}).items():
-        print(f"      • {cat}: {val}%")
-    print(f"\n   Interpretation: {interpret_enclosure(result['value'])}")
+        print(f" • {cat}: {val}%")
+    print(f"\nInterpretation: {interpret_enclosure(result['value'])}")
     
     # Cleanup
     os.remove(test_path)
-    print("\n   🧹 Test cleanup complete")
+    print("\n Test cleanup complete")

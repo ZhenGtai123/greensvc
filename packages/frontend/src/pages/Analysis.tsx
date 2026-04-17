@@ -185,8 +185,9 @@ function Analysis() {
     if (finalResult) {
       const result = finalResult as ProjectPipelineResult;
       setPipelineResult(result);
-      if (result.zone_analysis) setZoneResult(result.zone_analysis);
-      if (result.design_strategies) setDesignResult(result.design_strategies);
+      // Always set (including null) so a new run clears stale state from a previous run
+      setZoneResult(result.zone_analysis ?? null);
+      setDesignResult(result.design_strategies ?? null);
       toast({ title: 'Pipeline complete', status: 'success', duration: 3000 });
     }
   }, [selectedProjectId, selectedIndicatorIds, useLlm, toast, setPipelineResult, setZoneResult, setDesignResult]);
@@ -195,7 +196,9 @@ function Analysis() {
     abortRef.current?.abort();
   }, []);
 
-  const hasResults = zoneAnalysisResult !== null;
+  // Pipeline ran successfully — user can proceed to Reports even if zone_analysis
+  // is empty (e.g. n_zones=1 with nothing to compare). Reports page handles nulls.
+  const hasResults = pipelineResult !== null;
 
   // ETA estimation from the live per-image counter
   const etaSeconds = useMemo(() => {

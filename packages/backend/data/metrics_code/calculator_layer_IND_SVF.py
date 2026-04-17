@@ -1,29 +1,18 @@
-"""
-SceneRx Stage 2.5 - Calculator Layer
-================================================
-Indicator ID: IND_SVF
+"""Calculator Layer.
+
+Indicator ID:   IND_SVF
 Indicator Name: Sky View Factor
-Type: TYPE A (ratio mode)
+Type:           TYPE A (ratio mode
 
 Description:
-    The Sky View Factor (SVF) quantifies the proportion of sky visible from a 
-    given point in street-level imagery. It is a fundamental indicator in urban 
+    The Sky View Factor (SVF) quantifies the proportion of sky visible from a
+    given point in street-level imagery. It is a fundamental indicator in urban
     climate studies, thermal comfort assessment, and urban morphology analysis.
-    SVF relates to solar radiation access, urban heat island effects, and the 
-    perceived openness of urban spaces. Higher SVF values indicate more open 
+    SVF relates to solar radiation access, urban heat island effects, and the
+    perceived openness of urban spaces. Higher SVF values indicate more open
     spaces with greater sky exposure.
 
 Formula: SVF = (Sum(Sky_Pixels) / Sum(Total_Pixels)) × 100
-
-Variables:
-    - Sky_Pixels: Pixels classified as sky
-    - Total_Pixels: Total number of pixels in the image
-
-References:
-    - First confirmed by: Zhao, X., & Lin, G. (2024). Research on the Perception 
-      Evaluation of Urban Green Spaces Using Panoramic Images and Deep Learning.
-    - Merged from: IND_SKY, IND_SOI, IND_SKY_RAT
-    - Formula source: Chan, T.-C., et al. (2024). PLOS ONE, 19(5), e0301921.
 """
 
 import numpy as np
@@ -76,21 +65,21 @@ INDICATOR = {
 
 TARGET_RGB = {}
 
-print(f"\n🎯 Building color lookup for {INDICATOR['id']}:")
+print(f"\nBuilding color lookup for {INDICATOR['id']}:")
 for class_name in INDICATOR.get('target_classes', []):
     if class_name in semantic_colors:
         rgb = semantic_colors[class_name]
         TARGET_RGB[rgb] = class_name
-        print(f"   ✅ {class_name}: RGB{rgb}")
+        print(f" {class_name}: RGB{rgb}")
     else:
-        print(f"   ⚠️ NOT FOUND: {class_name}")
+        print(f" ️ NOT FOUND: {class_name}")
         # Try partial matching to suggest corrections
         for name in semantic_colors.keys():
             if class_name.split(';')[0] in name or name.split(';')[0] in class_name:
-                print(f"      💡 Did you mean: '{name}'?")
+                print(f" Did you mean: '{name}'?")
                 break
 
-print(f"\n✅ Calculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
+print(f"\nCalculator ready: {INDICATOR['id']} ({len(TARGET_RGB)} classes matched)")
 
 
 # =============================================================================
@@ -182,7 +171,7 @@ if __name__ == "__main__":
     Test code for standalone execution.
     Creates a synthetic test image and validates the calculator.
     """
-    print("\n🧪 Testing calculator...")
+    print("\nTesting calculator...")
     
     # Create a synthetic test image (100x100 pixels)
     test_img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -198,20 +187,20 @@ if __name__ == "__main__":
     
     # Run calculation
     result = calculate_indicator(test_path)
-    print(f"   Result: {result}")
+    print(f" Result: {result}")
     
     # Validate expected result (should be ~40%)
     if result['success']:
         expected_svf = 40.0  # 40% sky
         actual_svf = result['value']
-        print(f"   Expected SVF: ~{expected_svf}%")
-        print(f"   Actual SVF: {actual_svf}%")
+        print(f" Expected SVF: ~{expected_svf}%")
+        print(f" Actual SVF: {actual_svf}%")
         if abs(actual_svf - expected_svf) < 1:
-            print("   ✅ Test PASSED")
+            print(" Test PASSED")
         else:
-            print("   ⚠️ Test result differs from expected")
+            print(" ️ Test result differs from expected")
     
     # Cleanup
     import os
     os.remove(test_path)
-    print("   🧹 Test cleanup complete")
+    print(" Test cleanup complete")
