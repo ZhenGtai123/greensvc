@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useSearchParams, useParams, Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Heading,
@@ -387,9 +388,10 @@ function VisionAnalysis() {
   const projectId = routeProjectId || searchParams.get('project');
 
   const { data: semanticConfig, isLoading: configLoading } = useSemanticConfig();
-  const { data: project, isLoading: projectLoading } = useProject(projectId || '');
+  const { data: project, isLoading: projectLoading, isFetching: projectFetching } = useProject(projectId || '');
   const { data: calculators } = useCalculators();
   const toast = useAppToast();
+  const queryClient = useQueryClient();
 
   // Set of calculator IDs for quick lookup — recommendations without a calculator cannot be computed
   const calculatorIds = useMemo(
@@ -445,7 +447,14 @@ function VisionAnalysis() {
     selectedIndicators, addSelectedIndicator, removeSelectedIndicator,
     indicatorRelationships, setIndicatorRelationships,
     recommendationSummary, setRecommendationSummary,
+    pipelineRun,
   } = useAppStore();
+
+  // Block vision analysis while a pipeline is running for the same project —
+  // both write to project.uploaded_images[].metrics_results / mask_filepaths,
+  // and concurrent writes via the SQLite store can clobber each other.
+  const pipelineBlockingThisProject =
+    pipelineRun.isRunning && pipelineRun.projectId === projectId;
 
   // Indicator recommendation
   const recommendMutation = useRecommendIndicators();
@@ -539,12 +548,35 @@ function VisionAnalysis() {
       setSelectedProjectImages(new Set(project.uploaded_images.map(img => img.image_id)));
       imagesInitialized.current = true;
 
-      // Restore mask results from project data if Zustand store is empty
+      // Restore mask results from project data if Zustand store is empty.
+      // Panorama keys are stored as `{view}_{key}` pointing at files on disk
+      // under `masks/{project}/{imageId}_{view}/{key}.png`. Split them back
+      // into per-view entries so the URL builder (`/api/masks/{project}/
+      // {imageId}/{maskKey}.png`) lines up with the actual disk layout.
       if (maskResults.length === 0) {
         const restored: Array<{imageId: string; maskPaths: Record<string, string>}> = [];
         for (const img of project.uploaded_images) {
-          if (img.mask_filepaths && Object.keys(img.mask_filepaths).length > 0) {
-            restored.push({ imageId: img.image_id, maskPaths: img.mask_filepaths });
+          if (!img.mask_filepaths || Object.keys(img.mask_filepaths).length === 0) continue;
+
+          const standardPaths: Record<string, string> = {};
+          const viewPaths: Record<string, Record<string, string>> = {};
+          for (const [key, path] of Object.entries(img.mask_filepaths)) {
+            const m = key.match(/^(left|front|right)_(.+)$/);
+            if (m) {
+              const view = m[1];
+              const rest = m[2];
+              if (!viewPaths[view]) viewPaths[view] = {};
+              viewPaths[view][rest] = path;
+            } else {
+              standardPaths[key] = path;
+            }
+          }
+
+          if (Object.keys(standardPaths).length > 0) {
+            restored.push({ imageId: img.image_id, maskPaths: standardPaths });
+          }
+          for (const [view, paths] of Object.entries(viewPaths)) {
+            restored.push({ imageId: `${img.image_id}_${view}`, maskPaths: paths });
           }
         }
         if (restored.length > 0) {
@@ -700,6 +732,13 @@ function VisionAnalysis() {
         // Final flush for any remaining items in the buffer
         flushMaskBuffer();
 
+        // Refresh the cached project so readiness alerts (semantic_map presence)
+        // reflect the masks that were just persisted on the backend, instead of
+        // requiring the user to navigate away and back.
+        if (projectId && (successCount > 0 || skipped > 0)) {
+          queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+        }
+
         if (successCount > 0) {
           setStatistics({
             images_processed: successCount,
@@ -736,16 +775,34 @@ function VisionAnalysis() {
 
   const isPageLoading = configLoading || (projectId && projectLoading);
 
-  // Readiness check: how many zone-assigned images have semantic_map masks
+  // Readiness check: how many zone-assigned images have semantic_map masks.
+  // Panorama-analyzed images store keys as `{view}_semantic_map` (e.g.
+  // `left_semantic_map`) rather than the standard `semantic_map`, so we accept
+  // either form — otherwise panorama runs would show "no images analyzed"
+  // even after a successful analysis pass.
   const readiness = useMemo(() => {
     if (!project) return null;
     const assigned = project.uploaded_images.filter(img => img.zone_id);
-    const withSemantic = assigned.filter(img => img.mask_filepaths?.semantic_map);
-    const withFMB = assigned.filter(img =>
-      img.mask_filepaths?.foreground_map &&
-      img.mask_filepaths?.middleground_map &&
-      img.mask_filepaths?.background_map
-    );
+    const hasSemantic = (img: UploadedImage) => {
+      const mp = img.mask_filepaths;
+      if (!mp) return false;
+      return !!mp.semantic_map
+        || !!mp.front_semantic_map
+        || !!mp.left_semantic_map
+        || !!mp.right_semantic_map;
+    };
+    const hasFMB = (img: UploadedImage) => {
+      const mp = img.mask_filepaths;
+      if (!mp) return false;
+      const standard = mp.foreground_map && mp.middleground_map && mp.background_map;
+      if (standard) return true;
+      // Any view counts as having FMB coverage for that view
+      return ['front', 'left', 'right'].some(v =>
+        mp[`${v}_foreground_map`] && mp[`${v}_middleground_map`] && mp[`${v}_background_map`]
+      );
+    };
+    const withSemantic = assigned.filter(hasSemantic);
+    const withFMB = assigned.filter(hasFMB);
     return {
       totalImages: project.uploaded_images.length,
       assignedCount: assigned.length,
@@ -914,13 +971,28 @@ function VisionAnalysis() {
             </Alert>
           )}
 
+          {pipelineBlockingThisProject && (
+            <Alert status="warning" borderRadius="md">
+              <AlertIcon />
+              <Text fontSize="sm">
+                A pipeline is currently running for this project. Vision analysis is disabled until it finishes,
+                because both write the same project data and can corrupt each other.
+              </Text>
+            </Alert>
+          )}
+
           {/* Analyze Button */}
           <Button
             colorScheme="green"
             size="lg"
             onClick={handleAnalyze}
             isLoading={analyzing}
-            isDisabled={selectedClasses.length === 0 || selectedProjectImages.size === 0 || visionHealthy === false}
+            isDisabled={
+              selectedClasses.length === 0 ||
+              selectedProjectImages.size === 0 ||
+              visionHealthy === false ||
+              pipelineBlockingThisProject
+            }
           >
             {(() => {
               const total = selectedProjectImages.size;
@@ -1162,20 +1234,38 @@ function VisionAnalysis() {
                 </Alert>
               )}
 
-              {/* Results — accordion with details */}
+              {/* Results — accordion with details. Hide recommendations whose
+                  indicator has no calculator: they can't be computed anyway, so
+                  showing them just adds noise. Fall back to the full list while
+                  the calculators query is still loading (calculatorIds empty). */}
               {recommendations.length > 0 ? (
                 <VStack align="stretch" spacing={3}>
-                  <Accordion allowMultiple>
-                    {recommendations.map((rec) => (
-                      <RecommendationItem
-                        key={rec.indicator_id}
-                        rec={rec}
-                        selected={selectedIndicatorIds.has(rec.indicator_id)}
-                        onToggle={toggleIndicator}
-                        hasCalculator={calculatorIds.has(rec.indicator_id)}
-                      />
-                    ))}
-                  </Accordion>
+                  {(() => {
+                    const visibleRecs = calculatorIds.size > 0
+                      ? recommendations.filter(rec => calculatorIds.has(rec.indicator_id))
+                      : recommendations;
+                    const hidden = recommendations.length - visibleRecs.length;
+                    return (
+                      <>
+                        {hidden > 0 && (
+                          <Text fontSize="xs" color="gray.500">
+                            {hidden} recommendation{hidden > 1 ? 's' : ''} hidden (no calculator available).
+                          </Text>
+                        )}
+                        <Accordion allowMultiple>
+                          {visibleRecs.map((rec) => (
+                            <RecommendationItem
+                              key={rec.indicator_id}
+                              rec={rec}
+                              selected={selectedIndicatorIds.has(rec.indicator_id)}
+                              onToggle={toggleIndicator}
+                              hasCalculator={calculatorIds.has(rec.indicator_id)}
+                            />
+                          ))}
+                        </Accordion>
+                      </>
+                    );
+                  })()}
 
                   {/* Relationships */}
                   {indicatorRelationships.length > 0 && (
@@ -1238,8 +1328,10 @@ function VisionAnalysis() {
         </VStack>
       </SimpleGrid>
 
-      {/* Readiness Check */}
-      {readiness && routeProjectId && (
+      {/* Readiness Check — suppressed while React Query is refetching, otherwise
+          we'd render stale-cache-based alerts (e.g. "no zones assigned" right after
+          the user just assigned zones on the previous page) until the refetch lands. */}
+      {readiness && routeProjectId && !projectFetching && (
         <Box mt={6}>
           {readiness.assignedCount === 0 && (
             <Alert status="warning" mb={3} borderRadius="md">

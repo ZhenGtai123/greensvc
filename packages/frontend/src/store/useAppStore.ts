@@ -1,10 +1,51 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Project, IndicatorRecommendation, IndicatorRelationship, RecommendationSummary, ZoneAnalysisResult, DesignStrategyResult, ProjectPipelineResult } from '../types';
+import type { Project, IndicatorRecommendation, IndicatorRelationship, RecommendationSummary, ZoneAnalysisResult, DesignStrategyResult, ProjectPipelineResult, ProjectPipelineStreamEvent } from '../types';
+import api from '../api';
+import { extractErrorMessage } from '../utils/errorMessage';
 
 export interface VisionMaskResult {
   imageId: string;
   maskPaths: Record<string, string>;
+}
+
+export interface PipelineRunState {
+  isRunning: boolean;
+  projectId: string | null;
+  projectName: string | null;
+  startedAt: number | null;
+  steps: Array<{ step: string; status: string; detail: string }>;
+  imageProgress: {
+    current: number; total: number; filename: string;
+    succeeded: number; failed: number; cached: number;
+  } | null;
+  errorMessage: string | null;
+  // toast hook is provided by the caller because zustand store has no React context
+}
+
+const initialPipelineRun: PipelineRunState = {
+  isRunning: false,
+  projectId: null,
+  projectName: null,
+  startedAt: null,
+  steps: [],
+  imageProgress: null,
+  errorMessage: null,
+};
+
+// Module-level abort controller — kept outside React state so it never causes a
+// re-render and never gets persisted (an AbortController can't survive a reload
+// anyway). The store treats `isRunning` as the authoritative "is there a pipeline
+// in flight" signal; this controller is just the cancellation handle.
+let activeAbortController: AbortController | null = null;
+
+export interface StartPipelineArgs {
+  projectId: string;
+  projectName: string;
+  indicatorIds: string[];
+  useLlm: boolean;
+  onComplete?: (result: ProjectPipelineResult) => void;
+  onError?: (message: string) => void;
 }
 
 interface AppState {
@@ -47,6 +88,15 @@ interface AppState {
 
   clearPipelineResults: () => void;
 
+  // Pipeline run state — lives outside React component lifetimes so the run
+  // survives Analysis page unmount, and lets every other page show a global
+  // progress indicator. Not persisted (the in-flight SSE connection can't
+  // survive a reload anyway).
+  pipelineRun: PipelineRunState;
+  startPipeline: (args: StartPipelineArgs) => Promise<void>;
+  cancelPipeline: () => void;
+  resetPipelineRun: () => void;
+
   // UI State
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -58,7 +108,7 @@ interface AppState {
   resetCharts: () => void;
 }
 
-export const useAppStore = create<AppState>()(persist((set) => ({
+export const useAppStore = create<AppState>()(persist((set, get) => ({
   // Current project
   currentProject: null,
   setCurrentProject: (project) => set({ currentProject: project }),
@@ -117,6 +167,110 @@ export const useAppStore = create<AppState>()(persist((set) => ({
     aiReport: null,
     aiReportMeta: null,
   }),
+
+  // Pipeline run state
+  pipelineRun: initialPipelineRun,
+
+  resetPipelineRun: () => set({ pipelineRun: initialPipelineRun }),
+
+  cancelPipeline: () => {
+    activeAbortController?.abort();
+    activeAbortController = null;
+  },
+
+  startPipeline: async ({ projectId, projectName, indicatorIds, useLlm, onComplete, onError }) => {
+    if (get().pipelineRun.isRunning) {
+      // Don't allow concurrent pipelines from the same client. Caller should
+      // gate UI on `pipelineRun.isRunning` so this branch is rarely hit.
+      onError?.('A pipeline is already running');
+      return;
+    }
+
+    set({
+      pipelineRun: {
+        isRunning: true,
+        projectId,
+        projectName,
+        startedAt: Date.now(),
+        steps: [],
+        imageProgress: null,
+        errorMessage: null,
+      },
+    });
+
+    const controller = new AbortController();
+    activeAbortController = controller;
+
+    let finalResult: ProjectPipelineResult | null = null;
+    let errorMessage: string | null = null;
+
+    try {
+      await api.analysis.runProjectPipelineStream(
+        { project_id: projectId, indicator_ids: indicatorIds, run_stage3: true, use_llm: useLlm },
+        (ev: ProjectPipelineStreamEvent) => {
+          // Use functional set to compose with the latest steps array — avoids
+          // racing with concurrent progress events.
+          if (ev.type === 'progress') {
+            set((s) => ({
+              pipelineRun: {
+                ...s.pipelineRun,
+                imageProgress: {
+                  current: ev.current,
+                  total: ev.total,
+                  filename: ev.image_filename,
+                  succeeded: ev.succeeded,
+                  failed: ev.failed,
+                  cached: ev.cached,
+                },
+              },
+            }));
+          } else if (ev.type === 'status') {
+            set((s) => {
+              const prev = s.pipelineRun.steps;
+              const idx = prev.findIndex(x => x.step === ev.step);
+              const next = { step: ev.step, status: ev.status, detail: ev.detail };
+              const steps = idx >= 0
+                ? prev.map((x, i) => (i === idx ? next : x))
+                : [...prev, next];
+              return { pipelineRun: { ...s.pipelineRun, steps } };
+            });
+          } else if (ev.type === 'result') {
+            finalResult = ev.data;
+          } else if (ev.type === 'error') {
+            errorMessage = ev.message;
+          }
+        },
+        controller.signal,
+      );
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        set({ pipelineRun: initialPipelineRun });
+        activeAbortController = null;
+        return;
+      }
+      errorMessage = extractErrorMessage(err, 'Pipeline failed');
+    }
+
+    activeAbortController = null;
+
+    if (errorMessage) {
+      set((s) => ({ pipelineRun: { ...s.pipelineRun, isRunning: false, errorMessage } }));
+      onError?.(errorMessage);
+      return;
+    }
+    if (finalResult) {
+      const result = finalResult as ProjectPipelineResult;
+      set((s) => ({
+        pipelineResult: result,
+        zoneAnalysisResult: result.zone_analysis ?? null,
+        designStrategyResult: result.design_strategies ?? null,
+        pipelineRun: { ...s.pipelineRun, isRunning: false },
+      }));
+      onComplete?.(result);
+    } else {
+      set((s) => ({ pipelineRun: { ...s.pipelineRun, isRunning: false } }));
+    }
+  },
 
   // UI State
   sidebarOpen: true,

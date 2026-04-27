@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { HStack, Box, Text } from '@chakra-ui/react';
 import { Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { StageStatus } from '../utils/pipelineStatus';
+import useAppStore from '../store/useAppStore';
 
 const MotionBox = motion.create(Box);
 
@@ -14,6 +15,11 @@ const STEPS = [
   { step: 5, label: 'Report', path: 'reports' },
 ];
 
+// Steps whose pages mutate project state (uploaded_images, masks, zone
+// assignments, metrics_results). Navigating to these mid-pipeline can race
+// with the backend's writes and corrupt the run, so we always confirm first.
+const DANGEROUS_STEPS = new Set([1, 2, 3]);
+
 interface StepIndicatorProps {
   currentStep: number;
   projectId: string;
@@ -22,6 +28,22 @@ interface StepIndicatorProps {
 
 function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorProps) {
   const isNewProject = !projectId;
+  const navigate = useNavigate();
+  const pipelineRun = useAppStore(s => s.pipelineRun);
+  const pipelineRunningHere = pipelineRun.isRunning && pipelineRun.projectId === projectId;
+
+  const handleNavGuarded = (e: React.MouseEvent, targetStep: number, to: string) => {
+    if (!pipelineRunningHere) return;
+    if (!DANGEROUS_STEPS.has(targetStep)) return;
+    e.preventDefault();
+    const confirmed = window.confirm(
+      'A pipeline is currently running for this project. Navigating to this page can ' +
+      "modify image masks or zone assignments while the pipeline is reading them, " +
+      'which may corrupt the run.\n\n' +
+      'Continue anyway?'
+    );
+    if (confirmed) navigate(to);
+  };
 
   return (
     <HStack spacing={0} w="full" bg="white" borderBottom="1px solid" borderColor="gray.200" px={4} py={3}>
@@ -108,6 +130,7 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
               <Box
                 as={Link}
                 to={linkTo}
+                onClick={(e: React.MouseEvent) => handleNavGuarded(e, s.step, linkTo)}
                 display="flex"
                 alignItems="center"
                 gap={2}

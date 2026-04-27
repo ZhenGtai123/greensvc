@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -30,11 +30,8 @@ import {
   useCalculators,
   useProjects,
 } from '../hooks/useApi';
-import api from '../api';
 import type {
   ProjectPipelineProgress,
-  ProjectPipelineResult,
-  ProjectPipelineStreamEvent,
 } from '../types';
 import useAppStore from '../store/useAppStore';
 import useAppToast from '../hooks/useAppToast';
@@ -47,30 +44,18 @@ const STEP_STATUS_COLORS: Record<string, string> = {
   failed: 'red',
 };
 
-function extractErrorMessage(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const axiosErr = err as { response?: { data?: { detail?: string } } };
-    if (axiosErr.response?.data?.detail) return axiosErr.response.data.detail;
-  }
-  if (err instanceof Error) return err.message;
-  return fallback;
-}
-
 function Analysis() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const toast = useAppToast();
   const {
     selectedIndicators,
-    zoneAnalysisResult, setZoneAnalysisResult,
-    designStrategyResult, setDesignStrategyResult,
-    pipelineResult: storePipelineResult, setPipelineResult: setStorePipelineResult,
+    pipelineResult,
+    zoneAnalysisResult,
+    pipelineRun,
+    startPipeline,
+    cancelPipeline,
   } = useAppStore();
-
-  const pipelineResult = storePipelineResult;
-  const setPipelineResult = setStorePipelineResult;
-  const setZoneResult = setZoneAnalysisResult;
-  const setDesignResult = setDesignStrategyResult;
 
   // Config state
   const [useLlm, setUseLlm] = useState(true);
@@ -87,16 +72,20 @@ function Analysis() {
       .filter(id => calculators.some(c => c.id === id));
   }, [selectedIndicators, calculators]);
 
-  // Streaming pipeline state (replaces a single blocking mutation so that
-  // long batch runs show a live per-image counter instead of a static spinner).
-  const [isRunning, setIsRunning] = useState(false);
-  const [streamSteps, setStreamSteps] = useState<Array<{ step: string; status: string; detail: string }>>([]);
-  const [imageProgress, setImageProgress] = useState<{
-    current: number; total: number; filename: string;
-    succeeded: number; failed: number; cached: number;
-  } | null>(null);
-  const [streamStartedAt, setStreamStartedAt] = useState<number | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  // A pipeline is "running for *this* project" iff the global run state is
+  // active and pinned to this projectId. If another project's pipeline is in
+  // flight we treat this view as idle but disable the Run button below.
+  const isRunningHere = pipelineRun.isRunning && pipelineRun.projectId === selectedProjectId;
+  const isRunningElsewhere = pipelineRun.isRunning && pipelineRun.projectId !== selectedProjectId;
+  const streamSteps = isRunningHere ? pipelineRun.steps : [];
+  const imageProgress = isRunningHere ? pipelineRun.imageProgress : null;
+  const streamStartedAt = isRunningHere ? pipelineRun.startedAt : null;
+  // After run_calculations completes the per-image counters stop updating,
+  // so the determinate "X / Y · 100%" bar would falsely look done while
+  // aggregate / zone_analysis / design_strategies are still running. Use
+  // this flag to swap to an indeterminate "running stage…" indicator.
+  const calcDone = streamSteps.some(s => s.step === 'run_calculations' && s.status === 'completed');
+  const activeStage = streamSteps.find(s => s.status === 'running') ?? streamSteps[streamSteps.length - 1];
 
   const selectedProject = useMemo(() => {
     if (!selectedProjectId || !projects) return null;
@@ -108,93 +97,31 @@ function Analysis() {
     const totalImages = selectedProject.uploaded_images.length;
     const assigned = selectedProject.uploaded_images.filter(img => img.zone_id);
     const assignedImages = assigned.length;
-    const analyzedImages = assigned.filter(img => img.mask_filepaths?.semantic_map).length;
+    const analyzedImages = assigned.filter(img => {
+      const mp = img.mask_filepaths;
+      return !!(mp?.semantic_map || mp?.front_semantic_map || mp?.left_semantic_map || mp?.right_semantic_map);
+    }).length;
     const zones = selectedProject.spatial_zones.length;
     return { totalImages, assignedImages, analyzedImages, zones };
   }, [selectedProject]);
 
   const handleRunPipeline = useCallback(async () => {
     if (!selectedProjectId || selectedIndicatorIds.length === 0) return;
-
-    setIsRunning(true);
-    setStreamSteps([]);
-    setImageProgress(null);
-    setStreamStartedAt(Date.now());
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    let finalResult: ProjectPipelineResult | null = null;
-    let errorMessage: string | null = null;
-
-    try {
-      await api.analysis.runProjectPipelineStream(
-        {
-          project_id: selectedProjectId,
-          indicator_ids: selectedIndicatorIds,
-          run_stage3: true,
-          use_llm: useLlm,
-        },
-        (ev: ProjectPipelineStreamEvent) => {
-          if (ev.type === 'progress') {
-            setImageProgress({
-              current: ev.current,
-              total: ev.total,
-              filename: ev.image_filename,
-              succeeded: ev.succeeded,
-              failed: ev.failed,
-              cached: ev.cached,
-            });
-          } else if (ev.type === 'status') {
-            setStreamSteps(prev => {
-              // Replace any existing entry for this step, else append
-              const idx = prev.findIndex(s => s.step === ev.step);
-              const next = { step: ev.step, status: ev.status, detail: ev.detail };
-              if (idx >= 0) {
-                const copy = [...prev];
-                copy[idx] = next;
-                return copy;
-              }
-              return [...prev, next];
-            });
-          } else if (ev.type === 'result') {
-            finalResult = ev.data;
-          } else if (ev.type === 'error') {
-            errorMessage = ev.message;
-          }
-        },
-        controller.signal,
-      );
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        toast({ title: 'Pipeline cancelled', status: 'info' });
-        setIsRunning(false);
-        abortRef.current = null;
-        return;
-      }
-      errorMessage = extractErrorMessage(err, 'Pipeline failed');
-    }
-
-    abortRef.current = null;
-    setIsRunning(false);
-
-    if (errorMessage) {
-      toast({ title: errorMessage, status: 'error' });
-      return;
-    }
-    if (finalResult) {
-      const result = finalResult as ProjectPipelineResult;
-      setPipelineResult(result);
-      // Always set (including null) so a new run clears stale state from a previous run
-      setZoneResult(result.zone_analysis ?? null);
-      setDesignResult(result.design_strategies ?? null);
-      toast({ title: 'Pipeline complete', status: 'success', duration: 3000 });
-    }
-  }, [selectedProjectId, selectedIndicatorIds, useLlm, toast, setPipelineResult, setZoneResult, setDesignResult]);
+    const projectName = selectedProject?.project_name || routeProjectId || 'Unknown';
+    await startPipeline({
+      projectId: selectedProjectId,
+      projectName,
+      indicatorIds: selectedIndicatorIds,
+      useLlm,
+      onComplete: () => toast({ title: 'Pipeline complete', status: 'success', duration: 3000 }),
+      onError: (msg) => toast({ title: msg, status: 'error' }),
+    });
+  }, [selectedProjectId, selectedIndicatorIds, useLlm, selectedProject, routeProjectId, startPipeline, toast]);
 
   const handleCancelPipeline = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+    cancelPipeline();
+    toast({ title: 'Pipeline cancelled', status: 'info' });
+  }, [cancelPipeline, toast]);
 
   // Pipeline ran successfully — user can proceed to Reports even if zone_analysis
   // is empty (e.g. n_zones=1 with nothing to compare). Reports page handles nulls.
@@ -231,6 +158,14 @@ function Analysis() {
           <Text fontWeight="bold" mb={3}>
             Project: {selectedProject?.project_name || routeProjectId || 'No project'}
           </Text>
+
+          {isRunningElsewhere && (
+            <Alert status="warning" mb={4}>
+              <AlertIcon />
+              A pipeline is already running for another project ({pipelineRun.projectName}).
+              Wait for it to finish before starting a new run.
+            </Alert>
+          )}
 
           {projectSummary && (
             <>
@@ -290,8 +225,13 @@ function Analysis() {
           <Button
             colorScheme="green"
             onClick={handleRunPipeline}
-            isLoading={isRunning}
-            isDisabled={!selectedProjectId || selectedIndicatorIds.length === 0 || isRunning || projectSummary?.analyzedImages === 0}
+            isLoading={isRunningHere}
+            isDisabled={
+              !selectedProjectId ||
+              selectedIndicatorIds.length === 0 ||
+              pipelineRun.isRunning ||
+              projectSummary?.analyzedImages === 0
+            }
             mt={4}
           >
             Run Pipeline
@@ -300,7 +240,7 @@ function Analysis() {
       </Card>
 
       {/* Live progress during streaming pipeline run */}
-      {isRunning && (
+      {isRunningHere && (
         <Card mb={6}>
           <CardHeader>
             <HStack justify="space-between">
@@ -313,7 +253,7 @@ function Analysis() {
           <CardBody>
             <VStack align="stretch" spacing={4}>
               {/* Per-image progress (the slow part: calculators running on N images) */}
-              {imageProgress && (
+              {imageProgress && !calcDone && (
                 <Box>
                   <HStack justify="space-between" mb={1}>
                     <Text fontSize="sm" fontWeight="bold">
@@ -337,6 +277,31 @@ function Analysis() {
                     {imageProgress.failed > 0 && <Text color="red.600">{imageProgress.failed} failed</Text>}
                     {imageProgress.cached > 0 && <Text color="gray.500">{imageProgress.cached} cached</Text>}
                   </HStack>
+                </Box>
+              )}
+
+              {/* Post-calc indeterminate progress: aggregate / zone_analysis /
+                  design_strategies stages don't have a numeric percentage,
+                  so show a flowing bar with the active stage label. */}
+              {calcDone && activeStage && activeStage.status === 'running' && (
+                <Box>
+                  <HStack justify="space-between" mb={1}>
+                    <Text fontSize="sm" fontWeight="bold">
+                      {activeStage.step === 'aggregate'
+                        ? 'Aggregating zone statistics…'
+                        : activeStage.step === 'zone_analysis'
+                          ? 'Analyzing zones (Stage 2.5)…'
+                          : activeStage.step === 'design_strategies'
+                            ? 'Generating design strategies (Stage 3 · LLM)…'
+                            : `Running ${activeStage.step}…`}
+                    </Text>
+                  </HStack>
+                  <Progress isIndeterminate colorScheme="green" hasStripe borderRadius="md" />
+                  {activeStage.detail && (
+                    <Text mt={2} fontSize="xs" color="gray.600" noOfLines={1}>
+                      {activeStage.detail}
+                    </Text>
+                  )}
                 </Box>
               )}
 
@@ -376,7 +341,7 @@ function Analysis() {
       )}
 
       {/* Pipeline Result Summary */}
-      {pipelineResult && !isRunning && (
+      {pipelineResult && !isRunningHere && (
         <Card mb={6}>
           <CardHeader>
             <Heading size="md">Pipeline Results</Heading>
@@ -489,7 +454,7 @@ function Analysis() {
       )}
 
       {/* Empty state */}
-      {!pipelineResult && !isRunning && (
+      {!pipelineResult && !isRunningHere && (
         <Card>
           <CardBody textAlign="center" py={10}>
             <BarChart3 size={48} style={{ margin: '0 auto', opacity: 0.3 }} />

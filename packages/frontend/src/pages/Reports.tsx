@@ -578,11 +578,26 @@ function Reports() {
       </PageHeader>
 
       {isEmpty ? (
-        <EmptyState
-          icon={AlertTriangle}
-          title="No results yet"
-          description="Run the analysis pipeline first, then come back here to view results and generate reports."
-        />
+        pipelineResult !== null ? (
+          <EmptyState
+            icon={AlertTriangle}
+            title="Pipeline finished but the result didn't reach the browser"
+            description={
+              `The backend reported ${pipelineResult.zone_statistics_count} zone-stat ` +
+              `record(s) and ${pipelineResult.calculations_succeeded} successful calculations, ` +
+              `but the streamed result event was lost in transit (most often a proxy or buffer ` +
+              `truncating a multi-MB SSE chunk). Re-run the pipeline; if it persists, check the ` +
+              `browser console for "[Pipeline SSE] Failed to parse event" and the network tab ` +
+              `for the final data: line of /api/analysis/project-pipeline/stream.`
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={AlertTriangle}
+            title="No results yet"
+            description="Run the analysis pipeline first, then come back here to view results and generate reports."
+          />
+        )
       ) : (
         <Box>
           {/* Pipeline Overview */}

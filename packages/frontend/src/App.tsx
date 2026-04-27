@@ -5,6 +5,7 @@ import { ChakraProvider, Box, Divider, Flex, Heading, Text, VStack } from '@chak
 import { LayoutDashboard, FolderKanban, Calculator, Settings as SettingsIcon } from 'lucide-react';
 import theme from './theme';
 import StepIndicator from './components/StepIndicator';
+import GlobalPipelineProgress from './components/GlobalPipelineProgress';
 import useAppStore from './store/useAppStore';
 import { getStageStatuses } from './utils/pipelineStatus';
 import api from './api';
@@ -202,6 +203,7 @@ function App() {
 
             {/* Main content area */}
             <Box ml={SIDEBAR_W} flex={1} minH="100vh" minW={0} overflow="hidden">
+              <GlobalPipelineProgress />
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />

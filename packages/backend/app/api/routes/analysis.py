@@ -746,7 +746,16 @@ async def _execute_project_pipeline(
         design_strategies=design_result,
         steps=steps,
     )
-    yield {"type": "result", "data": final.model_dump(mode="json")}
+    # Strip image_records before sending — they're 1 row per (image × indicator × layer)
+    # and can easily run to 5–10 MB for a 1000+ image project. A single SSE event that
+    # large risks being truncated by intermediate buffers/proxies, which would silently
+    # drop the entire result event. The frontend reconstructs image_records from
+    # project.uploaded_images[].metrics_results, which it already has.
+    result_dict = final.model_dump(mode="json")
+    za = result_dict.get("zone_analysis")
+    if isinstance(za, dict):
+        za["image_records"] = []
+    yield {"type": "result", "data": result_dict}
 
 
 @router.post("/project-pipeline", response_model=ProjectPipelineResult)
