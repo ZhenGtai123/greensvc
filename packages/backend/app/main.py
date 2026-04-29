@@ -139,10 +139,98 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
+def _check_port_available(host: str, port: int) -> tuple[bool, OSError | None]:
+    """Pre-flight bind to detect port conflicts before uvicorn swallows them.
+
+    On Windows, Hyper-V / WSL2 dynamically reserves chunks of the ephemeral
+    port range at boot. A reservation lasts until the next reboot, then
+    typically lands on a different range — meaning *any* fixed default port
+    can be unlucky. We probe the port up front so we can give the user a
+    pointed error message instead of uvicorn's terse "Errno 13" trace.
+    """
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind((host, port))
+    except OSError as exc:
+        return False, exc
+    finally:
+        sock.close()
+    return True, None
+
+
+def _print_port_error(host: str, port: int, err: OSError) -> None:
+    """Format a developer-actionable error for a failed port bind."""
+    import sys
+
+    is_windows = sys.platform == "win32"
+    is_reserved = is_windows and getattr(err, "winerror", None) == 10013
+
+    bar = "=" * 70
+    print(f"\n{bar}", file=sys.stderr)
+    print(
+        f"X  Cannot bind backend on {host}:{port}  ({err})",
+        file=sys.stderr,
+    )
+    print(bar, file=sys.stderr)
+    if is_reserved:
+        print(
+            f"\nPort {port} is reserved by Windows (typically Hyper-V or WSL2)."
+            "\nThese reservations are dynamic and can shift on every reboot,"
+            "\nso *any* fixed port may be unlucky on a given day.",
+            file=sys.stderr,
+        )
+        print("\nTwo fixes:", file=sys.stderr)
+        print(
+            f"\n  [1] One-shot: pick another port for this run."
+            f"\n      PowerShell:  $env:PORT='8500'; python -m app.main"
+            f"\n      Bash:        PORT=8500 python -m app.main"
+            f"\n      Or set PORT=NNNN in packages/backend/.env",
+            file=sys.stderr,
+        )
+        print(
+            f"\n  [2] Permanent (recommended): reserve port {port} for SceneRx"
+            f"\n      so Hyper-V never grabs it. Run once in an *Administrator*"
+            f"\n      PowerShell, then restart this command:"
+            f"\n"
+            f"\n        netsh int ipv4 add excludedportrange protocol=tcp \\"
+            f"\n          startport={port} numberofports=1 store=persistent"
+            f"\n"
+            f"\n      The store=persistent flag survives reboots.",
+            file=sys.stderr,
+        )
+        print(
+            "\n  Inspect current Hyper-V / WSL2 reservations with:"
+            "\n    netsh interface ipv4 show excludedportrange protocol=tcp",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            "\nLikely causes:"
+            "\n  - Another process is already listening on this port."
+            f"\n    Check with: lsof -i :{port}   (or  netstat -ano | findstr :{port}  on Windows)"
+            "\n  - The OS is restricting access (run as a non-privileged user, or pick port >= 1024).",
+            file=sys.stderr,
+        )
+        print(
+            f"\nSet PORT=NNNN in packages/backend/.env or via env var to use a different port.",
+            file=sys.stderr,
+        )
+    print(f"\n{bar}\n", file=sys.stderr)
+
+
 if __name__ == "__main__":
+    import sys
     import uvicorn
 
     settings = get_settings()
+    ok, err = _check_port_available(settings.host, settings.port)
+    if not ok and err is not None:
+        _print_port_error(settings.host, settings.port, err)
+        sys.exit(1)
+
     uvicorn.run(
         "app.main:app",
         host=settings.host,

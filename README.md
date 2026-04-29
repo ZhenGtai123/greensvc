@@ -182,6 +182,23 @@ npm run dev                      # http://localhost:5173
 > Vision API (AI_City_View) 需要单独启动，见 [AI_City_View README](../AI_City_View/README.md)。
 > 如果 Vision API 未运行，其他功能（项目管理、指标推荐、报告计算）仍可正常使用。
 
+#### Windows 端口冲突
+
+如果 backend 启动时报 `[WinError 10013]`，说明端口被 Windows Hyper-V / WSL2
+动态保留了（这些保留每次重启会变化）。Backend 启动脚本会自动检测并打印两个
+修复方案：
+
+```powershell
+# 方案 1（一次性）：换个端口跑这一次
+$env:PORT="8500"; python -m app.main
+
+# 方案 2（推荐 · 永久）：把 8080 从 Hyper-V 抓取池里抠出来
+# 管理员 PowerShell，运行一次即可，store=persistent 保证重启保留
+netsh int ipv4 add excludedportrange protocol=tcp startport=8080 numberofports=1 store=persistent
+```
+
+查看当前所有保留段：`netsh interface ipv4 show excludedportrange protocol=tcp`
+
 ### 生产部署
 
 ```bash
