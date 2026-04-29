@@ -1,5 +1,5 @@
-import { useMemo, useCallback, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Heading,
@@ -51,6 +51,9 @@ import { CHART_REGISTRY } from '../components/analysisCharts/registry';
 import { ChartHost } from '../components/analysisCharts/ChartHost';
 import { ChartPicker } from '../components/analysisCharts/ChartPicker';
 import { buildChartContext } from '../components/analysisCharts/ChartContext';
+import { ModeAlert } from '../components/analysisCharts/ModeAlert';
+import { DataQualitySummary } from '../components/analysisCharts/DataQualitySummary';
+import { LayerSelector, LAYER_OPTIONS } from '../components/analysisCharts/LayerSelector';
 import type { ReportRequest, ZoneDiagnostic, ZoneDesignOutput, ClusteringResponse } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -180,9 +183,30 @@ function Reports() {
   const designStrategiesMutation = useRunDesignStrategies();
   const [clusteringResult, setClusteringResult] = useState<ClusteringResponse | null>(null);
 
-  // Layer — fixed to full (per-layer breakdowns shown inline in Deep Dive,
-  // Radar by Layer, Global Stats, and Distribution charts)
-  const selectedLayer = 'full';
+  // Global layer selector — drives any chart with `layerAware: true`. Synced
+  // to ?layer=... so reloads / shared links keep the view.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialLayer = (() => {
+    const fromUrl = searchParams.get('layer');
+    if (fromUrl && LAYER_OPTIONS.some((o) => o.value === fromUrl)) return fromUrl;
+    return 'full';
+  })();
+  const [selectedLayer, setSelectedLayer] = useState<string>(initialLayer);
+  useEffect(() => {
+    const current = searchParams.get('layer');
+    if (selectedLayer === 'full') {
+      if (current) {
+        const next = new URLSearchParams(searchParams);
+        next.delete('layer');
+        setSearchParams(next, { replace: true });
+      }
+      return;
+    }
+    if (current === selectedLayer) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('layer', selectedLayer);
+    setSearchParams(next, { replace: true });
+  }, [selectedLayer, searchParams, setSearchParams]);
 
   // Check if Stage 3 failed in pipeline
   const stage3Failed = pipelineResult?.steps?.some(s => s.step === 'design_strategies' && s.status === 'failed') ?? false;
@@ -721,6 +745,48 @@ function Reports() {
             <TabPanels>
               {/* ── Tab: Analysis (unified — replaces former Diagnostics + Statistics) ── */}
               <TabPanel px={0}>
+                {/* Sticky layer selector — drives any layerAware chart */}
+                <Box
+                  position="sticky"
+                  top={0}
+                  zIndex={2}
+                  bg="white"
+                  borderBottom="1px solid"
+                  borderColor="gray.200"
+                  py={2}
+                  px={1}
+                  mb={3}
+                >
+                  <HStack justify="space-between" flexWrap="wrap" gap={2}>
+                    <LayerSelector value={selectedLayer} onChange={setSelectedLayer} />
+                    <Text fontSize="xs" color="gray.500">
+                      Layer-independent charts ignore this selector.
+                    </Text>
+                  </HStack>
+                </Box>
+
+                {/* Single-zone / image-level mode banner */}
+                <ModeAlert
+                  analysisMode={chartCtx.analysisMode}
+                  zoneSource={chartCtx.zoneSource}
+                  projectId={routeProjectId ?? null}
+                  zoneCount={
+                    currentProject?.spatial_zones?.length ?? sortedDiagnostics.length
+                  }
+                  imageCount={chartCtx.imageRecords.length}
+                  onRunClustering={handleRunClustering}
+                  isClusteringRunning={clusteringMutation.isPending}
+                  canRunClustering={!!currentProject}
+                />
+
+                {/* Data Quality summary — surfaces report warning + key metrics */}
+                <DataQualitySummary
+                  ctx={chartCtx}
+                  reportWarning={
+                    (aiReportMeta?.data_quality_warning as string | undefined) ?? null
+                  }
+                />
+
                 {/* Computation warnings */}
                 {zoneAnalysisResult?.computation_metadata?.warnings?.length ? (
                   <Alert status="warning" mb={4} borderRadius="md" alignItems="flex-start">
