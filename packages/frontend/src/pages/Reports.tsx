@@ -47,13 +47,19 @@ import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
-import { CHART_REGISTRY } from '../components/analysisCharts/registry';
+import {
+  CHART_REGISTRY,
+  SECTION_ORDER,
+  SectionHeading,
+  type ChartSection,
+} from '../components/analysisCharts/registry';
 import { ChartHost } from '../components/analysisCharts/ChartHost';
 import { ChartPicker } from '../components/analysisCharts/ChartPicker';
 import { buildChartContext } from '../components/analysisCharts/ChartContext';
 import { ModeAlert } from '../components/analysisCharts/ModeAlert';
 import { DataQualitySummary } from '../components/analysisCharts/DataQualitySummary';
 import { LayerSelector, LAYER_OPTIONS } from '../components/analysisCharts/LayerSelector';
+import { GlossaryDrawer } from '../components/GlossaryDrawer';
 import type { ReportRequest, ZoneDiagnostic, ZoneDesignOutput, ClusteringResponse } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -351,10 +357,20 @@ function Reports() {
     () => analysisCharts.filter(c => c.section === 'clustering'),
     [analysisCharts],
   );
-  const nonClusteringCharts = useMemo(
-    () => analysisCharts.filter(c => c.section !== 'clustering'),
-    [analysisCharts],
-  );
+  // Group non-clustering charts by section so Reports.tsx can render
+  // sub-headings (5.10.2). Sections that have zero available charts (after
+  // ChartHost's own isAvailable check) still render their group header but
+  // the rendered list will be empty — handled with a fallback in the JSX.
+  const sectionedCharts = useMemo(() => {
+    const grouped: Partial<Record<ChartSection, typeof analysisCharts>> = {};
+    for (const c of analysisCharts) {
+      if (c.section === 'clustering') continue;
+      const list = grouped[c.section] ?? [];
+      list.push(c);
+      grouped[c.section] = list;
+    }
+    return grouped;
+  }, [analysisCharts]);
   const sortedDiagnostics = chartCtx.sortedDiagnostics;
 
   // Downloads
@@ -589,6 +605,7 @@ function Reports() {
     <PageShell>
       <PageHeader title="Results & Report">
         <HStack spacing={2}>
+          <GlossaryDrawer />
           {hasAnalysis && (
             <ChartPicker
               hiddenIds={hiddenChartIds}
@@ -825,10 +842,28 @@ function Reports() {
                       ))}
                     </SimpleGrid>
 
-                    {/* All non-clustering analysis charts */}
-                    {nonClusteringCharts.map(chart => (
-                      <ChartHost key={chart.id} descriptor={chart} ctx={chartCtx} onHide={toggleChart} />
-                    ))}
+                    {/* Sectioned analysis charts (5.10.2 — narrative ordering) */}
+                    {SECTION_ORDER.filter(s => s !== 'clustering').map(section => {
+                      const charts = sectionedCharts[section] ?? [];
+                      if (charts.length === 0) return null;
+                      const visibleCount = charts.filter(c => c.isAvailable(chartCtx)).length;
+                      if (visibleCount === 0) return null;
+                      return (
+                        <Box key={section}>
+                          <SectionHeading section={section} />
+                          <VStack spacing={4} align="stretch">
+                            {charts.map(chart => (
+                              <ChartHost
+                                key={chart.id}
+                                descriptor={chart}
+                                ctx={chartCtx}
+                                onHide={toggleChart}
+                              />
+                            ))}
+                          </VStack>
+                        </Box>
+                      );
+                    })}
 
                     {/* GPS coverage hint — shown when no spatial charts rendered */}
                     {chartCtx.gpsImages.length === 0 && (
@@ -844,55 +879,65 @@ function Reports() {
                       </Alert>
                     )}
 
-                    {/* Clustering */}
-                    <Card variant="outline">
-                      <CardBody>
-                        <HStack justify="space-between" flexWrap="wrap" gap={2}>
-                          <VStack align="start" spacing={0}>
-                            <Text fontWeight="bold" fontSize="sm">SVC Archetype Clustering</Text>
-                            <Text fontSize="xs" color="gray.500">
-                              Discover spatial archetypes via KMeans on image-level metrics (requires 10+ images with computed indicators)
+                    {/* Clustering — collapsed group (5.9) */}
+                    <Accordion allowToggle>
+                      <AccordionItem border="1px solid" borderColor="gray.200" borderRadius="md">
+                        <AccordionButton bg="gray.50" _hover={{ bg: 'gray.100' }}>
+                          <Box flex="1" textAlign="left">
+                            <HStack spacing={2}>
+                              <Text fontWeight="bold" fontSize="sm">SVC Archetype Clustering</Text>
+                              {clusteringResult?.clustering && (
+                                <Badge colorScheme="green" fontSize="2xs">
+                                  k={clusteringResult.clustering.k} · silhouette={clusteringResult.clustering.silhouette_score.toFixed(2)}
+                                </Badge>
+                              )}
+                              {clusteringResult?.skipped && (
+                                <Badge colorScheme="yellow" fontSize="2xs">{clusteringResult.reason}</Badge>
+                              )}
+                            </HStack>
+                            <Text fontSize="xs" color="gray.500" mt={0.5}>
+                              Discover spatial archetypes via KMeans on image-level metrics (requires 10+ images with computed indicators).
                             </Text>
-                          </VStack>
-                          <HStack>
-                            {clusteringResult?.clustering && (
-                              <Badge colorScheme="green">
-                                k={clusteringResult.clustering.k} silhouette={clusteringResult.clustering.silhouette_score.toFixed(2)}
-                              </Badge>
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                        <AccordionPanel pb={4}>
+                          <VStack align="stretch" spacing={4}>
+                            <HStack justify="flex-end">
+                              <Button
+                                size="sm"
+                                colorScheme="teal"
+                                variant="outline"
+                                onClick={handleRunClustering}
+                                isLoading={clusteringMutation.isPending}
+                                isDisabled={!currentProject}
+                              >
+                                {clusteringResult?.clustering ? 'Re-run Clustering' : 'Run Clustering'}
+                              </Button>
+                            </HStack>
+                            {clusteringResult?.clustering && clusteringResult.clustering.archetype_profiles.length > 0 && (
+                              <Wrap spacing={2}>
+                                {clusteringResult.clustering.archetype_profiles.map(a => (
+                                  <WrapItem key={a.archetype_id}>
+                                    <Tag size="sm" colorScheme="teal" variant="subtle">
+                                      <TagLabel>Archetype {a.archetype_id}: {a.archetype_label} ({a.point_count} pts)</TagLabel>
+                                    </Tag>
+                                  </WrapItem>
+                                ))}
+                              </Wrap>
                             )}
-                            {clusteringResult?.skipped && (
-                              <Badge colorScheme="yellow">{clusteringResult.reason}</Badge>
-                            )}
-                            <Button
-                              size="sm"
-                              colorScheme="teal"
-                              variant="outline"
-                              onClick={handleRunClustering}
-                              isLoading={clusteringMutation.isPending}
-                              isDisabled={!currentProject}
-                            >
-                              {clusteringResult?.clustering ? 'Re-run' : 'Run Clustering'}
-                            </Button>
-                          </HStack>
-                        </HStack>
-                        {clusteringResult?.clustering && clusteringResult.clustering.archetype_profiles.length > 0 && (
-                          <Wrap spacing={2} mt={3}>
-                            {clusteringResult.clustering.archetype_profiles.map(a => (
-                              <WrapItem key={a.archetype_id}>
-                                <Tag size="sm" colorScheme="teal" variant="subtle">
-                                  <TagLabel>Archetype {a.archetype_id}: {a.archetype_label} ({a.point_count} pts)</TagLabel>
-                                </Tag>
-                              </WrapItem>
+                            {clusteringCharts.map(chart => (
+                              <ChartHost
+                                key={chart.id}
+                                descriptor={chart}
+                                ctx={chartCtx}
+                                onHide={toggleChart}
+                              />
                             ))}
-                          </Wrap>
-                        )}
-                      </CardBody>
-                    </Card>
-
-                    {/* Clustering charts */}
-                    {clusteringCharts.map(chart => (
-                      <ChartHost key={chart.id} descriptor={chart} ctx={chartCtx} onHide={toggleChart} />
-                    ))}
+                          </VStack>
+                        </AccordionPanel>
+                      </AccordionItem>
+                    </Accordion>
                   </VStack>
                 )}
               </TabPanel>

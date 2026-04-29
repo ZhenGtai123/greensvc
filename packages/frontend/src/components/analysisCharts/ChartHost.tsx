@@ -12,6 +12,7 @@ import {
   MenuItem,
   Skeleton,
   Box,
+  Text,
 } from '@chakra-ui/react';
 import { MoreHorizontal, Download, EyeOff } from 'lucide-react';
 import type { ChartDescriptor } from './registry';
@@ -89,7 +90,14 @@ export function ChartHost({ descriptor, ctx, onHide }: ChartHostProps) {
     <Card ref={cardRef}>
       <CardHeader pb={2}>
         <HStack justify="space-between" align="start">
-          <Heading size="sm">{descriptor.title}</Heading>
+          <Box flex="1" minW={0}>
+            <Heading size="sm">{descriptor.title}</Heading>
+            {descriptor.description && (
+              <Text fontSize="xs" color="gray.500" mt={1} lineHeight="1.4">
+                {descriptor.description}
+              </Text>
+            )}
+          </Box>
           <Menu placement="bottom-end" isLazy>
             <MenuButton
               as={IconButton}

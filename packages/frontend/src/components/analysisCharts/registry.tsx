@@ -11,10 +11,15 @@ import {
   Td,
   Tooltip,
   SimpleGrid,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel,
+  Heading,
 } from '@chakra-ui/react';
 import {
   RadarProfileChart,
-  RadarProfileByLayer,
   ZonePriorityChart,
   CorrelationHeatmap,
   PriorityHeatmap,
@@ -33,9 +38,74 @@ import {
   DataQualityTable,
 } from '../AnalysisCharts';
 import type { ChartContext } from './ChartContext';
+import { LAYER_LABELS } from './ChartContext';
 
 export type ChartTab = 'diagnostics' | 'statistics' | 'analysis';
-export type ChartSection = 'zone' | 'clustering' | 'tables' | 'distributions';
+
+/**
+ * Sections drive the narrative ordering on the Analysis tab. Order below
+ * matches the rendered order; descriptors carry their section so Reports.tsx
+ * can group them under sub-headings without reading the registry order
+ * directly.
+ */
+export type ChartSection =
+  | 'context'
+  | 'overview'
+  | 'spatial'
+  | 'comparison'
+  | 'correlation'
+  | 'detail'
+  | 'tables'
+  | 'clustering';
+
+export const SECTION_ORDER: ChartSection[] = [
+  'context',
+  'overview',
+  'spatial',
+  'comparison',
+  'correlation',
+  'detail',
+  'tables',
+  'clustering',
+];
+
+export const SECTION_META: Record<
+  ChartSection,
+  { title: string; subtitle: string }
+> = {
+  context: {
+    title: 'Context',
+    subtitle: 'What we are analysing — indicator registry and data quality.',
+  },
+  overview: {
+    title: 'Zone Overview',
+    subtitle: "Where each zone sits on the deviation spectrum.",
+  },
+  spatial: {
+    title: 'Spatial',
+    subtitle: 'Where indicators land on the site map.',
+  },
+  comparison: {
+    title: 'Cross-Zone Comparison',
+    subtitle: 'How zones differ on the selected layer.',
+  },
+  correlation: {
+    title: 'Correlations',
+    subtitle: 'Which indicators co-vary.',
+  },
+  detail: {
+    title: 'Per-Indicator Detail',
+    subtitle: 'Drill into one indicator at a time.',
+  },
+  tables: {
+    title: 'Reference Tables',
+    subtitle: 'Numbers behind the figures.',
+  },
+  clustering: {
+    title: 'SVC Archetype Clustering',
+    subtitle: 'Optional: discover sub-zone archetypes.',
+  },
+};
 
 export interface ChartDescriptor {
   /** Stable unique identifier, used as persistence key */
@@ -44,10 +114,9 @@ export interface ChartDescriptor {
   title: string;
   /** Which tab this chart renders in */
   tab: ChartTab;
-  /** Subsection within a tab (diagnostics charts split into 'zone' and
-   * 'clustering' so the Clustering control card can sit between them). */
-  section?: ChartSection;
-  /** Short tooltip/description shown in the picker */
+  /** Narrative section — drives ordering and subheadings on the Analysis tab. */
+  section: ChartSection;
+  /** Short caption rendered below the Card header (also used in picker tooltip). */
   description?: string;
   /** Returns false when required data isn't available — chart is skipped */
   isAvailable: (ctx: ChartContext) => boolean;
@@ -58,211 +127,292 @@ export interface ChartDescriptor {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: resolve radar_profiles for the currently-selected layer
+// ---------------------------------------------------------------------------
+function resolveRadarProfiles(
+  ctx: ChartContext,
+): Record<string, Record<string, number>> | null {
+  const za = ctx.zoneAnalysisResult;
+  if (!za) return null;
+  if (ctx.selectedLayer === 'full' || !za.radar_profiles_by_layer) {
+    return za.radar_profiles ?? null;
+  }
+  const byLayer = za.radar_profiles_by_layer[ctx.selectedLayer];
+  if (byLayer && Object.keys(byLayer).length > 0) return byLayer;
+  return za.radar_profiles ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
-// Order here = render order in each tab. Add new charts by appending a
-// descriptor. Remove a chart by deleting / commenting out its entry.
+// Order = render order. Sections group cards under subheadings on the
+// Analysis tab. The 19 → 12 consolidation merges three spatial cards into a
+// single Tabs card and two radar cards into one layer-aware card.
 
 export const CHART_REGISTRY: ChartDescriptor[] = [
-  // ════════════════════════════════════════════════════════════════════════
-  // Unified "Analysis" tab  (merged from former Diagnostics + Statistics)
-  //
-  // Sections:  zone → tables → distributions → clustering
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Context ──────────────────────────────────────────────────────────
+  {
+    id: 'indicator-registry-table',
+    title: 'Indicator Registry (Table M1)',
+    tab: 'analysis',
+    section: 'context',
+    description: 'What indicators are we analyzing? Metadata-only list.',
+    isAvailable: (ctx) => Object.keys(ctx.indicatorDefs).length > 0,
+    render: (ctx) => {
+      const defs = Object.values(ctx.indicatorDefs);
+      return (
+        <Box overflowX="auto">
+          <Table size="sm">
+            <Thead>
+              <Tr>
+                <Th>ID</Th>
+                <Th>Full Name</Th>
+                <Th>Unit</Th>
+                <Th>Target</Th>
+                <Th>Category</Th>
+                <Th isNumeric>N (Full)</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {defs.map((d) => {
+                const gs = ctx.globalIndicatorStats.find((s) => s.indicator_id === d.id);
+                const fullN = gs?.by_layer?.full?.N ?? '—';
+                return (
+                  <Tr key={d.id}>
+                    <Td fontSize="xs" fontWeight="bold">{d.id}</Td>
+                    <Td fontSize="xs">{d.name}</Td>
+                    <Td fontSize="xs">{d.unit}</Td>
+                    <Td fontSize="xs">{d.target_direction}</Td>
+                    <Td fontSize="xs">{d.category}</Td>
+                    <Td fontSize="xs" isNumeric>{fullN}</Td>
+                  </Tr>
+                );
+              })}
+            </Tbody>
+          </Table>
+        </Box>
+      );
+    },
+  },
+  {
+    id: 'data-quality-table',
+    title: 'Data Quality Diagnostics (Table M4)',
+    tab: 'analysis',
+    section: 'context',
+    description: 'Images per indicator, FMB coverage, normality, correlation method.',
+    isAvailable: (ctx) => ctx.dataQuality.length > 0,
+    render: (ctx) => <DataQualityTable rows={ctx.dataQuality} />,
+  },
 
-  // ── Zone overview ──────────────────────────────────────────────────────
+  // ── Zone overview ────────────────────────────────────────────────────
   {
     id: 'zone-deviation-overview',
-    title: 'Zone Deviation Overview',
+    title: "Each zone's overall distinctiveness",
     tab: 'analysis',
-    section: 'zone',
-    description: 'Horizontal bar of each zone ranked by mean |z-score|',
+    section: 'overview',
+    description:
+      'Horizontal bar of each zone ranked by mean |z-score| across indicators (full layer).',
     isAvailable: (ctx) => ctx.sortedDiagnostics.length > 0,
     render: (ctx) => <ZonePriorityChart diagnostics={ctx.sortedDiagnostics} />,
   },
   {
     id: 'priority-heatmap',
-    title: 'Zone × Indicator Z-Score Grid',
+    title: "Each zone's per-indicator deviation",
     tab: 'analysis',
-    section: 'zone',
-    description: 'Descriptive z-score grid per zone × indicator (full layer)',
+    section: 'overview',
+    description:
+      'Z-score grid: rows = zones, columns = indicators (full layer). Red = above mean, blue = below.',
     isAvailable: (ctx) => ctx.sortedDiagnostics.length > 0,
     render: (ctx) => <PriorityHeatmap diagnostics={ctx.sortedDiagnostics} layer="full" />,
   },
+
+  // ── Spatial (3-tab combo replacing former 3 separate cards) ──────────
   {
-    id: 'spatial-distribution-by-layer',
-    title: 'Layer Coverage Map per Indicator',
+    id: 'spatial-overview',
+    title: 'Where on the site does each indicator stand out?',
     tab: 'analysis',
-    section: 'zone',
+    section: 'spatial',
+    layerAware: true,
     description:
-      'Per indicator, four small maps (Full/FG/MG/BG) showing where each layer has data. Color encodes the layer, NOT the indicator value — see Value Heatmap for value-based coloring.',
-    isAvailable: (ctx) => ctx.gpsImages.length > 0 && ctx.gpsIndicatorIds.length > 0,
-    render: (ctx) => (
-      <VStack align="stretch" spacing={6}>
-        {ctx.gpsIndicatorIds.map((ind) => (
-          <SpatialScatterByLayer key={ind} gpsImages={ctx.gpsImages} indicatorId={ind} />
-        ))}
-      </VStack>
-    ),
-  },
-  {
-    id: 'value-spatial-distribution',
-    title: 'Value Heatmap per Indicator',
-    tab: 'analysis',
-    section: 'zone',
-    description:
-      'Per indicator, GPS points colored by the raw indicator value (full layer). Direction-aware gradient: INCREASE indicators darken when higher, DECREASE indicators darken when lower.',
+      'Three views of the GPS scatter: Layer Coverage shows where each FMB layer has data; Value Heatmap colors points by raw indicator value; Z-Deviation highlights the most distinctive indicator at each point.',
     isAvailable: (ctx) => ctx.gpsImages.length > 0 && ctx.gpsIndicatorIds.length > 0,
     render: (ctx) => {
       const defs = ctx.zoneAnalysisResult?.indicator_definitions || {};
+      const layerLabel = LAYER_LABELS[ctx.selectedLayer] ?? ctx.selectedLayer;
       return (
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-          {ctx.gpsIndicatorIds.map((ind) => (
-            <ValueSpatialMap
-              key={ind}
-              gpsImages={ctx.gpsImages}
-              indicatorId={ind}
-              layer="full"
-              targetDirection={defs[ind]?.target_direction}
-            />
-          ))}
-        </SimpleGrid>
+        <Tabs colorScheme="blue" variant="soft-rounded" size="sm">
+          <TabList>
+            <Tab>Layer Coverage</Tab>
+            <Tab>Value Heatmap ({layerLabel})</Tab>
+            <Tab>Z-Deviation</Tab>
+          </TabList>
+          <TabPanels>
+            <TabPanel px={0}>
+              <Text fontSize="xs" color="gray.500" mb={3}>
+                Per indicator, four small maps (Full/FG/MG/BG). Color encodes the layer the point came
+                from, NOT the indicator value — see the Value Heatmap tab for value-based coloring.
+              </Text>
+              <VStack align="stretch" spacing={6}>
+                {ctx.gpsIndicatorIds.map((ind) => (
+                  <SpatialScatterByLayer
+                    key={ind}
+                    gpsImages={ctx.gpsImages}
+                    indicatorId={ind}
+                  />
+                ))}
+              </VStack>
+            </TabPanel>
+            <TabPanel px={0}>
+              <Text fontSize="xs" color="gray.500" mb={3}>
+                Points colored by raw indicator value on the {layerLabel} layer.
+                INCREASE indicators darken when higher; DECREASE indicators darken when lower.
+              </Text>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                {ctx.gpsIndicatorIds.map((ind) => (
+                  <ValueSpatialMap
+                    key={ind}
+                    gpsImages={ctx.gpsImages}
+                    indicatorId={ind}
+                    layer={ctx.selectedLayer as 'full' | 'foreground' | 'middleground' | 'background'}
+                    targetDirection={defs[ind]?.target_direction}
+                  />
+                ))}
+              </SimpleGrid>
+            </TabPanel>
+            <TabPanel px={0}>
+              <Text fontSize="xs" color="gray.500" mb={3}>
+                Mean |z| deviation across indicators (left) and the most-distinctive indicator at
+                each GPS point (right). Full-layer values.
+              </Text>
+              <CrossIndicatorSpatialMaps
+                gpsImages={ctx.gpsImages}
+                indicatorIds={ctx.gpsIndicatorIds}
+              />
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
       );
     },
   },
-  {
-    id: 'cross-indicator-spatial-maps',
-    title: 'Cross-Indicator Spatial Maps (Fig 8)',
-    tab: 'analysis',
-    section: 'zone',
-    description: 'Mean |z| deviation + most-distinctive indicator per GPS point (full layer)',
-    isAvailable: (ctx) => ctx.gpsImages.length > 0 && ctx.gpsIndicatorIds.length > 0,
-    render: (ctx) => (
-      <CrossIndicatorSpatialMaps gpsImages={ctx.gpsImages} indicatorIds={ctx.gpsIndicatorIds} />
-    ),
-  },
+
+  // ── Cross-zone comparison ────────────────────────────────────────────
   {
     id: 'radar-profiles',
-    title: 'Radar Profiles (Zone Comparison, Full Layer)',
+    title: 'Radar Profiles (Cross-Zone)',
     tab: 'analysis',
-    section: 'zone',
-    description: 'All zones overlaid on one radar — percentile scores, full layer',
-    isAvailable: (ctx) =>
-      !!ctx.zoneAnalysisResult?.radar_profiles &&
-      Object.keys(ctx.zoneAnalysisResult.radar_profiles).length > 0,
-    render: (ctx) => <RadarProfileChart radarProfiles={ctx.zoneAnalysisResult!.radar_profiles} />,
-  },
-  {
-    id: 'radar-profiles-by-layer',
-    title: 'Radar Profiles by Layer (Per Zone)',
-    tab: 'analysis',
-    section: 'zone',
-    description: 'Per-zone radar with FG/MG/BG/Full polygons overlaid (matches notebook Fig 4)',
-    isAvailable: (ctx) =>
-      !!ctx.zoneAnalysisResult?.radar_profiles_by_layer &&
-      Object.keys(ctx.zoneAnalysisResult.radar_profiles_by_layer).length > 0,
-    render: (ctx) => (
-      <RadarProfileByLayer
-        radarProfilesByLayer={ctx.zoneAnalysisResult!.radar_profiles_by_layer!}
-      />
-    ),
-  },
-
-  // ── Clustering (still in Diagnostics tab, rendered after the control card)
-  {
-    id: 'silhouette-curve',
-    title: 'Silhouette Score Curve',
-    tab: 'analysis',
-    section: 'clustering',
-    description: 'Silhouette score per K (optimal K selection)',
-    isAvailable: (ctx) =>
-      !!ctx.effectiveClustering?.silhouette_scores &&
-      ctx.effectiveClustering.silhouette_scores.length > 1,
-    render: (ctx) => (
-      <SilhouetteCurve
-        scores={ctx.effectiveClustering!.silhouette_scores}
-        bestK={ctx.effectiveClustering!.k}
-      />
-    ),
-  },
-  {
-    id: 'dendrogram',
-    title: 'Ward Hierarchical Clustering',
-    tab: 'analysis',
-    section: 'clustering',
-    description: 'Dendrogram from Ward linkage',
-    isAvailable: (ctx) =>
-      !!ctx.effectiveClustering?.dendrogram_linkage &&
-      ctx.effectiveClustering.dendrogram_linkage.length > 0,
-    render: (ctx) => <Dendrogram linkage={ctx.effectiveClustering!.dendrogram_linkage} />,
-  },
-  {
-    id: 'cluster-spatial-smoothing',
-    title: 'Cluster Spatial Smoothing',
-    tab: 'analysis',
-    section: 'clustering',
-    description: 'Before/after KNN spatial smoothing comparison (needs GPS)',
-    isAvailable: (ctx) =>
-      !!ctx.effectiveClustering?.point_lats &&
-      ctx.effectiveClustering.point_lats.length > 0 &&
-      !!ctx.effectiveClustering.labels_raw &&
-      ctx.effectiveClustering.labels_raw.length > 0,
+    section: 'comparison',
+    layerAware: true,
+    description:
+      "All zones overlaid on one radar — percentile scores. Use the Layer toggle at the top of this tab to switch between Full / FG / MG / BG views.",
+    isAvailable: (ctx) => {
+      const profiles = resolveRadarProfiles(ctx);
+      return !!profiles && Object.keys(profiles).length > 0;
+    },
     render: (ctx) => {
-      const cl = ctx.effectiveClustering!;
+      const profiles = resolveRadarProfiles(ctx);
+      if (!profiles) return null;
+      const layerLabel = LAYER_LABELS[ctx.selectedLayer] ?? ctx.selectedLayer;
       return (
-        <ClusterSpatialBeforeAfter
-          lats={cl.point_lats}
-          lngs={cl.point_lngs}
-          labelsRaw={cl.labels_raw}
-          labelsSmoothed={cl.labels_smoothed}
-          archetypeLabels={Object.fromEntries(
-            cl.archetype_profiles.map((a) => [a.archetype_id, a.archetype_label]),
-          )}
-        />
+        <Box>
+          <Text fontSize="xs" color="gray.500" mb={2}>
+            Showing zone-level percentiles on the <b>{layerLabel}</b> layer.
+          </Text>
+          <RadarProfileChart radarProfiles={profiles} />
+        </Box>
       );
     },
   },
   {
-    id: 'archetype-radar',
-    title: 'Archetype Radar Profiles',
+    id: 'zone-indicator-matrix',
+    title: 'Zone × Indicator Matrix (Table M3)',
     tab: 'analysis',
-    section: 'clustering',
-    description: 'Z-score radar for each discovered archetype',
-    isAvailable: (ctx) =>
-      !!ctx.effectiveClustering && ctx.effectiveClustering.archetype_profiles.length > 0,
-    render: (ctx) => (
-      <ArchetypeRadarChart archetypes={ctx.effectiveClustering!.archetype_profiles} />
-    ),
-  },
-  {
-    id: 'cluster-size-distribution',
-    title: 'Cluster Size Distribution',
-    tab: 'analysis',
-    section: 'clustering',
-    description: 'Point count per archetype',
-    isAvailable: (ctx) =>
-      !!ctx.effectiveClustering && ctx.effectiveClustering.archetype_profiles.length > 0,
-    render: (ctx) => <ClusterSizeChart archetypes={ctx.effectiveClustering!.archetype_profiles} />,
+    section: 'comparison',
+    description:
+      'Absolute mean values per zone per indicator (full layer) plus a global-mean reference row.',
+    isAvailable: (ctx) => ctx.filteredStats.length > 0,
+    render: (ctx) => {
+      const stats = ctx.filteredStats;
+      const zones = Array.from(new Set(stats.map((s) => s.zone_name))).sort();
+      const indicators = Array.from(new Set(stats.map((s) => s.indicator_id))).sort();
+      const grid: Record<string, Record<string, number | null>> = {};
+      for (const s of stats) {
+        if (!grid[s.zone_name]) grid[s.zone_name] = {};
+        grid[s.zone_name][s.indicator_id] = s.mean ?? null;
+      }
+      const globalMean: Record<string, number | null> = {};
+      for (const ind of indicators) {
+        const vals = stats
+          .filter((s) => s.indicator_id === ind && s.mean != null)
+          .map((s) => s.mean!);
+        globalMean[ind] = vals.length > 0
+          ? vals.reduce((a, b) => a + b, 0) / vals.length
+          : null;
+      }
+      return (
+        <Box overflowX="auto">
+          <Table size="sm">
+            <Thead>
+              <Tr>
+                <Th>Zone</Th>
+                {indicators.map((ind) => (
+                  <Th key={ind} isNumeric>
+                    <Tooltip label={ind}>
+                      <Text noOfLines={1} maxW="70px">{ind}</Text>
+                    </Tooltip>
+                  </Th>
+                ))}
+              </Tr>
+            </Thead>
+            <Tbody>
+              {zones.map((zone) => (
+                <Tr key={zone}>
+                  <Td fontSize="xs" fontWeight="medium">{zone}</Td>
+                  {indicators.map((ind) => (
+                    <Td key={ind} isNumeric fontSize="xs">
+                      {grid[zone]?.[ind] != null ? grid[zone][ind]!.toFixed(2) : '—'}
+                    </Td>
+                  ))}
+                </Tr>
+              ))}
+              <Tr bg="gray.50" fontWeight="bold">
+                <Td fontSize="xs">Global Mean</Td>
+                {indicators.map((ind) => (
+                  <Td key={ind} isNumeric fontSize="xs">
+                    {globalMean[ind] != null ? globalMean[ind]!.toFixed(2) : '—'}
+                  </Td>
+                ))}
+              </Tr>
+            </Tbody>
+          </Table>
+        </Box>
+      );
+    },
   },
 
-  // ── Correlations + tables ────────────────────────────────────────────────
+  // ── Correlations ─────────────────────────────────────────────────────
   {
     id: 'correlation-heatmap',
-    title: 'Correlation Heatmap',
+    title: 'Indicator Correlation Heatmap',
     tab: 'analysis',
+    section: 'correlation',
     layerAware: true,
+    description:
+      'Pairwise correlation between indicators on the selected layer. Single-zone projects fall back to image-level correlations.',
     isAvailable: (ctx) => !!ctx.correlationData && ctx.correlationData.indicators.length > 0,
     render: (ctx) => {
       const cd = ctx.correlationData!;
       return <CorrelationHeatmap corr={cd.corr} pval={cd.pval} indicators={cd.indicators} />;
     },
   },
-  // ── Per-indicator drill-down ─────────────────────────────────────────────
+
+  // ── Per-indicator detail ─────────────────────────────────────────────
   {
     id: 'indicator-deep-dive',
     title: 'Per-Indicator Deep Dive',
     tab: 'analysis',
-    description: 'Per-indicator histogram, ranking, FG/MG/BG breakdown',
+    section: 'detail',
+    description:
+      'For each indicator: histogram, ranking across zones, and FG/MG/BG breakdown. Layer std/CV columns reuse the global stats from Table M2.',
     isAvailable: (ctx) =>
       !!ctx.zoneAnalysisResult && ctx.zoneAnalysisResult.zone_statistics.length > 0,
     render: (ctx) => {
@@ -297,150 +447,125 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
       );
     },
   },
-
-  // ────────────────────────────────────────────────────────────────────────
-  // v7.0 — New Tables & Figures (Stage 2 Figure & Table Plan)
-  // ────────────────────────────────────────────────────────────────────────
-  {
-    id: 'indicator-registry-table',
-    title: 'Indicator Registry (Table M1)',
-    tab: 'analysis',
-    description: 'What indicators are we analyzing? Metadata-only list.',
-    isAvailable: (ctx) => Object.keys(ctx.indicatorDefs).length > 0,
-    render: (ctx) => {
-      const defs = Object.values(ctx.indicatorDefs);
-      return (
-        <Box overflowX="auto">
-          <Table size="sm">
-            <Thead>
-              <Tr>
-                <Th>ID</Th>
-                <Th>Full Name</Th>
-                <Th>Unit</Th>
-                <Th>Target</Th>
-                <Th>Category</Th>
-                <Th isNumeric>N (Full)</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {defs.map((d) => {
-                const gs = ctx.globalIndicatorStats.find(
-                  (s) => s.indicator_id === d.id,
-                );
-                const fullN = gs?.by_layer?.full?.N ?? '-';
-                return (
-                  <Tr key={d.id}>
-                    <Td fontSize="xs" fontWeight="bold">{d.id}</Td>
-                    <Td fontSize="xs">{d.name}</Td>
-                    <Td fontSize="xs">{d.unit}</Td>
-                    <Td fontSize="xs">{d.target_direction}</Td>
-                    <Td fontSize="xs">{d.category}</Td>
-                    <Td fontSize="xs" isNumeric>{fullN}</Td>
-                  </Tr>
-                );
-              })}
-            </Tbody>
-          </Table>
-        </Box>
-      );
-    },
-  },
-  {
-    id: 'global-stats-table',
-    title: 'Global Descriptive Statistics (Table M2)',
-    tab: 'analysis',
-    description: 'Per-indicator Mean±Std by layer, CV, Shapiro-Wilk, Kruskal-Wallis',
-    isAvailable: (ctx) => ctx.globalIndicatorStats.length > 0,
-    render: (ctx) => <GlobalStatsTable stats={ctx.globalIndicatorStats} />,
-  },
-  {
-    id: 'zone-indicator-matrix',
-    title: 'Zone × Indicator Matrix (Table M3)',
-    tab: 'analysis',
-    description: 'Absolute mean values per zone per indicator (full layer) + global mean row',
-    isAvailable: (ctx) => ctx.filteredStats.length > 0,
-    render: (ctx) => {
-      const stats = ctx.filteredStats;
-      const zones = Array.from(new Set(stats.map((s) => s.zone_name))).sort();
-      const indicators = Array.from(new Set(stats.map((s) => s.indicator_id))).sort();
-      const grid: Record<string, Record<string, number | null>> = {};
-      for (const s of stats) {
-        if (!grid[s.zone_name]) grid[s.zone_name] = {};
-        grid[s.zone_name][s.indicator_id] = s.mean ?? null;
-      }
-      // Global mean row
-      const globalMean: Record<string, number | null> = {};
-      for (const ind of indicators) {
-        const vals = stats
-          .filter((s) => s.indicator_id === ind && s.mean != null)
-          .map((s) => s.mean!);
-        globalMean[ind] = vals.length > 0
-          ? vals.reduce((a, b) => a + b, 0) / vals.length
-          : null;
-      }
-
-      return (
-        <Box overflowX="auto">
-          <Table size="sm">
-            <Thead>
-              <Tr>
-                <Th>Zone</Th>
-                {indicators.map((ind) => (
-                  <Th key={ind} isNumeric>
-                    <Tooltip label={ind}>
-                      <Text noOfLines={1} maxW="70px">{ind}</Text>
-                    </Tooltip>
-                  </Th>
-                ))}
-              </Tr>
-            </Thead>
-            <Tbody>
-              {zones.map((zone) => (
-                <Tr key={zone}>
-                  <Td fontSize="xs" fontWeight="medium">{zone}</Td>
-                  {indicators.map((ind) => (
-                    <Td key={ind} isNumeric fontSize="xs">
-                      {grid[zone]?.[ind] != null
-                        ? grid[zone][ind]!.toFixed(2)
-                        : '-'}
-                    </Td>
-                  ))}
-                </Tr>
-              ))}
-              {/* Global mean row */}
-              <Tr bg="gray.50" fontWeight="bold">
-                <Td fontSize="xs">Global Mean</Td>
-                {indicators.map((ind) => (
-                  <Td key={ind} isNumeric fontSize="xs">
-                    {globalMean[ind] != null ? globalMean[ind]!.toFixed(2) : '-'}
-                  </Td>
-                ))}
-              </Tr>
-            </Tbody>
-          </Table>
-        </Box>
-      );
-    },
-  },
-  {
-    id: 'data-quality-table',
-    title: 'Data Quality Diagnostics (Table M4)',
-    tab: 'analysis',
-    description: 'Images per indicator, FMB coverage, normality, correlation method',
-    isAvailable: (ctx) => ctx.dataQuality.length > 0,
-    render: (ctx) => <DataQualityTable rows={ctx.dataQuality} />,
-  },
   {
     id: 'distribution-violin',
     title: 'Distribution Shape (Fig M1)',
     tab: 'analysis',
-    description: 'Box-whisker per layer for each indicator (image-level values)',
+    section: 'detail',
+    description: 'Box-whisker per layer for each indicator (image-level values).',
     isAvailable: (ctx) => ctx.imageRecords.length > 0,
     render: (ctx) => (
-      <ViolinGrid
-        imageRecords={ctx.imageRecords}
-        indicatorDefs={ctx.indicatorDefs}
+      <ViolinGrid imageRecords={ctx.imageRecords} indicatorDefs={ctx.indicatorDefs} />
+    ),
+  },
+
+  // ── Reference tables ────────────────────────────────────────────────
+  {
+    id: 'global-stats-table',
+    title: 'Global Descriptive Statistics (Table M2)',
+    tab: 'analysis',
+    section: 'tables',
+    description: 'Per-indicator Mean ± Std by layer, CV, Shapiro-Wilk, Kruskal-Wallis.',
+    isAvailable: (ctx) => ctx.globalIndicatorStats.length > 0,
+    render: (ctx) => <GlobalStatsTable stats={ctx.globalIndicatorStats} />,
+  },
+
+  // ── Clustering (folded inside an Accordion in Reports.tsx) ───────────
+  {
+    id: 'silhouette-curve',
+    title: 'Silhouette Score Curve',
+    tab: 'analysis',
+    section: 'clustering',
+    description: 'Silhouette score per K (used to pick optimal cluster count).',
+    isAvailable: (ctx) =>
+      !!ctx.effectiveClustering?.silhouette_scores &&
+      ctx.effectiveClustering.silhouette_scores.length > 1,
+    render: (ctx) => (
+      <SilhouetteCurve
+        scores={ctx.effectiveClustering!.silhouette_scores}
+        bestK={ctx.effectiveClustering!.k}
       />
     ),
   },
+  {
+    id: 'dendrogram',
+    title: 'Ward Hierarchical Clustering',
+    tab: 'analysis',
+    section: 'clustering',
+    description: 'Dendrogram from Ward linkage.',
+    isAvailable: (ctx) =>
+      !!ctx.effectiveClustering?.dendrogram_linkage &&
+      ctx.effectiveClustering.dendrogram_linkage.length > 0,
+    render: (ctx) => <Dendrogram linkage={ctx.effectiveClustering!.dendrogram_linkage} />,
+  },
+  {
+    id: 'cluster-spatial-smoothing',
+    title: 'Cluster Spatial Smoothing',
+    tab: 'analysis',
+    section: 'clustering',
+    description: 'Before/after KNN spatial smoothing comparison (needs GPS).',
+    isAvailable: (ctx) =>
+      !!ctx.effectiveClustering?.point_lats &&
+      ctx.effectiveClustering.point_lats.length > 0 &&
+      !!ctx.effectiveClustering.labels_raw &&
+      ctx.effectiveClustering.labels_raw.length > 0,
+    render: (ctx) => {
+      const cl = ctx.effectiveClustering!;
+      return (
+        <ClusterSpatialBeforeAfter
+          lats={cl.point_lats}
+          lngs={cl.point_lngs}
+          labelsRaw={cl.labels_raw}
+          labelsSmoothed={cl.labels_smoothed}
+          archetypeLabels={Object.fromEntries(
+            cl.archetype_profiles.map((a) => [a.archetype_id, a.archetype_label]),
+          )}
+        />
+      );
+    },
+  },
+  {
+    id: 'archetype-radar',
+    title: 'Archetype Radar Profiles',
+    tab: 'analysis',
+    section: 'clustering',
+    description: 'Z-score radar for each discovered archetype.',
+    isAvailable: (ctx) =>
+      !!ctx.effectiveClustering && ctx.effectiveClustering.archetype_profiles.length > 0,
+    render: (ctx) => (
+      <ArchetypeRadarChart archetypes={ctx.effectiveClustering!.archetype_profiles} />
+    ),
+  },
+  {
+    id: 'cluster-size-distribution',
+    title: 'Cluster Size Distribution',
+    tab: 'analysis',
+    section: 'clustering',
+    description: 'Point count per archetype.',
+    isAvailable: (ctx) =>
+      !!ctx.effectiveClustering && ctx.effectiveClustering.archetype_profiles.length > 0,
+    render: (ctx) => <ClusterSizeChart archetypes={ctx.effectiveClustering!.archetype_profiles} />,
+  },
 ];
+
+// Re-export so consumers can render the section heading next to chart groups.
+export function getDescriptorBySection(
+  section: ChartSection,
+): ChartDescriptor[] {
+  return CHART_REGISTRY.filter((c) => c.section === section);
+}
+
+// Heading helper for Reports.tsx
+export function SectionHeading({ section }: { section: ChartSection }) {
+  const meta = SECTION_META[section];
+  return (
+    <Box mb={2} mt={2}>
+      <Heading size="sm" color="gray.700">
+        {meta.title}
+      </Heading>
+      <Text fontSize="xs" color="gray.500">
+        {meta.subtitle}
+      </Text>
+    </Box>
+  );
+}
