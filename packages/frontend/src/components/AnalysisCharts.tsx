@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Box, Text, SimpleGrid } from '@chakra-ui/react';
+import { Box, Text, SimpleGrid, HStack } from '@chakra-ui/react';
 import {
   RadarChart,
   PolarGrid,
@@ -21,6 +21,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import type { EnrichedZoneStat, ZoneDiagnostic, ArchetypeProfile, UploadedImage, ImageRecord, GlobalIndicatorStats, DataQualityRow, IndicatorDefinitionInput } from '../types';
+import { divergingColor, directionalColor, magnitudeColor } from '../utils/palette';
 
 // Shared color palette for zones
 const ZONE_COLORS = [
@@ -237,9 +238,14 @@ interface CorrelationHeatmapProps {
   corr: Record<string, Record<string, number>>;
   pval?: Record<string, Record<string, number>>;
   indicators: string[];
+  /** 5.10.8 — switch to Cividis when set, default red-blue otherwise. */
+  colorblindMode?: boolean;
 }
 
-function corrColor(val: number): string {
+function corrColor(val: number, colorblindMode = false): string {
+  if (colorblindMode) {
+    return divergingColor(val, true);
+  }
   const intensity = Math.min(Math.abs(val), 1);
   const alpha = 0.15 + intensity * 0.85;
   if (val > 0) return `rgba(49, 130, 206, ${alpha})`;   // blue
@@ -255,7 +261,7 @@ function significanceStars(p: number | undefined): string {
   return '';
 }
 
-export function CorrelationHeatmap({ corr, pval, indicators }: CorrelationHeatmapProps) {
+export function CorrelationHeatmap({ corr, pval, indicators, colorblindMode }: CorrelationHeatmapProps) {
   const n = indicators.length;
   const cellSize = Math.max(36, Math.min(48, 400 / Math.max(n, 1)));
   const labelWidth = 100;
@@ -306,7 +312,7 @@ export function CorrelationHeatmap({ corr, pval, indicators }: CorrelationHeatma
                     width={cellSize - 2}
                     height={cellSize - 2}
                     rx={3}
-                    fill={val != null ? corrColor(val) : '#EDF2F7'}
+                    fill={val != null ? corrColor(val, colorblindMode) : '#EDF2F7'}
                     stroke="#E2E8F0"
                     strokeWidth={0.5}
                   >
@@ -342,11 +348,11 @@ export function CorrelationHeatmap({ corr, pval, indicators }: CorrelationHeatma
 
         {/* Color legend */}
         <g transform={`translate(${labelWidth}, ${svgHeight - 16})`}>
-          <rect width={12} height={12} fill="rgba(229, 62, 62, 0.85)" rx={2} />
+          <rect width={12} height={12} fill={corrColor(-1, colorblindMode)} rx={2} />
           <text x={16} y={10} fontSize={9} fill="#4A5568">-1</text>
-          <rect x={40} width={12} height={12} fill="rgba(160, 174, 192, 0.2)" rx={2} />
+          <rect x={40} width={12} height={12} fill={corrColor(0, colorblindMode)} rx={2} />
           <text x={56} y={10} fontSize={9} fill="#4A5568">0</text>
-          <rect x={72} width={12} height={12} fill="rgba(49, 130, 206, 0.85)" rx={2} />
+          <rect x={72} width={12} height={12} fill={corrColor(1, colorblindMode)} rx={2} />
           <text x={88} y={10} fontSize={9} fill="#4A5568">+1</text>
         </g>
       </svg>
@@ -356,7 +362,12 @@ export function CorrelationHeatmap({ corr, pval, indicators }: CorrelationHeatma
 
 // ─── Z-Score Heatmap (Zone × Indicator) — v6.0 descriptive ─────────────────
 
-function zScoreCellColor(z: number): string {
+function zScoreCellColor(z: number, colorblindMode = false): string {
+  if (colorblindMode) {
+    // Map z to [-1, 1] (clip at ±2 for legibility), then run through Cividis.
+    const t = Math.max(-1, Math.min(1, z / 2));
+    return divergingColor(t, true);
+  }
   // coolwarm-style: neutral center, blue for negative, red for positive
   const absZ = Math.abs(z);
   if (absZ < 0.25) return '#E2E8F0';     // near zero = gray
@@ -375,9 +386,10 @@ function zScoreCellColor(z: number): string {
 interface PriorityHeatmapProps {
   diagnostics: ZoneDiagnostic[];
   layer?: string;
+  colorblindMode?: boolean;
 }
 
-export function PriorityHeatmap({ diagnostics, layer = 'full' }: PriorityHeatmapProps) {
+export function PriorityHeatmap({ diagnostics, layer = 'full', colorblindMode }: PriorityHeatmapProps) {
   const { zones, indicators, grid } = useMemo(() => {
     const zoneList = diagnostics.map(d => d.zone_name);
     const indSet = new Set<string>();
@@ -450,7 +462,7 @@ export function PriorityHeatmap({ diagnostics, layer = 'full' }: PriorityHeatmap
                     width={cellW - 2}
                     height={cellH - 2}
                     rx={3}
-                    fill={zScoreCellColor(zs)}
+                    fill={zScoreCellColor(zs, colorblindMode)}
                     opacity={0.85}
                   >
                     <title>{`${zone} x ${ind}: z=${zs.toFixed(2)}`}</title>
@@ -1187,27 +1199,15 @@ interface ValueSpatialMapProps {
   layer?: 'full' | 'foreground' | 'middleground' | 'background';
   /** INCREASE = green-better, DECREASE = red-better, NEUTRAL = blue. */
   targetDirection?: string;
+  colorblindMode?: boolean;
 }
 
-function gradientForDirection(t: number, dir: string): string {
-  const clamped = Math.max(0, Math.min(1, t));
-  const palettes: Record<string, [number, number, number][]> = {
-    INCREASE: [[247, 252, 245], [116, 196, 118], [0, 90, 50]],
-    DECREASE: [[255, 245, 240], [251, 106, 74], [165, 15, 21]],
-    NEUTRAL:  [[247, 251, 255], [107, 174, 214], [8, 48, 107]],
-  };
-  const stops = palettes[dir] || palettes.NEUTRAL;
-  const seg = clamped * (stops.length - 1);
-  const i0 = Math.floor(seg), i1 = Math.min(stops.length - 1, i0 + 1);
-  const f = seg - i0;
-  const r = Math.round(stops[i0][0] * (1 - f) + stops[i1][0] * f);
-  const g = Math.round(stops[i0][1] * (1 - f) + stops[i1][1] * f);
-  const b = Math.round(stops[i0][2] * (1 - f) + stops[i1][2] * f);
-  return `rgb(${r},${g},${b})`;
+function gradientForDirection(t: number, dir: string, colorblindMode = false): string {
+  return directionalColor(t, dir, colorblindMode);
 }
 
 export function ValueSpatialMap({
-  gpsImages, indicatorId, layer = 'full', targetDirection = 'NEUTRAL',
+  gpsImages, indicatorId, layer = 'full', targetDirection = 'NEUTRAL', colorblindMode,
 }: ValueSpatialMapProps) {
   const points = useMemo(() => {
     const suffix = LAYER_DEFS.find(l => l.key === layer)?.suffix ?? '';
@@ -1256,7 +1256,7 @@ export function ValueSpatialMap({
             const t = (p.value - p5) / valRange;
             return (
               <circle key={i} cx={toX(p.lng)} cy={toY(p.lat)} r={4.5}
-                fill={gradientForDirection(t, targetDirection)} stroke="#fff" strokeWidth={0.6} opacity={0.9}>
+                fill={gradientForDirection(t, targetDirection, colorblindMode)} stroke="#fff" strokeWidth={0.6} opacity={0.9}>
                 <title>{`${p.label}: ${p.value.toFixed(3)}`}</title>
               </circle>
             );
@@ -1264,9 +1264,9 @@ export function ValueSpatialMap({
           {/* Gradient legend */}
           <defs>
             <linearGradient id={`val-${indicatorId}-${layer}`} x1="0" x2="1">
-              <stop offset="0%" stopColor={gradientForDirection(0, targetDirection)} />
-              <stop offset="50%" stopColor={gradientForDirection(0.5, targetDirection)} />
-              <stop offset="100%" stopColor={gradientForDirection(1, targetDirection)} />
+              <stop offset="0%" stopColor={gradientForDirection(0, targetDirection, colorblindMode)} />
+              <stop offset="50%" stopColor={gradientForDirection(0.5, targetDirection, colorblindMode)} />
+              <stop offset="100%" stopColor={gradientForDirection(1, targetDirection, colorblindMode)} />
             </linearGradient>
           </defs>
           <rect x={margin.l + 4} y={6} width={120} height={8}
@@ -1285,24 +1285,12 @@ export function ValueSpatialMap({
 interface CrossIndicatorSpatialMapsProps {
   gpsImages: UploadedImage[];
   indicatorIds: string[];
+  colorblindMode?: boolean;
 }
 
-/** YlOrRd-ish gradient: yellow → orange → red. `t` in [0, 1]. */
-function ylOrRdColor(t: number): string {
-  const clamped = Math.max(0, Math.min(1, t));
-  const stops = [
-    [255, 255, 178], // yellow
-    [253, 141, 60],  // orange
-    [189, 0, 38],    // red
-  ];
-  const seg = clamped * (stops.length - 1);
-  const i0 = Math.floor(seg);
-  const i1 = Math.min(stops.length - 1, i0 + 1);
-  const f = seg - i0;
-  const r = Math.round(stops[i0][0] * (1 - f) + stops[i1][0] * f);
-  const g = Math.round(stops[i0][1] * (1 - f) + stops[i1][1] * f);
-  const b = Math.round(stops[i0][2] * (1 - f) + stops[i1][2] * f);
-  return `rgb(${r},${g},${b})`;
+/** YlOrRd → Viridis when colorblindMode is on. `t` in [0, 1]. */
+function ylOrRdColor(t: number, colorblindMode = false): string {
+  return magnitudeColor(t, colorblindMode);
 }
 
 const CATEGORICAL_PALETTE = [
@@ -1324,6 +1312,7 @@ function renderCrossScatter(
   mode: 'gradient' | 'categorical',
   getColor: (p: CrossPoint) => string,
   valueFn: (p: CrossPoint) => string,
+  colorblindMode = false,
 ) {
   if (points.length === 0) return null;
   const svgW = 340;
@@ -1357,9 +1346,9 @@ function renderCrossScatter(
         <>
           <defs>
             <linearGradient id={`ylOrRd-${points.length}`} x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stopColor={ylOrRdColor(0)} />
-              <stop offset="50%" stopColor={ylOrRdColor(0.5)} />
-              <stop offset="100%" stopColor={ylOrRdColor(1)} />
+              <stop offset="0%" stopColor={ylOrRdColor(0, colorblindMode)} />
+              <stop offset="50%" stopColor={ylOrRdColor(0.5, colorblindMode)} />
+              <stop offset="100%" stopColor={ylOrRdColor(1, colorblindMode)} />
             </linearGradient>
           </defs>
           <rect x={margin.l + plotW - 110} y={margin.t + 4} width={90} height={8} fill={`url(#ylOrRd-${points.length})`} rx={2} />
@@ -1371,7 +1360,7 @@ function renderCrossScatter(
   );
 }
 
-export function CrossIndicatorSpatialMaps({ gpsImages, indicatorIds }: CrossIndicatorSpatialMapsProps) {
+export function CrossIndicatorSpatialMaps({ gpsImages, indicatorIds, colorblindMode }: CrossIndicatorSpatialMapsProps) {
   // Compute only for full layer (aggregated view — per-layer breakdown in Deep Dive)
   const points = useMemo(() => {
     // Mean/std per indicator across all GPS points (full layer)
@@ -1458,8 +1447,9 @@ export function CrossIndicatorSpatialMaps({ gpsImages, indicatorIds }: CrossIndi
           {renderCrossScatter(
             points,
             'gradient',
-            p => ylOrRdColor(p.meanAbsZ / 2),
+            p => ylOrRdColor(p.meanAbsZ / 2, colorblindMode),
             p => `Mean |Z| = ${p.meanAbsZ.toFixed(3)}`,
+            colorblindMode,
           )}
         </Box>
         <Box>

@@ -106,6 +106,12 @@ interface AppState {
   hiddenChartIds: string[];
   toggleChart: (id: string) => void;
   resetCharts: () => void;
+
+  // Reports-page reading preferences (5.10.4 + 5.10.8)
+  showAiSummary: boolean;
+  setShowAiSummary: (v: boolean) => void;
+  colorblindMode: boolean;
+  setColorblindMode: (v: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -285,6 +291,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         : [...state.hiddenChartIds, id],
     })),
   resetCharts: () => set({ hiddenChartIds: [] }),
+
+  // Reports preferences (persisted)
+  showAiSummary: true,
+  setShowAiSummary: (v) => set({ showAiSummary: v }),
+  colorblindMode: false,
+  setColorblindMode: (v) => set({ colorblindMode: v }),
 }), {
   name: 'scenerx-store',
   partialize: (state) => ({
@@ -313,6 +325,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     aiReport: state.aiReport,
     aiReportMeta: state.aiReportMeta,
     hiddenChartIds: state.hiddenChartIds,
+    showAiSummary: state.showAiSummary,
+    colorblindMode: state.colorblindMode,
   }),
 }));
 

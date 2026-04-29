@@ -238,7 +238,13 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     description:
       'Z-score grid: rows = zones, columns = indicators (full layer). Red = above mean, blue = below.',
     isAvailable: (ctx) => ctx.sortedDiagnostics.length > 0,
-    render: (ctx) => <PriorityHeatmap diagnostics={ctx.sortedDiagnostics} layer="full" />,
+    render: (ctx) => (
+      <PriorityHeatmap
+        diagnostics={ctx.sortedDiagnostics}
+        layer="full"
+        colorblindMode={ctx.colorblindMode}
+      />
+    ),
   },
 
   // ── Spatial (3-tab combo replacing former 3 separate cards) ──────────
@@ -290,6 +296,7 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
                     indicatorId={ind}
                     layer={ctx.selectedLayer as 'full' | 'foreground' | 'middleground' | 'background'}
                     targetDirection={defs[ind]?.target_direction}
+                    colorblindMode={ctx.colorblindMode}
                   />
                 ))}
               </SimpleGrid>
@@ -302,6 +309,7 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
               <CrossIndicatorSpatialMaps
                 gpsImages={ctx.gpsImages}
                 indicatorIds={ctx.gpsIndicatorIds}
+                colorblindMode={ctx.colorblindMode}
               />
             </TabPanel>
           </TabPanels>
@@ -421,7 +429,14 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     isAvailable: (ctx) => !!ctx.correlationData && ctx.correlationData.indicators.length > 0,
     render: (ctx) => {
       const cd = ctx.correlationData!;
-      return <CorrelationHeatmap corr={cd.corr} pval={cd.pval} indicators={cd.indicators} />;
+      return (
+        <CorrelationHeatmap
+          corr={cd.corr}
+          pval={cd.pval}
+          indicators={cd.indicators}
+          colorblindMode={ctx.colorblindMode}
+        />
+      );
     },
     summaryPayload: (ctx) => {
       const cd = ctx.correlationData;

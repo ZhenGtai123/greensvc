@@ -60,6 +60,7 @@ import { buildChartContext } from '../components/analysisCharts/ChartContext';
 import { ModeAlert } from '../components/analysisCharts/ModeAlert';
 import { DataQualitySummary } from '../components/analysisCharts/DataQualitySummary';
 import { LayerSelector, LAYER_OPTIONS } from '../components/analysisCharts/LayerSelector';
+import { AnalysisConfidenceGauge } from '../components/analysisCharts/AnalysisConfidenceGauge';
 import { GlossaryDrawer } from '../components/GlossaryDrawer';
 import type { ReportRequest, ZoneDiagnostic, ZoneDesignOutput, ClusteringResponse } from '../types';
 
@@ -210,6 +211,10 @@ function Reports() {
     hiddenChartIds,
     toggleChart,
     resetCharts,
+    showAiSummary,
+    setShowAiSummary,
+    colorblindMode,
+    setColorblindMode,
   } = useAppStore();
 
   const projectName = currentProject?.project_name || pipelineResult?.project_name || 'Unknown Project';
@@ -380,8 +385,9 @@ function Reports() {
         clusteringResult,
         currentProject: currentProject ?? null,
         selectedLayer,
+        colorblindMode,
       }),
-    [zoneAnalysisResult, pipelineResult, clusteringResult, currentProject, selectedLayer],
+    [zoneAnalysisResult, pipelineResult, clusteringResult, currentProject, selectedLayer, colorblindMode],
   );
 
   // Compact project context handed to chart-summary requests so LLM grounding
@@ -664,6 +670,10 @@ function Reports() {
               hiddenIds={hiddenChartIds}
               onToggle={toggleChart}
               onReset={resetCharts}
+              showAiSummary={showAiSummary}
+              onShowAiSummaryChange={setShowAiSummary}
+              colorblindMode={colorblindMode}
+              onColorblindModeChange={setColorblindMode}
             />
           )}
           <Tooltip label="Readable report with zone diagnostics, correlations, and design strategies" placement="bottom" hasArrow>
@@ -752,7 +762,7 @@ function Reports() {
             <Card mb={6} borderColor={aiReport ? 'purple.300' : 'gray.200'} borderWidth={aiReport ? 2 : 1} overflow="hidden">
               <CardHeader>
                 <VStack align="stretch" spacing={3}>
-                  <HStack spacing={2}>
+                  <HStack spacing={2} flexWrap="wrap">
                     <Icon as={Sparkles} color="purple.500" boxSize={5} />
                     <Heading size="md">AI Report</Heading>
                     {!aiReport && <Badge colorScheme="gray" variant="subtle">Not generated</Badge>}
@@ -761,6 +771,15 @@ function Reports() {
                         {String(aiReportMeta.word_count || '?')} words
                       </Badge>
                     )}
+                    <Box flex="1" />
+                    <AnalysisConfidenceGauge
+                      ctx={chartCtx}
+                      aiReportWordCount={
+                        aiReportMeta?.word_count != null
+                          ? Number(aiReportMeta.word_count)
+                          : null
+                      }
+                    />
                   </HStack>
                   <HStack spacing={2} flexWrap="wrap">
                     <Button
@@ -913,6 +932,7 @@ function Reports() {
                                 onHide={toggleChart}
                                 projectId={routeProjectId ?? null}
                                 projectContext={chartProjectContext}
+                                showAiSummary={showAiSummary}
                               />
                             ))}
                           </VStack>
@@ -989,6 +1009,7 @@ function Reports() {
                                 onHide={toggleChart}
                                 projectId={routeProjectId ?? null}
                                 projectContext={chartProjectContext}
+                                showAiSummary={showAiSummary}
                               />
                             ))}
                           </VStack>
