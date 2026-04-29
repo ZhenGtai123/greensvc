@@ -749,6 +749,10 @@ interface IndicatorDeepDiveProps {
   indicatorName?: string;
   unit?: string;
   targetDirection?: string;
+  /** When `image_level`, fall back to image-level Std/CV from globalStats. */
+  analysisMode?: 'zone_level' | 'image_level';
+  /** Per-indicator image-level stats (n=images, has by_layer.{N,Mean,Std}). */
+  globalStats?: GlobalIndicatorStats;
 }
 
 const DD_LAYERS = ['full', 'foreground', 'middleground', 'background'] as const;
@@ -774,7 +778,7 @@ function viridisColor(t: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-export function IndicatorDeepDive({ stats, indicatorId, indicatorName, unit, targetDirection }: IndicatorDeepDiveProps) {
+export function IndicatorDeepDive({ stats, indicatorId, indicatorName, unit, targetDirection, analysisMode, globalStats }: IndicatorDeepDiveProps) {
   const derived = useMemo(() => {
     const indStats = stats.filter(s => s.indicator_id === indicatorId);
     if (indStats.length === 0) return null;
@@ -797,23 +801,40 @@ export function IndicatorDeepDive({ stats, indicatorId, indicatorName, unit, tar
     const maxV = fullEntries.length > 0 ? Math.max(...fullEntries.map(e => e.value)) : 0;
     const minV = fullEntries.length > 0 ? Math.min(...fullEntries.map(e => e.value)) : 0;
 
-    // Layer statistics (aggregated across zones)
+    // Layer statistics. With < 2 zones, the cross-zone std/cv collapse to 0
+    // mathematically — fall back to image-level Std/CV (n = n_images) which
+    // captures the meaningful within-zone dispersion.
+    const useImageLevel = analysisMode === 'image_level' || zoneList.length < 2;
     const layerStats = DD_LAYERS.map(layer => {
+      if (useImageLevel && globalStats) {
+        const layerEntry = globalStats.by_layer?.[layer];
+        if (layerEntry?.N != null && layerEntry.N > 0) {
+          const mean = layerEntry.Mean ?? 0;
+          const std = layerEntry.Std ?? 0;
+          const cv = layer === 'full' && globalStats.cv_full != null
+            ? globalStats.cv_full
+            : (mean !== 0 ? (std / Math.abs(mean)) * 100 : 0);
+          return { layer, n: layerEntry.N, mean, std, cv };
+        }
+      }
       const vals = zoneList.map(z => getVal(z.id, layer)).filter((v): v is number => v != null);
       if (vals.length === 0) return { layer, n: 0, mean: 0, std: 0, cv: 0 };
       const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-      const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
+      // ddof=1 (sample std) so a single value yields NaN, not 0.
+      if (vals.length < 2) return { layer, n: vals.length, mean, std: NaN, cv: NaN };
+      const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / (vals.length - 1);
       const std = Math.sqrt(variance);
       const cv = mean !== 0 ? (std / Math.abs(mean)) * 100 : 0;
       return { layer, n: vals.length, mean, std, cv };
     });
 
-    return { fullEntries, maxV, minV, layerStats };
-  }, [stats, indicatorId]);
+    return { fullEntries, maxV, minV, layerStats, useImageLevel };
+  }, [stats, indicatorId, analysisMode, globalStats]);
 
   if (!derived) return null;
-  const { fullEntries, maxV, minV, layerStats } = derived;
+  const { fullEntries, maxV, minV, layerStats, useImageLevel } = derived;
   const range = maxV - minV || 1;
+  const fmt = (v: number, digits: number) => (Number.isFinite(v) ? v.toFixed(digits) : '—');
 
   return (
     <Box>
@@ -865,7 +886,14 @@ export function IndicatorDeepDive({ stats, indicatorId, indicatorName, unit, tar
 
         {/* Layer Statistics table */}
         <Box>
-          <Text fontSize="xs" fontWeight="bold" mb={1}>Layer Statistics</Text>
+          <HStack justify="space-between" mb={1}>
+            <Text fontSize="xs" fontWeight="bold">Layer Statistics</Text>
+            {useImageLevel && (
+              <Text fontSize="2xs" color="gray.500">
+                (image-level, n = {layerStats.find(l => l.layer === 'full')?.n ?? '?'})
+              </Text>
+            )}
+          </HStack>
           <Box as="table" fontSize="10px" width="100%" sx={{ borderCollapse: 'collapse' }}>
             <Box as="thead">
               <Box as="tr" bg="gray.50" fontWeight="bold">
@@ -883,9 +911,9 @@ export function IndicatorDeepDive({ stats, indicatorId, indicatorName, unit, tar
                     {DD_LAYER_LABELS[ls.layer]}
                   </Box>
                   <Box as="td" px={2} py={1} textAlign="right">{ls.n}</Box>
-                  <Box as="td" px={2} py={1} textAlign="right">{ls.mean.toFixed(3)}</Box>
-                  <Box as="td" px={2} py={1} textAlign="right">{ls.std.toFixed(3)}</Box>
-                  <Box as="td" px={2} py={1} textAlign="right">{ls.cv.toFixed(1)}</Box>
+                  <Box as="td" px={2} py={1} textAlign="right">{fmt(ls.mean, 3)}</Box>
+                  <Box as="td" px={2} py={1} textAlign="right">{fmt(ls.std, 3)}</Box>
+                  <Box as="td" px={2} py={1} textAlign="right">{fmt(ls.cv, 1)}</Box>
                 </Box>
               ))}
             </Box>
@@ -1072,87 +1100,179 @@ const LAYER_SCATTER_COLORS: Record<string, string> = {
 };
 
 export function SpatialScatterByLayer({ gpsImages, indicatorId }: SpatialScatterByLayerProps) {
-  // Collect points across all layers into one dataset
-  const allPoints = useMemo(() => {
-    const pts: { lat: number; lng: number; value: number; label: string; layerKey: string; layerLabel: string }[] = [];
+  // Per-layer point sets. With identical (lat,lng) across the 4 layers, an
+  // overlaid single-canvas rendering hides every layer except the last drawn —
+  // small multiples (one canvas per layer) removes the occlusion entirely.
+  const layered = useMemo(() => {
+    type Pt = { lat: number; lng: number; value: number; label: string };
+    const out: Record<string, Pt[]> = { full: [], foreground: [], middleground: [], background: [] };
     for (const l of LAYER_DEFS) {
       const key = l.suffix ? `${indicatorId}${l.suffix}` : indicatorId;
       for (const img of gpsImages) {
         const v = img.metrics_results[key];
         if (v != null && img.latitude != null && img.longitude != null) {
-          pts.push({
-            lat: img.latitude,
-            lng: img.longitude,
-            value: v,
-            label: `${img.zone_id || img.filename} [${l.label}]`,
-            layerKey: l.key,
-            layerLabel: l.label,
+          out[l.key].push({
+            lat: img.latitude, lng: img.longitude, value: v,
+            label: `${img.zone_id || img.filename}`,
           });
         }
       }
     }
-    return pts;
+    return out;
   }, [gpsImages, indicatorId]);
 
-  if (allPoints.length === 0) return null;
+  // Shared lat/lng extent so all 4 panels align.
+  const allPts = useMemo(
+    () => Object.values(layered).flat(),
+    [layered],
+  );
+  if (allPts.length === 0) return null;
 
-  const svgW = 500;
-  const svgH = 360;
-  const margin = { l: 56, r: 16, t: 20, b: 44 };
-  const plotW = svgW - margin.l - margin.r;
-  const plotH = svgH - margin.t - margin.b;
-
-  const lngs = allPoints.map(p => p.lng);
-  const lats = allPoints.map(p => p.lat);
+  const lngs = allPts.map(p => p.lng);
+  const lats = allPts.map(p => p.lat);
   const lngMin = Math.min(...lngs), lngMax = Math.max(...lngs);
   const latMin = Math.min(...lats), latMax = Math.max(...lats);
   const lngRange = lngMax - lngMin || 0.001;
   const latRange = latMax - latMin || 0.001;
 
+  const svgW = 280, svgH = 220;
+  const margin = { l: 38, r: 10, t: 22, b: 28 };
+  const plotW = svgW - margin.l - margin.r;
+  const plotH = svgH - margin.t - margin.b;
   const toX = (lng: number) => margin.l + ((lng - lngMin) / lngRange) * plotW;
   const toY = (lat: number) => margin.t + plotH - ((lat - latMin) / latRange) * plotH;
-
-  // Count per layer for legend
-  const layerCounts: Record<string, number> = {};
-  for (const p of allPoints) layerCounts[p.layerKey] = (layerCounts[p.layerKey] || 0) + 1;
-
-  // Render order: full first (bottom), then BG, MG, FG on top
-  const renderOrder = ['full', 'background', 'middleground', 'foreground'];
 
   return (
     <Box>
       <Text fontSize="sm" fontWeight="bold" mb={2}>{indicatorId}</Text>
+      <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={2}>
+        {LAYER_DEFS.map(l => {
+          const pts = layered[l.key];
+          const color = LAYER_SCATTER_COLORS[l.key] || '#A0AEC0';
+          return (
+            <Box key={l.key} borderWidth={1} borderColor="gray.200" borderRadius="md" p={1}>
+              <svg width={svgW} height={svgH} style={{ fontFamily: 'system-ui, sans-serif' }}>
+                <text x={svgW / 2} y={14} textAnchor="middle" fontSize={10} fontWeight="bold" fill={color}>
+                  {l.label} (n={pts.length})
+                </text>
+                <line x1={margin.l} y1={margin.t} x2={margin.l} y2={margin.t + plotH} stroke="#CBD5E0" />
+                <line x1={margin.l} y1={margin.t + plotH} x2={margin.l + plotW} y2={margin.t + plotH} stroke="#CBD5E0" />
+                {pts.map((p, i) => (
+                  <circle key={i} cx={toX(p.lng)} cy={toY(p.lat)} r={3.5}
+                    fill={color} stroke="#fff" strokeWidth={0.5} opacity={0.85}>
+                    <title>{`${p.label}: ${p.value.toFixed(3)}`}</title>
+                  </circle>
+                ))}
+              </svg>
+            </Box>
+          );
+        })}
+      </SimpleGrid>
+    </Box>
+  );
+}
+
+// ─── Per-Indicator Value Spatial Distribution (Issue 4d) ───────────────────
+// A heatmap over GPS points colored by indicator VALUE (not layer, not z).
+// Complements:
+//   • Fig 7 (Layer Coverage): "where does each layer have data?"
+//   • Fig 8 (Z-Deviation):    "where does the indicator deviate from mean?"
+//   • Value Heatmap:          "where is the indicator value high vs. low?"
+// Especially useful for single-zone projects where the z-based views collapse.
+
+interface ValueSpatialMapProps {
+  gpsImages: UploadedImage[];
+  indicatorId: string;
+  /** Which layer's value to display (default 'full'). */
+  layer?: 'full' | 'foreground' | 'middleground' | 'background';
+  /** INCREASE = green-better, DECREASE = red-better, NEUTRAL = blue. */
+  targetDirection?: string;
+}
+
+function gradientForDirection(t: number, dir: string): string {
+  const clamped = Math.max(0, Math.min(1, t));
+  const palettes: Record<string, [number, number, number][]> = {
+    INCREASE: [[247, 252, 245], [116, 196, 118], [0, 90, 50]],
+    DECREASE: [[255, 245, 240], [251, 106, 74], [165, 15, 21]],
+    NEUTRAL:  [[247, 251, 255], [107, 174, 214], [8, 48, 107]],
+  };
+  const stops = palettes[dir] || palettes.NEUTRAL;
+  const seg = clamped * (stops.length - 1);
+  const i0 = Math.floor(seg), i1 = Math.min(stops.length - 1, i0 + 1);
+  const f = seg - i0;
+  const r = Math.round(stops[i0][0] * (1 - f) + stops[i1][0] * f);
+  const g = Math.round(stops[i0][1] * (1 - f) + stops[i1][1] * f);
+  const b = Math.round(stops[i0][2] * (1 - f) + stops[i1][2] * f);
+  return `rgb(${r},${g},${b})`;
+}
+
+export function ValueSpatialMap({
+  gpsImages, indicatorId, layer = 'full', targetDirection = 'NEUTRAL',
+}: ValueSpatialMapProps) {
+  const points = useMemo(() => {
+    const suffix = LAYER_DEFS.find(l => l.key === layer)?.suffix ?? '';
+    const key = suffix ? `${indicatorId}${suffix}` : indicatorId;
+    const pts: { lat: number; lng: number; value: number; label: string }[] = [];
+    for (const img of gpsImages) {
+      const v = img.metrics_results[key];
+      if (v != null && img.latitude != null && img.longitude != null) {
+        pts.push({ lat: img.latitude, lng: img.longitude, value: v, label: img.filename });
+      }
+    }
+    return pts;
+  }, [gpsImages, indicatorId, layer]);
+
+  if (points.length === 0) return null;
+
+  // Robust value range using p5/p95 to avoid outliers compressing the gradient.
+  const vals = [...points.map(p => p.value)].sort((a, b) => a - b);
+  const p5 = vals[Math.floor(vals.length * 0.05)] ?? vals[0];
+  const p95 = vals[Math.floor(vals.length * 0.95)] ?? vals[vals.length - 1];
+  const valRange = p95 - p5 || 1;
+
+  const svgW = 360, svgH = 260;
+  const margin = { l: 50, r: 16, t: 28, b: 38 };
+  const plotW = svgW - margin.l - margin.r;
+  const plotH = svgH - margin.t - margin.b;
+  const lngs = points.map(p => p.lng), lats = points.map(p => p.lat);
+  const lngMin = Math.min(...lngs), lngMax = Math.max(...lngs);
+  const latMin = Math.min(...lats), latMax = Math.max(...lats);
+  const lngRange = lngMax - lngMin || 0.001;
+  const latRange = latMax - latMin || 0.001;
+  const toX = (lng: number) => margin.l + ((lng - lngMin) / lngRange) * plotW;
+  const toY = (lat: number) => margin.t + plotH - ((lat - latMin) / latRange) * plotH;
+
+  return (
+    <Box>
+      <Text fontSize="sm" fontWeight="bold" mb={1}>{indicatorId}</Text>
+      <Text fontSize="xs" color="gray.500" mb={1}>
+        Color = indicator value ({layer} layer · {targetDirection.toLowerCase()} = better-darker · range p5–p95)
+      </Text>
       <Box overflowX="auto">
         <svg width={svgW} height={svgH} style={{ fontFamily: 'system-ui, sans-serif' }}>
           <line x1={margin.l} y1={margin.t} x2={margin.l} y2={margin.t + plotH} stroke="#CBD5E0" />
           <line x1={margin.l} y1={margin.t + plotH} x2={margin.l + plotW} y2={margin.t + plotH} stroke="#CBD5E0" />
-          <text x={svgW / 2} y={svgH - 5} textAnchor="middle" fontSize={10} fill="#718096">Longitude</text>
-          <text x={12} y={svgH / 2} textAnchor="middle" fontSize={10} fill="#718096" transform={`rotate(-90, 12, ${svgH / 2})`}>Latitude</text>
-          {renderOrder.map(layerKey =>
-            allPoints
-              .filter(p => p.layerKey === layerKey)
-              .map((p, i) => (
-                <circle
-                  key={`${layerKey}-${i}`}
-                  cx={toX(p.lng)}
-                  cy={toY(p.lat)}
-                  r={5.5}
-                  fill={LAYER_SCATTER_COLORS[layerKey] || '#A0AEC0'}
-                  stroke="#fff"
-                  strokeWidth={0.8}
-                  opacity={0.8}
-                >
-                  <title>{`${p.label}: ${p.value.toFixed(3)}`}</title>
-                </circle>
-              ))
-          )}
-          {/* Layer legend */}
-          {LAYER_DEFS.filter(l => layerCounts[l.key]).map((l, i) => (
-            <g key={l.key} transform={`translate(${margin.l + 8}, ${margin.t + 8 + i * 18})`}>
-              <circle cx={6} cy={0} r={5} fill={LAYER_SCATTER_COLORS[l.key]} stroke="#fff" strokeWidth={0.8} opacity={0.8} />
-              <text x={16} y={4} fontSize={9} fill="#4A5568">{l.label} (n={layerCounts[l.key]})</text>
-            </g>
-          ))}
+          {points.map((p, i) => {
+            const t = (p.value - p5) / valRange;
+            return (
+              <circle key={i} cx={toX(p.lng)} cy={toY(p.lat)} r={4.5}
+                fill={gradientForDirection(t, targetDirection)} stroke="#fff" strokeWidth={0.6} opacity={0.9}>
+                <title>{`${p.label}: ${p.value.toFixed(3)}`}</title>
+              </circle>
+            );
+          })}
+          {/* Gradient legend */}
+          <defs>
+            <linearGradient id={`val-${indicatorId}-${layer}`} x1="0" x2="1">
+              <stop offset="0%" stopColor={gradientForDirection(0, targetDirection)} />
+              <stop offset="50%" stopColor={gradientForDirection(0.5, targetDirection)} />
+              <stop offset="100%" stopColor={gradientForDirection(1, targetDirection)} />
+            </linearGradient>
+          </defs>
+          <rect x={margin.l + 4} y={6} width={120} height={8}
+            fill={`url(#val-${indicatorId}-${layer})`} rx={2} />
+          <text x={margin.l + 2} y={20} fontSize={8} fill="#718096">{p5.toFixed(2)}</text>
+          <text x={margin.l + 124} y={20} textAnchor="end" fontSize={8} fill="#718096">{p95.toFixed(2)}</text>
         </svg>
       </Box>
     </Box>

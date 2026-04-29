@@ -10,6 +10,7 @@ import {
   Th,
   Td,
   Tooltip,
+  SimpleGrid,
 } from '@chakra-ui/react';
 import {
   RadarProfileChart,
@@ -23,6 +24,7 @@ import {
   SilhouetteCurve,
   IndicatorDeepDive,
   CrossIndicatorSpatialMaps,
+  ValueSpatialMap,
   Dendrogram,
   ClusterSpatialBeforeAfter,
   // v7.0
@@ -89,10 +91,11 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
   },
   {
     id: 'spatial-distribution-by-layer',
-    title: 'Spatial Distribution — All Layers (Fig 7)',
+    title: 'Layer Coverage Map per Indicator',
     tab: 'analysis',
     section: 'zone',
-    description: 'Combined spatial scatter per indicator, color-coded by layer (needs GPS)',
+    description:
+      'Per indicator, four small maps (Full/FG/MG/BG) showing where each layer has data. Color encodes the layer, NOT the indicator value — see Value Heatmap for value-based coloring.',
     isAvailable: (ctx) => ctx.gpsImages.length > 0 && ctx.gpsIndicatorIds.length > 0,
     render: (ctx) => (
       <VStack align="stretch" spacing={6}>
@@ -101,6 +104,31 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
         ))}
       </VStack>
     ),
+  },
+  {
+    id: 'value-spatial-distribution',
+    title: 'Value Heatmap per Indicator',
+    tab: 'analysis',
+    section: 'zone',
+    description:
+      'Per indicator, GPS points colored by the raw indicator value (full layer). Direction-aware gradient: INCREASE indicators darken when higher, DECREASE indicators darken when lower.',
+    isAvailable: (ctx) => ctx.gpsImages.length > 0 && ctx.gpsIndicatorIds.length > 0,
+    render: (ctx) => {
+      const defs = ctx.zoneAnalysisResult?.indicator_definitions || {};
+      return (
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+          {ctx.gpsIndicatorIds.map((ind) => (
+            <ValueSpatialMap
+              key={ind}
+              gpsImages={ctx.gpsImages}
+              indicatorId={ind}
+              layer="full"
+              targetDirection={defs[ind]?.target_direction}
+            />
+          ))}
+        </SimpleGrid>
+      );
+    },
   },
   {
     id: 'cross-indicator-spatial-maps',
@@ -241,6 +269,9 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
       const za = ctx.zoneAnalysisResult!;
       const indIds = Array.from(new Set(za.zone_statistics.map((s) => s.indicator_id))).sort();
       const indDefs = za.indicator_definitions || {};
+      const globalStatsByInd = new Map(
+        ctx.globalIndicatorStats.map((s) => [s.indicator_id, s]),
+      );
       return (
         <VStack
           align="stretch"
@@ -257,6 +288,8 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
                 indicatorName={def?.name}
                 unit={def?.unit}
                 targetDirection={def?.target_direction}
+                analysisMode={ctx.analysisMode}
+                globalStats={globalStatsByInd.get(ind)}
               />
             );
           })}

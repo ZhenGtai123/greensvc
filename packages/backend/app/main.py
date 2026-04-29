@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
 from app.db.project_store import init_project_store, get_project_store
-from app.api.routes import health, config, metrics, projects, vision, indicators, tasks, auth, analysis
+from app.api.routes import health, config, metrics, projects, vision, indicators, tasks, auth, analysis, encoding
 
 # Configure logging
 logging.basicConfig(
@@ -115,6 +115,11 @@ def create_app() -> FastAPI:
         analysis.router,
         prefix="/api/analysis",
         tags=["Analysis Pipeline"],
+    )
+    app.include_router(
+        encoding.router,
+        prefix="/api/encoding",
+        tags=["Encoding Dictionary"],
     )
 
     # Serve uploaded images as static files

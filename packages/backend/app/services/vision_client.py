@@ -29,7 +29,7 @@ class VisionModelClient:
     ):
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
-        self._health_cache: Optional[bool] = None
+        self._health_info_cache: Optional[dict] = None
         self._health_cache_time: float = 0
         self._config_cache: Optional[dict] = None
         # Per-class RGB mapping loaded from Semantic_configuration.json.
@@ -131,24 +131,35 @@ class VisionModelClient:
 
     async def check_health(self) -> bool:
         """Check API health status with caching"""
-        current_time = time.time()
-        if self._health_cache is not None and current_time - self._health_cache_time < 5:
-            return self._health_cache
+        info = await self.get_health_info()
+        return info is not None and info.get("status") == "healthy"
 
+    async def get_health_info(self) -> Optional[dict]:
+        """Fetch the full /health payload (cached for 5s).
+
+        Returns the Vision API's health JSON which includes GPU info,
+        currently loaded depth model, and the list of available models.
+        Returns None if the Vision API is unreachable.
+        """
+        current_time = time.time()
+        if (
+            self._health_info_cache is not None
+            and current_time - self._health_cache_time < 5
+        ):
+            return self._health_info_cache
+
+        info: Optional[dict] = None
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(f"{self.base_url}/health", timeout=3.0)
                 if response.status_code == 200:
-                    data = response.json()
-                    self._health_cache = data.get('status') == 'healthy'
-                else:
-                    self._health_cache = False
+                    info = response.json()
         except Exception as e:
             logger.warning(f"Health check failed: {e}")
-            self._health_cache = False
 
+        self._health_info_cache = info
         self._health_cache_time = current_time
-        return self._health_cache
+        return info
 
     async def get_config(self) -> Optional[dict]:
         """Get API configuration with caching"""

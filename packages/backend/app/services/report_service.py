@@ -160,6 +160,18 @@ class ReportService:
         """Generate comprehensive evidence-based design strategy report."""
         t0 = time.time()
 
+        # Pre-flight: warn the LLM up front when single-zone analysis has yielded
+        # all-zero deviations (image-level fallback active but no within-zone
+        # variance to discuss). The flag is later embedded in stage2_data so the
+        # prompt can surface it as a caveat in Section 6 instead of returning
+        # generic boilerplate.
+        za = request.zone_analysis
+        is_image_level = (za.analysis_mode or "zone_level") == "image_level"
+        all_zero_deviation = bool(
+            za.zone_diagnostics
+            and all(d.mean_abs_z == 0 for d in za.zone_diagnostics)
+        )
+
         # Prepare compact data summaries
         project_context = json.dumps(
             request.project_context.model_dump(), ensure_ascii=False, indent=2
@@ -202,6 +214,12 @@ class ReportService:
             "unique_references": len(set(coded_refs)),
             "section_count": len(sections),
             "chain_reasoning_count": chain_refs,
+            "analysis_mode": za.analysis_mode or "zone_level",
+            "data_quality_warning": (
+                "Single-zone analysis returned no cross-zone variance — "
+                "add a second zone or run sub-zone clustering for richer diagnostics."
+                if is_image_level and all_zero_deviation else None
+            ),
             "sections_present": {
                 "executive_summary": "Executive Summary" in report_text or "## 1" in report_text,
                 "indicator_selection": "Indicator Selection" in report_text or "## 2" in report_text,
@@ -332,7 +350,8 @@ class ReportService:
             ]
 
         # v7.0 analysis mode
-        summary["analysis_mode"] = zone_analysis.analysis_mode or "multi_zone"
+        summary["analysis_mode"] = zone_analysis.analysis_mode or "zone_level"
+        summary["zone_source"] = zone_analysis.zone_source
 
         # Significant correlations
         sig_pairs = []

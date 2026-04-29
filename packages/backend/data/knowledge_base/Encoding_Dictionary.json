@@ -17319,7 +17319,7 @@
   },
   "E_countries": {
     "CNT_CHN": {
-      "name": "Cnt Chn",
+      "name": "China",
       "supporting_papers": [
         {
           "paper_file": "Chen et al",
@@ -17678,7 +17678,7 @@
       "source_paper": "Liang Cheng et al. - 2017 - Use of Tencent Street View Imagery for Visual Percep"
     },
     "CNT_USA": {
-      "name": "Cnt Usa",
+      "name": "United States",
       "supporting_papers": [
         {
           "paper_file": "Amiruzzaman et al",
@@ -17885,7 +17885,7 @@
       "definition_source": "LLM_expanded"
     },
     "CNT_GBR": {
-      "name": "United Kingdom (Great Britain)",
+      "name": "United Kingdom",
       "supporting_papers": [
         {
           "paper_file": "Wang, M",

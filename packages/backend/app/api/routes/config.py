@@ -45,11 +45,13 @@ async def get_config(settings: Settings = Depends(get_settings_dep)):
 async def test_vision_connection(
     vision_client: VisionModelClient = Depends(get_vision_client),
 ):
-    """Test connection to Vision API"""
-    healthy = await vision_client.check_health()
+    """Test connection to Vision API and return its health/model info."""
+    info = await vision_client.get_health_info()
+    healthy = info is not None and info.get("status") == "healthy"
     config = await vision_client.get_config() if healthy else None
     return {
         "healthy": healthy,
+        "info": info,
         "config": config,
     }
 

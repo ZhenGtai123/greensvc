@@ -18,7 +18,7 @@ import {
   Input,
   Code,
 } from '@chakra-ui/react';
-import { Server, Eye, Brain, Database } from 'lucide-react';
+import { Server, Eye, Brain, Database, Cpu } from 'lucide-react';
 import { useConfig, useHealth, useKnowledgeBaseSummary, useLLMProviders, useProviderModels, queryKeys } from '../hooks/useApi';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../api';
@@ -63,7 +63,9 @@ function Settings() {
   const activeProviderId = llmProviders?.find((p: LLMProviderInfo) => p.active)?.id;
   const { data: dynamicModels, isLoading: modelsLoading } = useProviderModels(activeProviderId);
 
+  type VisionInfo = NonNullable<Awaited<ReturnType<typeof api.testVision>>['data']['info']>;
   const [visionHealthy, setVisionHealthy] = useState<boolean | null>(null);
+  const [visionInfo, setVisionInfo] = useState<VisionInfo | null>(null);
   const [llmStatus, setLlmStatus] = useState<{ configured: boolean; provider: string; model: string | null } | null>(null);
   const [testingVision, setTestingVision] = useState(false);
   const [testingLLM, setTestingLLM] = useState(false);
@@ -85,16 +87,25 @@ function Settings() {
     try {
       const response = await api.testVision();
       setVisionHealthy(response.data.healthy);
+      setVisionInfo(response.data.info);
       toast({
         title: response.data.healthy ? 'Vision API connected' : 'Vision API not available',
         status: response.data.healthy ? 'success' : 'warning',
       });
     } catch {
       setVisionHealthy(false);
+      setVisionInfo(null);
       toast({ title: 'Failed to connect to Vision API', status: 'error' });
     }
     setTestingVision(false);
   };
+
+  // Auto-fetch vision info on first mount so the Vision Model card has data
+  // without requiring the user to click Test.
+  useEffect(() => {
+    void testVisionConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const testLLMConnection = async () => {
     setTestingLLM(true);
@@ -216,6 +227,139 @@ function Settings() {
                   {kbSummary?.loaded ? `${kbSummary.total_evidence} records` : 'Not Loaded'}
                 </Badge>
               </HStack>
+            </VStack>
+          </CardBody>
+        </Card>
+
+        {/* Vision Model */}
+        <Card>
+          <CardHeader>
+            <HStack>
+              <Cpu size={18} />
+              <Heading size="md">Vision Model</Heading>
+            </HStack>
+          </CardHeader>
+          <CardBody>
+            <VStack align="stretch" spacing={4}>
+              {visionInfo ? (
+                <>
+                  <FormControl>
+                    <FormLabel fontSize="sm">Currently loaded</FormLabel>
+                    <HStack>
+                      <Code p={2} borderRadius="md" flex={1} fontSize="sm">
+                        {visionInfo.depth_model}
+                      </Code>
+                      <Badge colorScheme="green" flexShrink={0}>Active</Badge>
+                    </HStack>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel fontSize="sm">GPU</FormLabel>
+                    <HStack spacing={2} flexWrap="wrap">
+                      <Badge colorScheme={visionInfo.gpu_available ? 'green' : 'red'}>
+                        {visionInfo.gpu_available ? 'CUDA' : 'CPU only'}
+                      </Badge>
+                      {visionInfo.gpu_name && (
+                        <Text fontSize="sm" color="gray.500" noOfLines={1}>
+                          {visionInfo.gpu_name}
+                        </Text>
+                      )}
+                      {visionInfo.gpu_memory && (
+                        <Badge colorScheme="purple">{visionInfo.gpu_memory}</Badge>
+                      )}
+                    </HStack>
+                  </FormControl>
+
+                  <Divider />
+
+                  <FormControl>
+                    <FormLabel fontSize="sm">Available models</FormLabel>
+                    <Select
+                      value={visionInfo.depth_model}
+                      isDisabled
+                      size="sm"
+                      fontFamily="mono"
+                      fontSize="sm"
+                    >
+                      {visionInfo.available_depth_models.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label} — {m.params_billions}B / {m.vram_gb}GB
+                        </option>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <VStack align="stretch" spacing={2}>
+                    {visionInfo.available_depth_models.map((m) => {
+                      const isActive = m.id === visionInfo.depth_model;
+                      const fits =
+                        visionInfo.gpu_memory_gb === null ||
+                        visionInfo.gpu_memory_gb >= m.vram_gb;
+                      return (
+                        <Box
+                          key={m.id}
+                          borderWidth={1}
+                          borderColor={isActive ? 'blue.400' : 'gray.200'}
+                          borderRadius="md"
+                          p={3}
+                          bg={isActive ? 'blue.50' : 'transparent'}
+                        >
+                          <HStack justify="space-between" mb={1}>
+                            <Text fontSize="sm" fontWeight="semibold">
+                              {m.label}
+                            </Text>
+                            <HStack spacing={1}>
+                              {isActive && <Badge colorScheme="blue" fontSize="xs">Active</Badge>}
+                              {!fits && <Badge colorScheme="red" fontSize="xs">Insufficient VRAM</Badge>}
+                            </HStack>
+                          </HStack>
+                          <Text fontSize="xs" color="gray.600" fontFamily="mono">
+                            {m.id}
+                          </Text>
+                          <HStack mt={2} spacing={3} fontSize="xs" color="gray.600" flexWrap="wrap">
+                            <Text>{m.params_billions}B params</Text>
+                            <Text>·</Text>
+                            <Text>{m.vram_gb}GB VRAM</Text>
+                            <Text>·</Text>
+                            <Text>sky: {m.sky_detection}</Text>
+                          </HStack>
+                          <Text fontSize="xs" color="gray.500" mt={1}>
+                            {m.notes}
+                          </Text>
+                        </Box>
+                      );
+                    })}
+                  </VStack>
+
+                  <Box
+                    borderLeftWidth={3}
+                    borderColor="blue.400"
+                    bg="blue.50"
+                    px={3}
+                    py={2}
+                    borderRadius="sm"
+                  >
+                    <Text fontSize="xs" color="gray.700">
+                      To switch model: set{' '}
+                      <Code fontSize="xs">VISION_DEPTH_MODEL</Code>{' '}
+                      env var (e.g.{' '}
+                      <Code fontSize="xs">DA3METRIC-LARGE</Code>{' '}
+                      or{' '}
+                      <Code fontSize="xs">DA3NESTED-GIANT-LARGE-1.1</Code>) and
+                      restart the Vision API service.
+                    </Text>
+                  </Box>
+                </>
+              ) : (
+                <HStack>
+                  <Text fontSize="sm" color="gray.500">
+                    Vision API not reachable.
+                  </Text>
+                  <Button size="xs" onClick={testVisionConnection} isLoading={testingVision}>
+                    Retry
+                  </Button>
+                </HStack>
+              )}
             </VStack>
           </CardBody>
         </Card>

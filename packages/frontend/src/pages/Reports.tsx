@@ -265,7 +265,25 @@ function Reports() {
       const result = await generateReportMutation.mutateAsync(request);
       setAiReport(result.content);
       setAiReportMeta(result.metadata);
-      toast({ title: `AI report generated — ${result.metadata.word_count || '?'} words`, status: 'success' });
+      const wc = Number(result.metadata?.word_count ?? 0);
+      const dataWarning = result.metadata?.data_quality_warning as string | undefined;
+      if (dataWarning) {
+        toast({
+          title: 'AI report generated with caveats',
+          description: dataWarning,
+          status: 'warning',
+          duration: 8000,
+        });
+      } else if (wc < 100) {
+        toast({
+          title: 'AI report has minimal content',
+          description: `Only ${wc} words returned — likely thin source data. Check that analysis charts have non-zero values.`,
+          status: 'warning',
+          duration: 8000,
+        });
+      } else {
+        toast({ title: `AI report generated — ${wc} words`, status: 'success' });
+      }
     } catch {
       toast({ title: 'AI report generation failed', status: 'error' });
     }

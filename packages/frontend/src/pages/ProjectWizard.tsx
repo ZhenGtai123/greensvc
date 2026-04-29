@@ -47,6 +47,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import api from '../api';
 import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
+import EncodingInfoPopover from '../components/EncodingInfoPopover';
+import { useEncodingSections } from '../hooks/useApi';
+import type { EncodingEntry } from '../types';
 
 // ============ Constants ============
 
@@ -66,75 +69,16 @@ const PROJECT_PHASES = [
   { value: 'evaluation', label: 'Post-occupancy Evaluation' },
 ];
 
-const KOPPEN_ZONES = [
-  { value: 'KPN_AF', label: 'KPN_AF — Tropical Rainforest (Af)' },
-  { value: 'KPN_CFA', label: 'KPN_CFA — Humid Subtropical (Cfa)' },
-  { value: 'KPN_CFB', label: 'KPN_CFB — Oceanic (Cfb)' },
-  { value: 'KPN_CSB', label: 'KPN_CSB — Warm-Summer Mediterranean' },
-  { value: 'KPN_CWA', label: 'KPN_CWA — Monsoon Humid Subtropical' },
-  { value: 'KPN_DFA', label: 'KPN_DFA — Hot-summer Humid Continental' },
-  { value: 'KPN_DFB', label: 'KPN_DFB — Warm-Summer Humid Continental' },
-  { value: 'KPN_DWA', label: 'KPN_DWA — Monsoon Humid Continental' },
-  { value: 'KPN_XX', label: 'KPN_XX — Unknown/Undefined' },
-];
-
-const COUNTRIES = [
-  { value: 'CNT_CHN', label: 'China' },
-  { value: 'CNT_DNK', label: 'Denmark' },
-  { value: 'CNT_FIN', label: 'Finland' },
-  { value: 'CNT_GBR', label: 'United Kingdom' },
-  { value: 'CNT_HKG', label: 'Hong Kong' },
-  { value: 'CNT_IND', label: 'India' },
-  { value: 'CNT_ITA', label: 'Italy' },
-  { value: 'CNT_JPN', label: 'Japan' },
-  { value: 'CNT_KOR', label: 'South Korea' },
-  { value: 'CNT_NLD', label: 'Netherlands' },
-  { value: 'CNT_SGP', label: 'Singapore' },
-  { value: 'CNT_TWN', label: 'Taiwan' },
-  { value: 'CNT_USA', label: 'United States' },
-  { value: 'CNT_GLO', label: 'Global' },
-];
-
-const SPACE_TYPES = [
-  { value: 'SET_PRK', label: 'Park' },
-  { value: 'SET_STR', label: 'Street' },
-  { value: 'SET_RES', label: 'Residential' },
-  { value: 'SET_COM', label: 'Commercial' },
-  { value: 'SET_CAM', label: 'Campus' },
-  { value: 'SET_CBD', label: 'Central Business District' },
-  { value: 'SET_COU', label: 'Courtyard' },
-  { value: 'SET_GWY', label: 'Greenway' },
-  { value: 'SET_HIS', label: 'Historical Area' },
-  { value: 'SET_POS', label: 'Public Open Space' },
-  { value: 'SET_URB', label: 'Urban' },
-];
-
-const LCZ_TYPES = [
-  { value: 'LCZ_1', label: 'LCZ 1 - Compact High-rise' },
-  { value: 'LCZ_2', label: 'LCZ 2 - Compact Mid-rise' },
-  { value: 'LCZ_3', label: 'LCZ 3 - Compact Low-rise' },
-  { value: 'LCZ_4', label: 'LCZ 4 - Open High-rise' },
-  { value: 'LCZ_6', label: 'LCZ 6 - Open Low-rise' },
-  { value: 'LCZ_A', label: 'LCZ A - Dense Trees' },
-  { value: 'LCZ_B', label: 'LCZ B - Scattered Trees' },
-  { value: 'LCZ_URB', label: 'Urban/Built-up' },
-];
-
-const AGE_GROUPS = [
-  { value: 'AGE_ALL', label: 'All Age Groups' },
-  { value: 'AGE_ADL', label: 'Adults' },
-  { value: 'AGE_ELD', label: 'Elderly' },
-  { value: 'AGE_UNSPECIFIED', label: 'Unspecified' },
-];
-
-const PERFORMANCE_DIMENSIONS = [
-  { id: 'PRF_AES', name: 'Environmental Aesthetics & Landscape Preference', icon: Eye, desc: 'Beauty, attractiveness, visual comfort, naturalness' },
-  { id: 'PRF_RST', name: 'Stress Relief & Psychological Restoration', icon: Heart, desc: 'Physiological stress responses, restoration-related recovery' },
-  { id: 'PRF_EMO', name: 'Emotion Regulation & Cognitive Modulation', icon: Brain, desc: 'Positive affect, mood, attentional recovery, cognitive modulation' },
-  { id: 'PRF_THR', name: 'Microclimate Perception & Thermal Comfort', icon: Thermometer, desc: 'Pedestrian-level heat conditions, thermal comfort' },
-  { id: 'PRF_USE', name: 'Spatial Use & Physical Activity', icon: Footprints, desc: 'Walking, cycling, dwell time, activity/health outcomes' },
-  { id: 'PRF_SOC', name: 'Social Interaction & Lingering', icon: Users, desc: 'Collective dwelling, interaction, perceived safety, social vitality' },
-];
+// Icon override for performance-dimension cards. The names + definitions
+// themselves come from the knowledge-base C_performance section.
+const PRF_ICON_BY_CODE: Record<string, React.ElementType> = {
+  PRF_AES: Eye,
+  PRF_RST: Heart,
+  PRF_EMO: Brain,
+  PRF_THR: Thermometer,
+  PRF_USE: Footprints,
+  PRF_SOC: Users,
+};
 
 const DEFAULT_ZONE_TYPES = [
   { id: 'entrance', name: 'Entrance/Gateway', def: 'Main entry points, gateways' },
@@ -172,6 +116,26 @@ function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType
   );
 }
 
+// FormLabel that pairs with an EncodingInfoPopover trigger.
+function LabelWithInfo({
+  children,
+  title,
+  entries,
+  selectedCode,
+}: {
+  children: React.ReactNode;
+  title: string;
+  entries: EncodingEntry[];
+  selectedCode?: string;
+}) {
+  return (
+    <HStack mb={2} spacing={1} align="center">
+      <FormLabel mb={0}>{children}</FormLabel>
+      <EncodingInfoPopover title={title} entries={entries} selectedCode={selectedCode} />
+    </HStack>
+  );
+}
+
 // ============ Types ============
 
 interface SpatialZone {
@@ -201,6 +165,19 @@ function ProjectWizard() {
   const queryClient = useQueryClient();
   const { isOpen: isRelationsOpen, onToggle: toggleRelations } = useDisclosure();
 
+  // Knowledge-base codebook (single source of truth for the 6 dropdown sections)
+  const { data: encoding } = useEncodingSections();
+  const koppenEntries: EncodingEntry[] = encoding?.K_climate ?? [];
+  const countryEntries: EncodingEntry[] = encoding?.E_countries ?? [];
+  const spaceTypeEntries: EncodingEntry[] = encoding?.E_settings ?? [];
+  const lczEntries: EncodingEntry[] = encoding?.L_lcz ?? [];
+  const ageEntries: EncodingEntry[] = encoding?.M_age_groups ?? [];
+  const performanceEntries: EncodingEntry[] = encoding?.C_performance ?? [];
+  const subdimensionEntries: EncodingEntry[] = encoding?.C_subdimensions ?? [];
+
+  const findEntry = (entries: EncodingEntry[], code: string) =>
+    entries.find((e) => e.code === code);
+
   // Loading state for edit mode
   const [loading, setLoading] = useState(isEditMode);
 
@@ -220,6 +197,7 @@ function ProjectWizard() {
   // Performance Goals
   const [designBrief, setDesignBrief] = useState('');
   const [selectedDimensions, setSelectedDimensions] = useState<string[]>([]);
+  const [selectedSubdimensions, setSelectedSubdimensions] = useState<string[]>([]);
 
   // Spatial Zones
   const [zones, setZones] = useState<SpatialZone[]>([]);
@@ -231,6 +209,20 @@ function ProjectWizard() {
 
   // Saving
   const [saving, setSaving] = useState(false);
+
+  // When a parent performance dimension is unchecked, drop any of its sub-dimensions
+  // so we never persist orphan PRS_* codes whose PRF_* parent is not selected.
+  useEffect(() => {
+    setSelectedSubdimensions((prev) => {
+      if (prev.length === 0) return prev;
+      const allowedParents = new Set(selectedDimensions);
+      const next = prev.filter((sd) => {
+        const entry = subdimensionEntries.find((e) => e.code === sd);
+        return entry?.parent_dim ? allowedParents.has(entry.parent_dim) : false;
+      });
+      return next.length === prev.length ? prev : next;
+    });
+  }, [selectedDimensions, subdimensionEntries]);
 
   // Load existing project data in edit mode
   useEffect(() => {
@@ -250,6 +242,7 @@ function ProjectWizard() {
           setAgeGroup(project.age_group_id || '');
           setDesignBrief(project.design_brief || '');
           setSelectedDimensions(project.performance_dimensions || []);
+          setSelectedSubdimensions(project.subdimensions || []);
 
           const loadedZones: SpatialZone[] = (project.spatial_zones || []).map((z: { zone_id: string; zone_name: string; zone_types?: string[]; area?: number; status?: string; description?: string }) => ({
             id: z.zone_id,
@@ -358,6 +351,7 @@ function ProjectWizard() {
         age_group_id: ageGroup,
         design_brief: designBrief,
         performance_dimensions: selectedDimensions,
+        subdimensions: selectedSubdimensions,
         spatial_zones: zones.map(z => ({
           zone_id: z.id,
           zone_name: z.name,
@@ -465,42 +459,87 @@ function ProjectWizard() {
           <CardBody>
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
               <FormControl>
-                <FormLabel>Köppen Climate Zone</FormLabel>
+                <LabelWithInfo
+                  title="Köppen Climate Zones"
+                  entries={koppenEntries}
+                  selectedCode={koppenZone}
+                >
+                  Köppen Climate Zone
+                </LabelWithInfo>
                 <Select value={koppenZone} onChange={(e) => setKoppenZone(e.target.value)} placeholder="Select climate">
-                  {KOPPEN_ZONES.map(k => (
-                    <option key={k.value} value={k.value}>{k.label}</option>
+                  {koppenEntries.map(k => (
+                    <option key={k.code} value={k.code}>{k.code} — {k.name}</option>
                   ))}
                 </Select>
+                {findEntry(koppenEntries, koppenZone)?.definition && (
+                  <Text fontSize="xs" color="gray.500" mt={1} noOfLines={2}>
+                    {findEntry(koppenEntries, koppenZone)!.definition}
+                  </Text>
+                )}
               </FormControl>
               <FormControl>
-                <FormLabel>Country/Region</FormLabel>
+                <LabelWithInfo
+                  title="Country / Region"
+                  entries={countryEntries}
+                  selectedCode={country}
+                >
+                  Country/Region
+                </LabelWithInfo>
                 <Select value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Select country">
-                  {COUNTRIES.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
+                  {countryEntries.map(c => (
+                    <option key={c.code} value={c.code}>{c.name}</option>
                   ))}
                 </Select>
               </FormControl>
               <FormControl>
-                <FormLabel>Space Type</FormLabel>
+                <LabelWithInfo
+                  title="Space Types (Setting)"
+                  entries={spaceTypeEntries}
+                  selectedCode={spaceType}
+                >
+                  Space Type
+                </LabelWithInfo>
                 <Select value={spaceType} onChange={(e) => setSpaceType(e.target.value)} placeholder="Select type">
-                  {SPACE_TYPES.map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                  {spaceTypeEntries.map(s => (
+                    <option key={s.code} value={s.code}>{s.name}</option>
                   ))}
                 </Select>
+                {findEntry(spaceTypeEntries, spaceType)?.definition && (
+                  <Text fontSize="xs" color="gray.500" mt={1} noOfLines={2}>
+                    {findEntry(spaceTypeEntries, spaceType)!.definition}
+                  </Text>
+                )}
               </FormControl>
               <FormControl>
-                <FormLabel>Local Climate Zone (LCZ)</FormLabel>
+                <LabelWithInfo
+                  title="Local Climate Zones (LCZ)"
+                  entries={lczEntries}
+                  selectedCode={lczType}
+                >
+                  Local Climate Zone (LCZ)
+                </LabelWithInfo>
                 <Select value={lczType} onChange={(e) => setLczType(e.target.value)} placeholder="Select LCZ">
-                  {LCZ_TYPES.map(l => (
-                    <option key={l.value} value={l.value}>{l.label}</option>
+                  {lczEntries.map(l => (
+                    <option key={l.code} value={l.code}>{l.name}</option>
                   ))}
                 </Select>
+                {findEntry(lczEntries, lczType)?.definition && (
+                  <Text fontSize="xs" color="gray.500" mt={1} noOfLines={2}>
+                    {findEntry(lczEntries, lczType)!.definition}
+                  </Text>
+                )}
               </FormControl>
               <FormControl>
-                <FormLabel>Target User Group</FormLabel>
+                <LabelWithInfo
+                  title="Target User / Age Groups"
+                  entries={ageEntries}
+                  selectedCode={ageGroup}
+                >
+                  Target User Group
+                </LabelWithInfo>
                 <Select value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)} placeholder="Select group">
-                  {AGE_GROUPS.map(a => (
-                    <option key={a.value} value={a.value}>{a.label}</option>
+                  {ageEntries.map(a => (
+                    <option key={a.code} value={a.code}>{a.name}</option>
                   ))}
                 </Select>
               </FormControl>
@@ -524,49 +563,123 @@ function ProjectWizard() {
               />
             </FormControl>
 
-            <FormLabel mb={2}>Performance Dimensions</FormLabel>
+            <HStack mb={2} spacing={1} align="center">
+              <FormLabel mb={0}>Performance Dimensions</FormLabel>
+              <EncodingInfoPopover
+                title="Performance Dimensions"
+                entries={performanceEntries}
+              />
+            </HStack>
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={3}>
-              {PERFORMANCE_DIMENSIONS.map(dim => {
-                const DimIcon = dim.icon;
+              {performanceEntries.map(dim => {
+                const DimIcon = PRF_ICON_BY_CODE[dim.code] ?? Target;
+                const isSelected = selectedDimensions.includes(dim.code);
                 return (
                   <Box
-                    key={dim.id}
+                    key={dim.code}
                     p={3}
                     borderWidth={2}
                     borderRadius="lg"
-                    borderColor={selectedDimensions.includes(dim.id) ? 'blue.500' : 'gray.200'}
-                    bg={selectedDimensions.includes(dim.id) ? 'blue.50' : 'white'}
+                    borderColor={isSelected ? 'blue.500' : 'gray.200'}
+                    bg={isSelected ? 'blue.50' : 'white'}
                     cursor="pointer"
                     onClick={() => {
                       setSelectedDimensions(prev =>
-                        prev.includes(dim.id)
-                          ? prev.filter(d => d !== dim.id)
-                          : [...prev, dim.id]
+                        prev.includes(dim.code)
+                          ? prev.filter(d => d !== dim.code)
+                          : [...prev, dim.code]
                       );
                     }}
                     _hover={{ borderColor: 'blue.300' }}
                     transition="all 0.15s"
                   >
-                    <HStack>
+                    <HStack align="flex-start">
                       <Checkbox
-                        isChecked={selectedDimensions.includes(dim.id)}
+                        isChecked={isSelected}
                         onChange={() => {}}
                         pointerEvents="none"
+                        mt={1}
                       />
-                      <Box color="brand.600" flexShrink={0}>
+                      <Box color="brand.600" flexShrink={0} mt={1}>
                         <DimIcon size={16} />
                       </Box>
                       <Box>
                         <Text fontWeight="bold" fontSize="sm">
                           {dim.name}
                         </Text>
-                        <Text fontSize="xs" color="gray.500">{dim.desc}</Text>
+                        <Text fontSize="xs" color="gray.500" noOfLines={3}>
+                          {dim.definition}
+                        </Text>
                       </Box>
                     </HStack>
                   </Box>
                 );
               })}
             </SimpleGrid>
+
+            {selectedDimensions.length > 0 && subdimensionEntries.length > 0 && (
+              <Box mt={6}>
+                <HStack mb={2} spacing={1} align="center">
+                  <FormLabel mb={0}>Sub-dimensions (Optional)</FormLabel>
+                  <EncodingInfoPopover
+                    title="Sub-dimensions"
+                    entries={subdimensionEntries}
+                  />
+                </HStack>
+                <Text fontSize="xs" color="gray.500" mb={3}>
+                  Refines evidence retrieval. Picking none falls back to dimension-level retrieval.
+                </Text>
+                {(() => {
+                  const visible = subdimensionEntries.filter(
+                    (sd) => sd.parent_dim && selectedDimensions.includes(sd.parent_dim)
+                  );
+                  if (visible.length === 0) return null;
+                  const grouped = selectedDimensions
+                    .map((dim) => ({
+                      dim,
+                      dimName: performanceEntries.find((p) => p.code === dim)?.name ?? dim,
+                      items: visible.filter((sd) => sd.parent_dim === dim),
+                    }))
+                    .filter((g) => g.items.length > 0);
+                  return (
+                    <VStack align="stretch" spacing={3}>
+                      {grouped.map(({ dim, dimName, items }) => (
+                        <Box key={dim}>
+                          <Text fontSize="xs" fontWeight="bold" color="gray.600" mb={1}>
+                            {dimName}
+                          </Text>
+                          <Wrap spacing={2}>
+                            {items.map((sd) => {
+                              const checked = selectedSubdimensions.includes(sd.code);
+                              return (
+                                <WrapItem key={sd.code}>
+                                  <Tag
+                                    size="md"
+                                    cursor="pointer"
+                                    variant={checked ? 'solid' : 'outline'}
+                                    colorScheme={checked ? 'blue' : 'gray'}
+                                    onClick={() =>
+                                      setSelectedSubdimensions((prev) =>
+                                        prev.includes(sd.code)
+                                          ? prev.filter((c) => c !== sd.code)
+                                          : [...prev, sd.code]
+                                      )
+                                    }
+                                    title={sd.definition || sd.name}
+                                  >
+                                    <TagLabel>{sd.name}</TagLabel>
+                                  </Tag>
+                                </WrapItem>
+                              );
+                            })}
+                          </Wrap>
+                        </Box>
+                      ))}
+                    </VStack>
+                  );
+                })()}
+              </Box>
+            )}
           </CardBody>
         </Card>
 

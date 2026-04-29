@@ -15,6 +15,7 @@ export const queryKeys = {
   knowledgeBase: ['knowledgeBase'],
   providerModels: (provider: string) => ['provider-models', provider],
   task: (id: string) => ['task', id],
+  encodingSections: ['encoding-sections'],
 };
 
 // Health & Config hooks
@@ -260,5 +261,15 @@ export function useCurrentUser(enabled = false) {
     queryFn: () => api.auth.me().then(r => r.data),
     enabled,
     retry: false,
+  });
+}
+
+// Encoding dictionary (knowledge-base codebook). Static data, cache forever.
+export function useEncodingSections() {
+  return useQuery({
+    queryKey: queryKeys.encodingSections,
+    queryFn: () => api.encoding.getSections().then((r) => r.data),
+    staleTime: Infinity,
+    gcTime: Infinity,
   });
 }

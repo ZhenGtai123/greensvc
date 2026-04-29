@@ -45,7 +45,8 @@ export interface ChartContext {
   globalIndicatorStats: GlobalIndicatorStats[];
   dataQuality: DataQualityRow[];
   indicatorDefs: Record<string, IndicatorDefinitionInput>;
-  analysisMode: 'multi_zone' | 'single_zone';
+  analysisMode: 'zone_level' | 'image_level';
+  zoneSource: 'user' | 'cluster' | null;
 }
 
 export const LAYERS = ['full', 'foreground', 'middleground', 'background'];
@@ -148,7 +149,8 @@ export function buildChartContext(args: BuildArgs): ChartContext {
   const globalIndicatorStats = zoneAnalysisResult?.global_indicator_stats ?? [];
   const dataQuality = zoneAnalysisResult?.data_quality ?? [];
   const indicatorDefs = zoneAnalysisResult?.indicator_definitions ?? {};
-  const analysisMode = zoneAnalysisResult?.analysis_mode ?? 'multi_zone';
+  const analysisMode = zoneAnalysisResult?.analysis_mode ?? 'zone_level';
+  const zoneSource = zoneAnalysisResult?.zone_source ?? null;
 
   return {
     zoneAnalysisResult,
@@ -167,5 +169,6 @@ export function buildChartContext(args: BuildArgs): ChartContext {
     dataQuality,
     indicatorDefs,
     analysisMode,
+    zoneSource,
   };
 }

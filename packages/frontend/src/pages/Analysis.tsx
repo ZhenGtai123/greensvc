@@ -14,7 +14,6 @@ import {
   Badge,
   Alert,
   AlertIcon,
-  Progress,
   Divider,
   Switch,
   FormControl,
@@ -54,7 +53,6 @@ function Analysis() {
     zoneAnalysisResult,
     pipelineRun,
     startPipeline,
-    cancelPipeline,
   } = useAppStore();
 
   // Config state
@@ -79,13 +77,10 @@ function Analysis() {
   const isRunningElsewhere = pipelineRun.isRunning && pipelineRun.projectId !== selectedProjectId;
   const streamSteps = isRunningHere ? pipelineRun.steps : [];
   const imageProgress = isRunningHere ? pipelineRun.imageProgress : null;
-  const streamStartedAt = isRunningHere ? pipelineRun.startedAt : null;
-  // After run_calculations completes the per-image counters stop updating,
-  // so the determinate "X / Y · 100%" bar would falsely look done while
-  // aggregate / zone_analysis / design_strategies are still running. Use
-  // this flag to swap to an indeterminate "running stage…" indicator.
+  // The per-image counters are only meaningful while run_calculations is
+  // active; once that step completes, hide them so they don't show stale
+  // values while later stages run.
   const calcDone = streamSteps.some(s => s.step === 'run_calculations' && s.status === 'completed');
-  const activeStage = streamSteps.find(s => s.status === 'running') ?? streamSteps[streamSteps.length - 1];
 
   const selectedProject = useMemo(() => {
     if (!selectedProjectId || !projects) return null;
@@ -118,32 +113,9 @@ function Analysis() {
     });
   }, [selectedProjectId, selectedIndicatorIds, useLlm, selectedProject, routeProjectId, startPipeline, toast]);
 
-  const handleCancelPipeline = useCallback(() => {
-    cancelPipeline();
-    toast({ title: 'Pipeline cancelled', status: 'info' });
-  }, [cancelPipeline, toast]);
-
   // Pipeline ran successfully — user can proceed to Reports even if zone_analysis
   // is empty (e.g. n_zones=1 with nothing to compare). Reports page handles nulls.
   const hasResults = pipelineResult !== null;
-
-  // ETA estimation from the live per-image counter
-  const etaSeconds = useMemo(() => {
-    if (!imageProgress || !streamStartedAt || imageProgress.current === 0) return null;
-    const elapsed = (Date.now() - streamStartedAt) / 1000;
-    const perImage = elapsed / imageProgress.current;
-    const remaining = imageProgress.total - imageProgress.current;
-    return Math.round(perImage * remaining);
-  }, [imageProgress, streamStartedAt]);
-
-  function formatDuration(seconds: number): string {
-    if (seconds < 60) return `${seconds}s`;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    if (mins < 60) return `${mins}m ${secs}s`;
-    const hrs = Math.floor(mins / 60);
-    return `${hrs}h ${mins % 60}m`;
-  }
 
   return (
     <PageShell>
@@ -239,70 +211,28 @@ function Analysis() {
         </CardBody>
       </Card>
 
-      {/* Live progress during streaming pipeline run */}
+      {/* Pipeline detail during a streaming run — complements the top sticky
+          banner (which already shows progress %, ETA, active stage, Cancel).
+          This card carries info the banner can't fit: the current image
+          filename, success/failure counters, and the full stage history. */}
       {isRunningHere && (
         <Card mb={6}>
           <CardHeader>
-            <HStack justify="space-between">
-              <Heading size="md">Pipeline Progress</Heading>
-              <Button size="sm" variant="outline" colorScheme="red" onClick={handleCancelPipeline}>
-                Cancel
-              </Button>
-            </HStack>
+            <Heading size="md">Pipeline Detail</Heading>
           </CardHeader>
           <CardBody>
             <VStack align="stretch" spacing={4}>
-              {/* Per-image progress (the slow part: calculators running on N images) */}
+              {/* Per-image counters (only meaningful during run_calculations) */}
               {imageProgress && !calcDone && (
-                <Box>
-                  <HStack justify="space-between" mb={1}>
-                    <Text fontSize="sm" fontWeight="bold">
-                      Calculating metrics — {imageProgress.current} / {imageProgress.total} images
-                    </Text>
-                    <Text fontSize="xs" color="gray.500">
-                      {((imageProgress.current / imageProgress.total) * 100).toFixed(0)}%
-                      {etaSeconds !== null && etaSeconds > 0 && ` · ~${formatDuration(etaSeconds)} remaining`}
-                    </Text>
-                  </HStack>
-                  <Progress
-                    value={(imageProgress.current / imageProgress.total) * 100}
-                    colorScheme="green"
-                    hasStripe
-                    isAnimated
-                    borderRadius="md"
-                  />
-                  <HStack mt={2} spacing={4} fontSize="xs" color="gray.600">
-                    <Text noOfLines={1} flex={1}>Current: {imageProgress.filename}</Text>
-                    <Text color="green.600">{imageProgress.succeeded} ok</Text>
-                    {imageProgress.failed > 0 && <Text color="red.600">{imageProgress.failed} failed</Text>}
-                    {imageProgress.cached > 0 && <Text color="gray.500">{imageProgress.cached} cached</Text>}
-                  </HStack>
-                </Box>
-              )}
-
-              {/* Post-calc indeterminate progress: aggregate / zone_analysis /
-                  design_strategies stages don't have a numeric percentage,
-                  so show a flowing bar with the active stage label. */}
-              {calcDone && activeStage && activeStage.status === 'running' && (
-                <Box>
-                  <HStack justify="space-between" mb={1}>
-                    <Text fontSize="sm" fontWeight="bold">
-                      {activeStage.step === 'aggregate'
-                        ? 'Aggregating zone statistics…'
-                        : activeStage.step === 'zone_analysis'
-                          ? 'Analyzing zones (Stage 2.5)…'
-                          : activeStage.step === 'design_strategies'
-                            ? 'Generating design strategies (Stage 3 · LLM)…'
-                            : `Running ${activeStage.step}…`}
-                    </Text>
-                  </HStack>
-                  <Progress isIndeterminate colorScheme="green" hasStripe borderRadius="md" />
-                  {activeStage.detail && (
-                    <Text mt={2} fontSize="xs" color="gray.600" noOfLines={1}>
-                      {activeStage.detail}
-                    </Text>
-                  )}
-                </Box>
+                <HStack spacing={4} fontSize="sm">
+                  <Text noOfLines={1} flex={1} color="gray.700">
+                    Current:{' '}
+                    <Text as="span" fontWeight="semibold">{imageProgress.filename}</Text>
+                  </Text>
+                  <Text color="green.600">{imageProgress.succeeded} ok</Text>
+                  {imageProgress.failed > 0 && <Text color="red.600">{imageProgress.failed} failed</Text>}
+                  {imageProgress.cached > 0 && <Text color="gray.500">{imageProgress.cached} cached</Text>}
+                </HStack>
               )}
 
               {/* Pipeline stage list — fills in as SSE status events arrive */}

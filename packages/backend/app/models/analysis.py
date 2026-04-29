@@ -202,8 +202,15 @@ class ZoneAnalysisResult(BaseModel):
     global_indicator_stats: list[GlobalIndicatorStats] = Field(default_factory=list)
     # Data quality diagnostics (Table M4)
     data_quality: list[DataQualityRow] = Field(default_factory=list)
-    # Mode: "multi_zone" (n_zones>1) or "single_zone" (n_zones≤1, uses archetypes)
-    analysis_mode: str = "multi_zone"
+    # Statistical sample unit:
+    #   "zone_level"  — zones (or sub-zones from clustering) are samples; n_zones≥2
+    #   "image_level" — image records are samples; used when n_zones<2 or by user opt-in
+    analysis_mode: str = "zone_level"
+    # Where the zones came from. Display-only metadata; does not affect compute path.
+    #   "user"    — zones defined in the project wizard
+    #   "cluster" — sub-zones derived from clustering (treated as zones for stats)
+    #   None      — irrelevant when analysis_mode == "image_level"
+    zone_source: Optional[str] = "user"
 
 
 # ---------------------------------------------------------------------------

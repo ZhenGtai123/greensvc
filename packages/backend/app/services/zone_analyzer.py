@@ -185,24 +185,70 @@ class ZoneAnalyzer:
                 percentile=round(pct_val, 2) if pct_val is not None else None,
             ))
 
+        # 4.5) Image-level fallback for single-zone projects.
+        # Cross-zone z-scores / correlations are mathematically undefined with
+        # < 2 zones. When image_records are available we compute the same data
+        # products treating each image as a sample, so charts surface real
+        # information instead of zero-filled placeholders.
+        mean_abs_z_override: dict[str, float] | None = None
+        used_image_level_fallback = False
+        if len(zone_names) < 2 and request.image_records:
+            fallback = self._compute_image_level_fallback(
+                request.image_records, zone_names, ind_ids,
+            )
+            if fallback:
+                used_image_level_fallback = True
+                zscore_by_layer = fallback["zscore_by_layer"]
+                pct_by_layer = fallback["pct_by_layer"]
+                mean_abs_z_override = fallback["mean_abs_z_full_by_zone"]
+                # Re-emit enriched records so EnrichedZoneStat.z_score / percentile
+                # reflect the image-level fallback values instead of the original
+                # zone-level NaN computation. Note: indices/columns may now be
+                # reindexed to NaN where data is missing — we treat NaN as None.
+                enriched = []
+                for rec in request.zone_statistics:
+                    layer = rec.layer
+                    if layer not in zscore_by_layer:
+                        continue
+                    z_df = zscore_by_layer[layer]
+                    p_df = pct_by_layer[layer]
+                    if rec.zone_name not in z_df.index or rec.indicator_id not in z_df.columns:
+                        continue
+                    z_raw = z_df.loc[rec.zone_name, rec.indicator_id]
+                    p_raw = p_df.loc[rec.zone_name, rec.indicator_id]
+                    enriched.append(EnrichedZoneStat(
+                        zone_id=rec.zone_id, zone_name=rec.zone_name,
+                        indicator_id=rec.indicator_id, layer=rec.layer,
+                        unit=rec.unit, n_images=rec.n_images,
+                        mean=rec.mean, std=rec.std, min=rec.min, max=rec.max,
+                        area_sqm=rec.area_sqm,
+                        z_score=None if pd.isna(z_raw) else round(float(z_raw), 4),
+                        percentile=None if pd.isna(p_raw) else round(float(p_raw), 2),
+                    ))
+
         # 5) Correlations per layer
         corr_out: dict[str, dict] = {}
         pval_out: dict[str, dict] = {}
-        for layer, z_df in zscore_by_layer.items():
-            corr_m, pval_m = _calc_corr_pval(z_df)
-            corr_out[layer] = {
-                c1: {c2: round(float(corr_m.loc[c1, c2]), 4) for c2 in corr_m.columns}
-                for c1 in corr_m.index
-            }
-            pval_out[layer] = {
-                c1: {c2: round(float(pval_m.loc[c1, c2]), 6) for c2 in pval_m.columns}
-                for c1 in pval_m.index
-            }
+        if used_image_level_fallback:
+            corr_out = fallback["corr_by_layer"]
+            pval_out = fallback["pval_by_layer"]
+        else:
+            for layer, z_df in zscore_by_layer.items():
+                corr_m, pval_m = _calc_corr_pval(z_df)
+                corr_out[layer] = {
+                    c1: {c2: round(float(corr_m.loc[c1, c2]), 4) for c2 in corr_m.columns}
+                    for c1 in corr_m.index
+                }
+                pval_out[layer] = {
+                    c1: {c2: round(float(pval_m.loc[c1, c2]), 6) for c2 in pval_m.columns}
+                    for c1 in pval_m.index
+                }
 
         # 6) Zone diagnostics (descriptive: mean_abs_z + indicator_status)
         diagnostics = self._build_diagnostics(
             zone_names, ind_ids, ind_defs,
             zscore_by_layer, raw_by_layer, meta_by_layer,
+            mean_abs_z_override=mean_abs_z_override,
         )
 
         # 7) Layer-level statistics (mean/std/N across zones, per indicator)
@@ -241,7 +287,8 @@ class ZoneAnalyzer:
         data_quality = self._compute_data_quality(
             image_records, ind_ids, global_stats,
         )
-        analysis_mode = "multi_zone" if len(zone_names) > 1 else "single_zone"
+        analysis_mode = "zone_level" if len(zone_names) > 1 else "image_level"
+        zone_source: str | None = "user" if analysis_mode == "zone_level" else None
 
         return ZoneAnalysisResult(
             zone_statistics=enriched,
@@ -261,6 +308,7 @@ class ZoneAnalyzer:
             global_indicator_stats=global_stats,
             data_quality=data_quality,
             analysis_mode=analysis_mode,
+            zone_source=zone_source,
         )
 
     # ------------------------------------------------------------------
@@ -304,11 +352,136 @@ class ZoneAnalyzer:
         return result, meta
 
     @staticmethod
+    def _build_image_dataframes(
+        image_records: list[ImageRecord],
+    ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+        """Pivot image_records into {layer: DataFrame(image_id × indicator_id)} of values.
+
+        Also returns image_id → zone_name mapping for per-zone aggregation.
+        """
+        by_layer: dict[str, dict[str, dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
+        image_to_zone: dict[str, str] = {}
+        for rec in image_records:
+            if rec.layer not in LAYERS:
+                continue
+            by_layer[rec.layer][rec.image_id][rec.indicator_id] = rec.value
+            if rec.zone_name and rec.image_id not in image_to_zone:
+                image_to_zone[rec.image_id] = rec.zone_name
+
+        result: dict[str, pd.DataFrame] = {}
+        for layer, image_dict in by_layer.items():
+            df = pd.DataFrame(image_dict).T
+            df = df.sort_index()
+            df = df.reindex(columns=sorted(df.columns))
+            result[layer] = df
+        return result, image_to_zone
+
+    @staticmethod
+    def _compute_image_level_fallback(
+        image_records: list[ImageRecord],
+        zone_names: list[str],
+        ind_ids: list[str],
+    ) -> dict | None:
+        """Image-level statistics for single-zone fallback.
+
+        Returns parallel structures to the zone-level path, but computed treating
+        each image as a sample. The (zone × indicator) shapes are preserved so
+        downstream code (radar, enriched records, correlations) works unchanged.
+
+          - zscore_by_layer: per-zone mean of image-level z. For a lone zone
+            this is ≈ 0 by construction (zone IS the population) — kept for
+            schema consistency; the meaningful single-zone signal is mean_abs_z
+            and the correlation matrix below.
+          - pct_by_layer:    per-zone mean of image-level rank-percentile.
+          - corr_by_layer:   correlations across indicators using image samples
+            (n = n_images, not n_zones) — Issue 6 fix.
+          - mean_abs_z_full_by_zone: per-zone mean of |z_image| on full layer.
+            Captures within-zone dispersion; non-zero even with one zone.
+
+        Returns None if image_records is empty or no usable layers were found.
+        """
+        if not image_records:
+            return None
+
+        image_df_by_layer, image_to_zone = ZoneAnalyzer._build_image_dataframes(image_records)
+        if not image_df_by_layer:
+            return None
+
+        zscore_by_layer: dict[str, pd.DataFrame] = {}
+        pct_by_layer: dict[str, pd.DataFrame] = {}
+        corr_out: dict[str, dict] = {}
+        pval_out: dict[str, dict] = {}
+        mean_abs_z_full_by_zone: dict[str, float] = {}
+
+        for layer, image_df in image_df_by_layer.items():
+            # Image-level z: standardize each indicator column over images
+            mean = image_df.mean()
+            std = image_df.std(ddof=0)
+            z_image = (image_df - mean) / std.replace(0, np.nan)
+
+            # Image-level percentile (rank within indicator across all images)
+            pct_image = image_df.rank(pct=True) * 100
+
+            # Per-zone aggregation (mean of image stats within each zone)
+            zone_series = pd.Series(
+                [image_to_zone.get(idx, "") for idx in image_df.index],
+                index=image_df.index, name="__zone__",
+            )
+            z_image_z = z_image.assign(__zone__=zone_series)
+            pct_image_z = pct_image.assign(__zone__=zone_series)
+            z_zone = z_image_z.groupby("__zone__").mean(numeric_only=True)
+            pct_zone = pct_image_z.groupby("__zone__").mean(numeric_only=True)
+            # Drop the empty-zone bucket from records without a zone_name
+            z_zone = z_zone.drop(index="", errors="ignore")
+            pct_zone = pct_zone.drop(index="", errors="ignore")
+            # Reindex to expected zones × indicators (fills missing as NaN)
+            z_zone = z_zone.reindex(index=zone_names, columns=ind_ids)
+            pct_zone = pct_zone.reindex(index=zone_names, columns=ind_ids)
+            zscore_by_layer[layer] = z_zone
+            pct_by_layer[layer] = pct_zone
+
+            # Image-level correlation (n = n_images)
+            corr_m, pval_m = _calc_corr_pval(image_df)
+            corr_out[layer] = {
+                c1: {c2: round(float(corr_m.loc[c1, c2]), 4) for c2 in corr_m.columns}
+                for c1 in corr_m.index
+            }
+            pval_out[layer] = {
+                c1: {c2: round(float(pval_m.loc[c1, c2]), 6) for c2 in pval_m.columns}
+                for c1 in pval_m.index
+            }
+
+            # Per-zone mean |z| on full layer (used in ZoneDiagnostic.mean_abs_z)
+            if layer == "full":
+                for zone in zone_names:
+                    mask = zone_series == zone
+                    if not mask.any():
+                        continue
+                    abs_vals = z_image.loc[mask].abs().values.flatten()
+                    abs_vals = abs_vals[~np.isnan(abs_vals)]
+                    if len(abs_vals) > 0:
+                        mean_abs_z_full_by_zone[zone] = round(float(abs_vals.mean()), 4)
+
+        return {
+            "zscore_by_layer": zscore_by_layer,
+            "pct_by_layer": pct_by_layer,
+            "corr_by_layer": corr_out,
+            "pval_by_layer": pval_out,
+            "mean_abs_z_full_by_zone": mean_abs_z_full_by_zone,
+        }
+
+    @staticmethod
     def _build_diagnostics(
         zone_names, ind_ids, ind_defs,
         zscore_by_layer, raw_by_layer, meta_by_layer,
+        mean_abs_z_override: dict[str, float] | None = None,
     ) -> list[ZoneDiagnostic]:
-        """Build purely descriptive zone diagnostics (v6.0)."""
+        """Build purely descriptive zone diagnostics (v6.0).
+
+        When `mean_abs_z_override` is provided (image-level fallback path),
+        the per-zone mean_abs_z is sourced from there instead of derived
+        from zscore_by_layer["full"].
+        """
         diagnostics: list[ZoneDiagnostic] = []
 
         for zone in zone_names:
@@ -331,9 +504,14 @@ class ZoneAnalyzer:
                     }
                 indicator_status[ind_id] = layer_data
 
-            # mean_abs_z: mean of abs(z_score) across all indicators in full layer
+            # mean_abs_z: mean of abs(z_score) across all indicators in full layer.
+            # In image-level fallback mode, the override carries the per-zone mean
+            # of |z_image| (within-zone dispersion), which is non-zero even when
+            # the zone-aggregated z's collapse to ~0 by mathematical construction.
             mean_abs_z = 0.0
-            if "full" in zscore_by_layer and zone in zscore_by_layer["full"].index:
+            if mean_abs_z_override is not None:
+                mean_abs_z = float(mean_abs_z_override.get(zone, 0.0))
+            elif "full" in zscore_by_layer and zone in zscore_by_layer["full"].index:
                 full_z = zscore_by_layer["full"].loc[zone]
                 abs_z = full_z.abs().dropna()
                 if len(abs_z) > 0:

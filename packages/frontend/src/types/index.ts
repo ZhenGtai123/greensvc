@@ -385,7 +385,8 @@ export interface ZoneAnalysisResult {
   image_records?: ImageRecord[];
   global_indicator_stats?: GlobalIndicatorStats[];
   data_quality?: DataQualityRow[];
-  analysis_mode?: 'multi_zone' | 'single_zone';
+  analysis_mode?: 'zone_level' | 'image_level';
+  zone_source?: 'user' | 'cluster' | null;
 }
 
 // Clustering types
@@ -619,3 +620,30 @@ export type ProjectPipelineStreamEvent =
     }
   | { type: 'result'; data: ProjectPipelineResult }
   | { type: 'error'; message: string };
+
+// Encoding dictionary (knowledge-base codebook) types
+export interface SupportingPaper {
+  paper_file?: string;
+  doi?: string;
+  citation?: string;
+}
+
+export interface EncodingEntry {
+  code: string;
+  name: string;
+  definition: string;
+  supporting_papers: SupportingPaper[];
+  parent_dim?: string | null;
+  evidence_count?: number | null;
+}
+
+export type EncodingSectionKey =
+  | 'K_climate'
+  | 'E_countries'
+  | 'E_settings'
+  | 'L_lcz'
+  | 'M_age_groups'
+  | 'C_performance'
+  | 'C_subdimensions';
+
+export type EncodingSections = Record<EncodingSectionKey, EncodingEntry[]>;

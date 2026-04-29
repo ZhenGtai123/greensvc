@@ -62,7 +62,7 @@ function GlobalPipelineProgress() {
     return Math.round(perImage * remaining);
   }, [pipelineRun]);
 
-  if (!pipelineRun.isRunning) return null;
+  if (!pipelineRun.isRunning || onAnalysisPage) return null;
 
   const lastStep = pipelineRun.steps[pipelineRun.steps.length - 1];
   const stageLabel = lastStep ? `${lastStep.step} (${lastStep.status})` : 'starting…';
