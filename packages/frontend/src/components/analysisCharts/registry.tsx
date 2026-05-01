@@ -255,7 +255,7 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
   // ── Spatial (3-tab combo replacing former 3 separate cards) ──────────
   {
     id: 'spatial-overview',
-    title: 'Where on the site does each indicator stand out?',
+    title: 'Indicator Spatial Maps (coverage · value · deviation)',
     tab: 'analysis',
     section: 'spatial',
     layerAware: true,

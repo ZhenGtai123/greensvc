@@ -14,6 +14,7 @@ export function getStageStatuses(
   store: {
     recommendations: unknown[];
     zoneAnalysisResult: unknown | null;
+    aiReport: string | null;
   },
 ): StageStatus[] {
   if (!project) {
@@ -35,6 +36,7 @@ export function getStageStatuses(
 
   const hasRecommendations = store.recommendations.length > 0;
   const hasZoneAnalysis = store.zoneAnalysisResult !== null;
+  const hasAiReport = !!store.aiReport;
 
   // Step 1: Project — done when project has zones defined
   const projectStep: StageStatus = { done: hasZones, ready: true };
@@ -51,8 +53,12 @@ export function getStageStatuses(
   // Step 4: Analysis — done when zone analysis exists, ready when prepare done
   const analysis: StageStatus = { done: hasZoneAnalysis, ready: hasMasks && hasRecommendations };
 
-  // Step 5: Report — never "done" (view-only), ready when analysis done
-  const report: StageStatus = { done: false, ready: hasZoneAnalysis };
+  // Step 5: Report — done once an AI report has been generated. Charts and
+  // raw downloads are always available the moment Stage 2.5 finishes, so
+  // "AI report exists" is the single user-meaningful signal that the
+  // workflow is complete. Pipeline runs and Stage 3 retries clear ai_report
+  // server-side, so this can never falsely show green for stale data.
+  const report: StageStatus = { done: hasAiReport, ready: hasZoneAnalysis };
 
   return [projectStep, images, prepare, analysis, report];
 }

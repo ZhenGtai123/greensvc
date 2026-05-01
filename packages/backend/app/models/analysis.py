@@ -298,6 +298,9 @@ class DesignStrategyRequest(BaseModel):
     # Shape: {zone_id: {chart_id: caption_text}}. zone_id "_global" carries
     # captions for charts that aren't per-zone (correlation, distribution, ...).
     analysis_narratives: dict[str, dict[str, str]] = Field(default_factory=dict)
+    # When set, the resulting strategies are persisted onto the project so
+    # they survive page reloads and project switches.
+    project_id: Optional[str] = None
 
 
 class DesignStrategyResult(BaseModel):
@@ -317,6 +320,9 @@ class ReportRequest(BaseModel):
     stage1_recommendations: Optional[list[dict]] = None
     project_context: ProjectContext = Field(default_factory=ProjectContext)
     format: str = "markdown"  # markdown | pdf
+    # When set, the generated report content + metadata are persisted onto
+    # the project so they survive page reloads and project switches.
+    project_id: Optional[str] = None
 
 
 class ReportResult(BaseModel):

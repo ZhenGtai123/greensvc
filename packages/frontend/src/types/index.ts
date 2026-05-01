@@ -46,6 +46,15 @@ export interface Project {
   spatial_zones: SpatialZone[];
   spatial_relations: SpatialRelation[];
   uploaded_images: UploadedImage[];
+
+  // Persisted analysis artefacts (server-side source of truth — survive
+  // reloads and project switches). Frontend hydrates the Zustand store from
+  // these on project mount; localStorage no longer holds them.
+  zone_analysis_result?: ZoneAnalysisResult | null;
+  design_strategy_result?: DesignStrategyResult | null;
+  ai_report?: string | null;
+  ai_report_meta?: Record<string, unknown> | null;
+  analysis_results_updated_at?: string | null;
 }
 
 export interface SpatialZoneCreate {

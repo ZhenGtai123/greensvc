@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, Outlet, useParams, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { ChakraProvider, Box, Divider, Flex, Heading, Text, VStack } from '@chakra-ui/react';
@@ -6,6 +6,7 @@ import { LayoutDashboard, FolderKanban, Calculator, Settings as SettingsIcon } f
 import theme from './theme';
 import StepIndicator from './components/StepIndicator';
 import GlobalPipelineProgress from './components/GlobalPipelineProgress';
+import SettingsDrawer from './components/SettingsDrawer';
 import useAppStore from './store/useAppStore';
 import { getStageStatuses } from './utils/pipelineStatus';
 import api from './api';
@@ -32,7 +33,7 @@ const queryClient = new QueryClient({
 const SIDEBAR_W = '224px';
 
 // ---------------------------------------------------------------------------
-// Sidebar nav item
+// Sidebar nav item — link variant (router navigation)
 // ---------------------------------------------------------------------------
 function NavItem({ to, label, active, icon: Icon }: { to: string; label: string; active: boolean; icon: React.ElementType }) {
   return (
@@ -61,9 +62,41 @@ function NavItem({ to, label, active, icon: Icon }: { to: string; label: string;
 }
 
 // ---------------------------------------------------------------------------
+// Sidebar nav item — button variant (in-page action; e.g. open drawer)
+// ---------------------------------------------------------------------------
+function NavButton({ label, active, icon: Icon, onClick }: { label: string; active: boolean; icon: React.ElementType; onClick: () => void }) {
+  return (
+    <Box
+      as="button"
+      type="button"
+      onClick={onClick}
+      display="flex"
+      alignItems="center"
+      gap={3}
+      px={5}
+      py={2.5}
+      fontSize="sm"
+      fontWeight={active ? '600' : '400'}
+      color={active ? 'brand.700' : 'gray.600'}
+      bg={active ? 'brand.50' : 'transparent'}
+      borderRight="3px solid"
+      borderColor={active ? 'brand.500' : 'transparent'}
+      _hover={{ bg: active ? 'brand.50' : 'gray.100', color: 'gray.800' }}
+      textAlign="left"
+      w="full"
+      transition="all 0.2s ease"
+      cursor="pointer"
+    >
+      <Icon size={18} />
+      {label}
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Sidebar
 // ---------------------------------------------------------------------------
-function Sidebar() {
+function Sidebar({ onOpenSettings, settingsActive }: { onOpenSettings: () => void; settingsActive: boolean }) {
   const { pathname } = useLocation();
 
   const mainItems = [
@@ -123,14 +156,16 @@ function Sidebar() {
         ))}
       </VStack>
 
-      {/* Bottom */}
+      {/* Bottom — Settings opens an in-page drawer instead of navigating
+          away, so the user keeps their place. The /settings route still
+          works as a deep-link fallback. */}
       <Divider />
       <Box py={3}>
-        <NavItem
-          to="/settings"
+        <NavButton
           label="Settings"
-          active={pathname.startsWith('/settings')}
+          active={settingsActive}
           icon={SettingsIcon}
+          onClick={onOpenSettings}
         />
       </Box>
     </Flex>
@@ -143,7 +178,14 @@ function Sidebar() {
 function ProjectPipelineLayout() {
   const { projectId } = useParams<{ projectId: string }>();
   const { pathname } = useLocation();
-  const { recommendations, zoneAnalysisResult, setCurrentProject, clearPipelineResults } = useAppStore();
+  const {
+    recommendations,
+    zoneAnalysisResult,
+    aiReport,
+    setCurrentProject,
+    clearPipelineResults,
+    hydrateFromProject,
+  } = useAppStore();
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -151,24 +193,32 @@ function ProjectPipelineLayout() {
     enabled: !!projectId,
   });
 
-  // Keep the Zustand store in sync with React Query. Fires on every page in the pipeline,
-  // so Reports/Analysis pages reached directly have currentProject populated without
-  // depending on localStorage hydration. Clears pipeline results when switching projects.
+  // Keep the Zustand store in sync with React Query, and hydrate
+  // analysis artefacts from the backend (source of truth for
+  // zone_analysis_result / design_strategy_result / ai_report). When
+  // switching projects we wipe transient state first, then hydrate from the
+  // new project — that way A's AI report can never leak into B's view.
   useEffect(() => {
     if (!project) return;
     const prev = useAppStore.getState().currentProject;
-    if (prev && prev.id !== project.id) {
+    const switching = !!prev && prev.id !== project.id;
+    if (switching) {
       clearPipelineResults();
     }
     setCurrentProject(project);
-  }, [project, setCurrentProject, clearPipelineResults]);
+    hydrateFromProject(project, switching);
+  }, [project, setCurrentProject, clearPipelineResults, hydrateFromProject]);
 
   const segment = pathname.split('/').pop() || '';
   // 5-step: Project(1) → Images(2) → Prepare(3) → Analysis(4) → Report(5)
   const stepMap: Record<string, number> = { edit: 1, vision: 3, analysis: 4, reports: 5 };
   const currentStep = stepMap[segment] || 2; // fallback 2 = Images
 
-  const stageStatuses = getStageStatuses(project ?? null, { recommendations, zoneAnalysisResult });
+  const stageStatuses = getStageStatuses(project ?? null, {
+    recommendations,
+    zoneAnalysisResult,
+    aiReport,
+  });
 
   return (
     <>
@@ -180,13 +230,64 @@ function ProjectPipelineLayout() {
 
 /** Layout for /projects/new — shows StepIndicator at step 1 with no project loaded */
 function NewProjectLayout() {
-  const stageStatuses = getStageStatuses(null, { recommendations: [], zoneAnalysisResult: null });
+  const stageStatuses = getStageStatuses(null, { recommendations: [], zoneAnalysisResult: null, aiReport: null });
 
   return (
     <>
       <StepIndicator currentStep={1} projectId="" stageStatuses={stageStatuses} />
       <Outlet />
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AppShell — owns the in-page Settings drawer state. Lives inside the Router
+// so it can read the current pathname for the active-state highlight on the
+// Settings nav item (the deep-link /settings route still highlights it).
+// ---------------------------------------------------------------------------
+function AppShell() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { pathname } = useLocation();
+  const settingsActive = settingsOpen || pathname.startsWith('/settings');
+
+  return (
+    <Flex minH="100vh">
+      <Sidebar
+        onOpenSettings={() => setSettingsOpen(true)}
+        settingsActive={settingsActive}
+      />
+
+      {/* Main content area */}
+      <Box ml={SIDEBAR_W} flex={1} minH="100vh" minW={0} overflow="hidden">
+        <GlobalPipelineProgress />
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/projects" element={<Projects />} />
+
+          {/* New project — step 1 of pipeline */}
+          <Route path="/projects/new" element={<NewProjectLayout />}>
+            <Route index element={<ProjectWizard />} />
+          </Route>
+
+          {/* 5-step pipeline: Project → Images → Prepare → Analysis → Report */}
+          <Route path="/projects/:projectId" element={<ProjectPipelineLayout />}>
+            <Route index element={<ProjectDetail />} />
+            <Route path="edit" element={<ProjectWizard />} />
+            <Route path="vision" element={<VisionAnalysis />} />
+            <Route path="analysis" element={<Analysis />} />
+            <Route path="reports" element={<Reports />} />
+          </Route>
+
+          <Route path="/calculators" element={<Calculators />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </Box>
+
+      <SettingsDrawer
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+    </Flex>
   );
 }
 
@@ -198,35 +299,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ChakraProvider theme={theme}>
         <BrowserRouter>
-          <Flex minH="100vh">
-            <Sidebar />
-
-            {/* Main content area */}
-            <Box ml={SIDEBAR_W} flex={1} minH="100vh" minW={0} overflow="hidden">
-              <GlobalPipelineProgress />
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/projects" element={<Projects />} />
-
-                {/* New project — step 1 of pipeline */}
-                <Route path="/projects/new" element={<NewProjectLayout />}>
-                  <Route index element={<ProjectWizard />} />
-                </Route>
-
-                {/* 5-step pipeline: Project → Images → Prepare → Analysis → Report */}
-                <Route path="/projects/:projectId" element={<ProjectPipelineLayout />}>
-                  <Route index element={<ProjectDetail />} />
-                  <Route path="edit" element={<ProjectWizard />} />
-                  <Route path="vision" element={<VisionAnalysis />} />
-                  <Route path="analysis" element={<Analysis />} />
-                  <Route path="reports" element={<Reports />} />
-                </Route>
-
-                <Route path="/calculators" element={<Calculators />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
-            </Box>
-          </Flex>
+          <AppShell />
         </BrowserRouter>
       </ChakraProvider>
     </QueryClientProvider>

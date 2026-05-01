@@ -137,8 +137,12 @@ flag below with one or two concrete sentences.
       - n_zones / analysis_mode
       - indicators_with_nan (list the affected IDs)
       - layer_coverage_pct (how complete the FG/MG/BG split is)
-      - transferability_mismatch_zones (zones whose context diverges from the
-        evidence pool)
+      - low_confidence_evidence_ratio (share of recommended indicators whose
+        evidence is dominated by descriptive / weakest-tier records — flag as
+        a confidence caveat when > 0.3)
+      - low_transferability_indicators (indicator IDs whose supporting
+        evidence pool's transferability to this project is mostly low or
+        unknown; cite each one explicitly as a context caveat)
 6.4 Knowledge gaps and methodological caveats.
 
 ## Input Data
@@ -200,7 +204,9 @@ class ReportService:
             request.project_context.model_dump(), ensure_ascii=False, indent=2
         )
         stage1_data = self._prepare_stage1(request.stage1_recommendations)
-        stage2_data = self._prepare_stage2(request.zone_analysis)
+        stage2_data = self._prepare_stage2(
+            request.zone_analysis, request.stage1_recommendations
+        )
         stage3_data = self._prepare_stage3(request.design_strategies)
         encoding_ref = json.dumps(
             self.kb.get_codebook_subset(max_chars=20000), ensure_ascii=False, indent=2
@@ -324,7 +330,11 @@ class ReportService:
             })
         return json.dumps(compact, ensure_ascii=False, indent=2)
 
-    def _prepare_stage2(self, zone_analysis: ZoneAnalysisResult) -> str:
+    def _prepare_stage2(
+        self,
+        zone_analysis: ZoneAnalysisResult,
+        recommendations: Optional[list[dict]] = None,
+    ) -> str:
         """Compact Stage 2 zone analysis for prompt (v6.0 descriptive)."""
         meta = zone_analysis.computation_metadata
         summary: dict = {
@@ -414,7 +424,9 @@ class ReportService:
         summary["zone_source"] = zone_analysis.zone_source
 
         # 6.B(3) — explicit data quality flags fed into Agent C §6
-        summary["data_quality_flags"] = self._compute_data_quality_flags(zone_analysis)
+        summary["data_quality_flags"] = self._compute_data_quality_flags(
+            zone_analysis, recommendations
+        )
 
         # Significant correlations
         sig_pairs = []
@@ -439,15 +451,23 @@ class ReportService:
         return json.dumps(summary, ensure_ascii=False, indent=2)
 
     @staticmethod
-    def _compute_data_quality_flags(zone_analysis: ZoneAnalysisResult) -> dict:
+    def _compute_data_quality_flags(
+        zone_analysis: ZoneAnalysisResult,
+        recommendations: Optional[list[dict]] = None,
+    ) -> dict:
         """Surface explicit quality signals so Agent C §6 can discuss them.
 
-        Mirrors the issues the user asked to expose in 6.B(3):
-          - is_single_zone (n_zones == 1)
-          - indicators_with_nan (count + ids of indicators missing valid means)
+        Flags exposed to the prompt:
+          - is_single_zone (n_zones <= 1)
+          - n_zones, analysis_mode
+          - indicators_with_nan (ids of indicators missing valid means)
           - layer_coverage_pct (mean FG/MG/BG coverage)
-          - low_confidence_evidence_ratio (Tier-C / descriptive-only share, if known)
-          - transferability_mismatch_zones (zones with climate/setting/age mismatches)
+          - low_confidence_evidence_ratio (share of recommendations whose
+            supporting evidence is dominated by descriptive/Tier-3 records)
+          - low_transferability_indicators (indicators whose evidence pool's
+            climate/setting/age coverage is mostly low-or-unknown for this
+            project — replaces the doc's per-zone framing because zone context
+            in this data model is project-level, not per-zone)
         """
         flags: dict = {
             "is_single_zone": False,
@@ -455,7 +475,7 @@ class ReportService:
             "indicators_with_nan": [],
             "layer_coverage_pct": None,
             "low_confidence_evidence_ratio": None,
-            "transferability_mismatch_zones": [],
+            "low_transferability_indicators": [],
         }
 
         meta = zone_analysis.computation_metadata
@@ -484,6 +504,44 @@ class ReportService:
                 coverages.append((fg + mg + bg) / 3.0)
             if coverages:
                 flags["layer_coverage_pct"] = round(sum(coverages) / len(coverages), 1)
+
+        # Recommendation-derived flags
+        if recommendations:
+            low_conf = 0
+            low_transfer: list[str] = []
+            counted = 0
+            for rec in recommendations:
+                ev = rec.get("evidence_summary") or {}
+                ts = rec.get("transferability_summary") or {}
+                ind_id = rec.get("indicator_id") or rec.get("indicator", {}).get("id", "")
+
+                inf = ev.get("inferential_count", 0) or 0
+                desc = ev.get("descriptive_count", 0) or 0
+                strongest = (ev.get("strongest_tier") or "").upper()
+                # Low-confidence indicator: no inferential records, OR best tier
+                # is the weakest, OR descriptive evidence outweighs inferential
+                is_low_conf = (
+                    inf == 0
+                    or strongest in ("TIR_T3", "TIR_C", "")
+                    or (desc > 0 and desc >= inf * 2)
+                )
+                if inf or desc:
+                    counted += 1
+                    if is_low_conf:
+                        low_conf += 1
+
+                hi = ts.get("high_count", 0) or 0
+                mod = ts.get("moderate_count", 0) or 0
+                lo = ts.get("low_count", 0) or 0
+                unk = ts.get("unknown_count", 0) or 0
+                # Low-transferability indicator: weak/unknown evidence outnumbers
+                # the high+moderate-transferability evidence
+                if (lo + unk) > (hi + mod) and ind_id:
+                    low_transfer.append(ind_id)
+
+            if counted:
+                flags["low_confidence_evidence_ratio"] = round(low_conf / counted, 2)
+            flags["low_transferability_indicators"] = low_transfer
 
         return flags
 

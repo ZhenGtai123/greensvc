@@ -283,8 +283,14 @@ function Reports() {
         zone_analysis: zoneAnalysisResult,
         analysis_narratives: narratives,
         use_llm: true,
+        project_id: routeProjectId ?? undefined,
       });
       useAppStore.getState().setDesignStrategyResult(result);
+      // Stage 3 changed → backend cleared the cached AI report; mirror that
+      // locally so the Report step's "done" indicator and the AI-report
+      // card don't show stale content.
+      useAppStore.getState().setAiReport(null);
+      useAppStore.getState().setAiReportMeta(null);
       toast({ title: 'Design strategies generated', status: 'success' });
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
@@ -349,6 +355,7 @@ function Reports() {
           },
         } : undefined,
         format: 'markdown',
+        project_id: routeProjectId ?? undefined,
       };
       const result = await generateReportMutation.mutateAsync(request);
       setAiReport(result.content);
@@ -375,7 +382,7 @@ function Reports() {
     } catch {
       toast({ title: 'AI report generation failed', status: 'error' });
     }
-  }, [zoneAnalysisResult, designStrategyResult, recommendations, currentProject, generateReportMutation, toast, setAiReport, setAiReportMeta]);
+  }, [zoneAnalysisResult, designStrategyResult, recommendations, currentProject, generateReportMutation, toast, setAiReport, setAiReportMeta, routeProjectId]);
 
   // Completion status
   const hasVision = (currentProject?.uploaded_images?.length ?? 0) > 0;

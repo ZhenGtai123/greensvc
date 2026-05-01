@@ -87,6 +87,7 @@ interface AppState {
   setAiReportMeta: (m: Record<string, unknown> | null) => void;
 
   clearPipelineResults: () => void;
+  hydrateFromProject: (project: Project, forceClearMissing: boolean) => void;
 
   // Pipeline run state — lives outside React component lifetimes so the run
   // survives Analysis page unmount, and lets every other page show a global
@@ -172,6 +173,31 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     pipelineResult: null,
     aiReport: null,
     aiReportMeta: null,
+  }),
+
+  // Hydrate analysis artefacts from a freshly fetched Project. The backend
+  // is the source of truth for these — this lets ProjectPipelineLayout
+  // restore them on every project mount so reloads / project switches don't
+  // lose the user's work. Pass `forceClearMissing` when switching projects:
+  // the new project may legitimately have no results yet, and we must NOT
+  // leak the previous project's blobs through.
+  hydrateFromProject: (project: Project, forceClearMissing: boolean) => set((s) => {
+    const next: Partial<AppState> = {};
+    if (project.zone_analysis_result !== undefined || forceClearMissing) {
+      next.zoneAnalysisResult = project.zone_analysis_result ?? null;
+    } else if (s.zoneAnalysisResult === null && project.zone_analysis_result) {
+      next.zoneAnalysisResult = project.zone_analysis_result;
+    }
+    if (project.design_strategy_result !== undefined || forceClearMissing) {
+      next.designStrategyResult = project.design_strategy_result ?? null;
+    }
+    if (project.ai_report !== undefined || forceClearMissing) {
+      next.aiReport = project.ai_report ?? null;
+    }
+    if (project.ai_report_meta !== undefined || forceClearMissing) {
+      next.aiReportMeta = project.ai_report_meta ?? null;
+    }
+    return next;
   }),
 
   // Pipeline run state
@@ -299,6 +325,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   setColorblindMode: (v) => set({ colorblindMode: v }),
 }), {
   name: 'scenerx-store',
+  // localStorage now holds ONLY UI prefs and pre-pipeline state. The big
+  // analysis blobs (zone_analysis_result / design_strategy_result / ai_report
+  // / pipelineResult) live on the backend ProjectResponse and hydrate into
+  // the store via `hydrateFromProject` on every project mount. This is what
+  // fixes "switching projects nukes my AI report" and lets users open the
+  // same project from another browser without losing work.
   partialize: (state) => ({
     // currentProject is NOT persisted — it contains uploaded_images (can be 1000s)
     // which blows past localStorage's 5-10MB quota. It's re-fetched via React Query
@@ -312,18 +344,6 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     recommendations: state.recommendations,
     indicatorRelationships: state.indicatorRelationships,
     recommendationSummary: state.recommendationSummary,
-    // Strip image_records from persisted state — they can be 10K+ entries
-    // which blows past localStorage quota. They're re-computed on each
-    // pipeline run and exist only in the in-memory store during the session.
-    zoneAnalysisResult: state.zoneAnalysisResult
-      ? { ...state.zoneAnalysisResult, image_records: [] }
-      : null,
-    designStrategyResult: state.designStrategyResult,
-    pipelineResult: state.pipelineResult
-      ? { ...state.pipelineResult, skipped_images: [] }
-      : null,
-    aiReport: state.aiReport,
-    aiReportMeta: state.aiReportMeta,
     hiddenChartIds: state.hiddenChartIds,
     showAiSummary: state.showAiSummary,
     colorblindMode: state.colorblindMode,

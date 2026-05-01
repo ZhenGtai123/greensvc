@@ -1,7 +1,7 @@
 """Project-related Pydantic models"""
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
@@ -121,6 +121,16 @@ class ProjectResponse(BaseModel):
     spatial_zones: list[SpatialZone] = Field(default_factory=list)
     spatial_relations: list[SpatialRelation] = Field(default_factory=list)
     uploaded_images: list[UploadedImage] = Field(default_factory=list)
+
+    # Persisted analysis artefacts. Stored as raw dicts so this module stays
+    # decoupled from the (much larger) analysis model graph; the pipeline
+    # already produces these via model_dump(mode="json") and the frontend
+    # consumes them via its own TypeScript types.
+    zone_analysis_result: Optional[dict[str, Any]] = None
+    design_strategy_result: Optional[dict[str, Any]] = None
+    ai_report: Optional[str] = None
+    ai_report_meta: Optional[dict[str, Any]] = None
+    analysis_results_updated_at: Optional[datetime] = None
 
 
 class ProjectQuery(BaseModel):

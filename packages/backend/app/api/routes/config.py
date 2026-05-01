@@ -237,6 +237,83 @@ def _fetch_gemini_models_sync(api_key: str) -> list[dict]:
     return models
 
 
+def _fetch_openai_models_sync(api_key: str) -> list[dict]:
+    """Fetch available OpenAI models from the API (blocking).
+
+    Filters to chat-capable model families (gpt-*, o1, o3, o4) and skips
+    embedding / audio / image / moderation variants the chat endpoint can't use.
+    """
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key)
+    _PREFIXES = ("gpt-", "chatgpt", "o1", "o3", "o4")
+    _SKIP = (
+        "embedding", "embed", "tts", "whisper", "audio",
+        "moderation", "image", "dall-e", "realtime", "search",
+        "transcribe", "instruct", "babbage", "davinci",
+    )
+    models = []
+    seen = set()
+    for m in client.models.list().data:
+        model_id = (m.id or "").lower()
+        if not model_id or model_id in seen:
+            continue
+        if not any(model_id.startswith(p) for p in _PREFIXES):
+            continue
+        if any(s in model_id for s in _SKIP):
+            continue
+        seen.add(model_id)
+        models.append({"id": m.id, "label": m.id})
+    models.sort(key=lambda x: x["id"])
+    return models
+
+
+def _fetch_anthropic_models_sync(api_key: str) -> list[dict]:
+    """Fetch available Anthropic Claude models from the API (blocking).
+
+    Uses the SDK's models.list() endpoint (anthropic >= 0.39 / API 2024-10-22).
+    Falls back to the messages-capable endpoint if that fails.
+    """
+    from anthropic import Anthropic
+
+    client = Anthropic(api_key=api_key)
+    models = []
+    for m in client.models.list().data:
+        model_id = m.id or ""
+        if not model_id:
+            continue
+        display = getattr(m, "display_name", "") or model_id
+        models.append({"id": model_id, "label": display})
+    # Anthropic returns newest-first; keep that ordering for the dropdown.
+    return models
+
+
+def _fetch_deepseek_models_sync(api_key: str) -> list[dict]:
+    """Fetch available DeepSeek models from the API (blocking).
+
+    DeepSeek serves an OpenAI-compatible /models endpoint.
+    """
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    models = []
+    for m in client.models.list().data:
+        model_id = m.id or ""
+        if not model_id:
+            continue
+        models.append({"id": model_id, "label": model_id})
+    models.sort(key=lambda x: x["id"])
+    return models
+
+
+_PROVIDER_FETCHERS = {
+    "gemini": _fetch_gemini_models_sync,
+    "openai": _fetch_openai_models_sync,
+    "anthropic": _fetch_anthropic_models_sync,
+    "deepseek": _fetch_deepseek_models_sync,
+}
+
+
 @router.get("/models/{provider}")
 async def list_provider_models(
     provider: str,
@@ -257,12 +334,12 @@ async def list_provider_models(
     if not api_key:
         return []  # frontend falls back to hardcoded list
 
+    fetcher = _PROVIDER_FETCHERS.get(provider)
+    if fetcher is None:
+        return []
+
     try:
-        if provider == "gemini":
-            models = await asyncio.to_thread(_fetch_gemini_models_sync, api_key)
-            return models
+        return await asyncio.to_thread(fetcher, api_key)
     except Exception as e:
         logger.warning("Failed to fetch models for %s: %s", provider, e)
         return []  # frontend falls back to hardcoded list
-
-    return []
