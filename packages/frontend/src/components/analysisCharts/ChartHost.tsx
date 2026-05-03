@@ -25,6 +25,7 @@ import {
   AlertIcon,
   VStack,
   Icon,
+  Badge,
 } from '@chakra-ui/react';
 import { MoreHorizontal, Download, EyeOff, Sparkles, ChevronRight, ChevronDown } from 'lucide-react';
 import type { ChartDescriptor } from './registry';
@@ -44,6 +45,9 @@ interface ChartHostProps {
   /** Force-render the chart even if it hasn't intersected yet. Used during
    * report export to ensure all charts are mounted before capture. */
   forceMount?: boolean;
+  /** Fired exactly once when the chart body actually hydrates (lazy-mount or
+   * forceMount). Used by the page-level loading progress bar. */
+  onMount?: (id: string) => void;
 }
 
 /**
@@ -67,12 +71,13 @@ export interface ChartHostHandle {
  */
 export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
   function ChartHost(
-    { descriptor, ctx, onHide, projectId, projectContext, showAiSummary = true, forceMount = false },
+    { descriptor, ctx, onHide, projectId, projectContext, showAiSummary = true, forceMount = false, onMount },
     ref,
   ) {
     const cardRef = useRef<HTMLDivElement | null>(null);
     const [hasIntersected, setHasIntersected] = useState(false);
-    const [aiOpen, setAiOpen] = useState(false);
+    const [aiOpen, setAiOpen] = useState(true);
+    const reportedMountRef = useRef(false);
 
     // IntersectionObserver lazy mount — defer rendering of heavy chart bodies
     // until the card scrolls near the viewport. Once mounted, stays mounted.
@@ -103,6 +108,16 @@ export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
     // forceMount flips on during report export — ensure the body has rendered
     // even if the user hasn't scrolled to it.
     const effectiveMounted = hasIntersected || forceMount;
+
+    // Fire onMount exactly once per chart instance once we've actually rendered
+    // the body (either via intersection or forced). The ref guard prevents
+    // double-fire across re-renders or strict-mode double effects.
+    useEffect(() => {
+      if (!effectiveMounted) return;
+      if (reportedMountRef.current) return;
+      reportedMountRef.current = true;
+      onMount?.(descriptor.id);
+    }, [effectiveMounted, descriptor.id, onMount]);
 
     const summaryPayload = descriptor.summaryPayload?.(ctx) ?? {
       chart_id: descriptor.id,
@@ -187,7 +202,14 @@ export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
         <CardHeader pb={2}>
           <HStack justify="space-between" align="start">
             <Box flex="1" minW={0}>
-              <Heading size="sm">{descriptor.title}</Heading>
+              <HStack spacing={2} align="center">
+                <Heading size="sm">{descriptor.title}</Heading>
+                {descriptor.refCode && (
+                  <Badge variant="subtle" colorScheme="gray" fontSize="2xs">
+                    {descriptor.refCode}
+                  </Badge>
+                )}
+              </HStack>
               {descriptor.description && (
                 <Text fontSize="xs" color="gray.500" mt={1} lineHeight="1.4">
                   {descriptor.description}

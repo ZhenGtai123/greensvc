@@ -183,7 +183,6 @@ function ProjectPipelineLayout() {
     zoneAnalysisResult,
     aiReport,
     setCurrentProject,
-    clearPipelineResults,
     hydrateFromProject,
   } = useAppStore();
 
@@ -193,21 +192,17 @@ function ProjectPipelineLayout() {
     enabled: !!projectId,
   });
 
-  // Keep the Zustand store in sync with React Query, and hydrate
-  // analysis artefacts from the backend (source of truth for
-  // zone_analysis_result / design_strategy_result / ai_report). When
-  // switching projects we wipe transient state first, then hydrate from the
-  // new project — that way A's AI report can never leak into B's view.
+  // Keep the Zustand store in sync with React Query and hydrate Stage 1 /
+  // analysis artefacts from the backend (source of truth for everything
+  // project-scoped). hydrateFromProject overwrites unconditionally, so a
+  // fresh tab opening project A cannot leak the previous session's blobs
+  // — and switching from A to B atomically swaps in B's data with no
+  // intermediate "cleared" state for the UI to flash.
   useEffect(() => {
     if (!project) return;
-    const prev = useAppStore.getState().currentProject;
-    const switching = !!prev && prev.id !== project.id;
-    if (switching) {
-      clearPipelineResults();
-    }
     setCurrentProject(project);
-    hydrateFromProject(project, switching);
-  }, [project, setCurrentProject, clearPipelineResults, hydrateFromProject]);
+    hydrateFromProject(project);
+  }, [project, setCurrentProject, hydrateFromProject]);
 
   const segment = pathname.split('/').pop() || '';
   // 5-step: Project(1) → Images(2) → Prepare(3) → Analysis(4) → Report(5)

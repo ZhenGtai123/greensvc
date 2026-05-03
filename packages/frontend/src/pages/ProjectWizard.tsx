@@ -15,31 +15,23 @@ import {
   CardHeader,
   CardBody,
   Text,
-  Badge,
   Checkbox,
-  IconButton,
   Tag,
   TagLabel,
   Wrap,
   WrapItem,
-  Collapse,
-  useDisclosure,
 } from '@chakra-ui/react';
 import {
   ClipboardList,
   Globe,
   Target,
   Map,
-  Link2,
-  X,
   Eye,
   Footprints,
   Thermometer,
   Heart,
   Brain,
   Users,
-  ChevronUp,
-  ChevronDown,
   Plus,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -52,22 +44,6 @@ import { useEncodingSections } from '../hooks/useApi';
 import type { EncodingEntry } from '../types';
 
 // ============ Constants ============
-
-const SITE_SCALES = [
-  { value: 'XS', label: 'Extra Small (<0.5 hectare)' },
-  { value: 'S', label: 'Small (0.5-2 hectares)' },
-  { value: 'M', label: 'Medium (2-10 hectares)' },
-  { value: 'L', label: 'Large (10-50 hectares)' },
-  { value: 'XL', label: 'Extra Large (>50 hectares)' },
-];
-
-const PROJECT_PHASES = [
-  { value: 'conceptual', label: 'Conceptual Design' },
-  { value: 'schematic', label: 'Schematic Design' },
-  { value: 'detailed', label: 'Detailed Design' },
-  { value: 'renovation', label: 'Renovation/Improvement' },
-  { value: 'evaluation', label: 'Post-occupancy Evaluation' },
-];
 
 // Icon override for performance-dimension cards. The names + definitions
 // themselves come from the knowledge-base C_performance section.
@@ -91,13 +67,6 @@ const DEFAULT_ZONE_TYPES = [
   { id: 'garden', name: 'Garden/Planting', def: 'Gardens, planting beds' },
   { id: 'path', name: 'Path/Corridor', def: 'Main circulation corridors' },
   { id: 'rest', name: 'Rest/Seating', def: 'Rest nodes, seating areas' },
-];
-
-const DEFAULT_RELATION_TYPES = [
-  { id: 'adjacent', name: 'Spatially Adjacent', color: '#2563eb', style: 'solid' },
-  { id: 'path', name: 'Path Connection', color: '#10b981', style: 'solid' },
-  { id: 'visual', name: 'Visual Connection', color: '#f59e0b', style: 'dashed' },
-  { id: 'functional', name: 'Functional Link', color: '#ef4444', style: 'dotted' },
 ];
 
 // ============ Section Title ============
@@ -147,14 +116,6 @@ interface SpatialZone {
   description?: string;
 }
 
-interface SpatialRelation {
-  id: string;
-  fromZone: string;
-  toZone: string;
-  relationType: string;
-  direction: 'single' | 'double';
-}
-
 // ============ Component ============
 
 function ProjectWizard() {
@@ -163,7 +124,6 @@ function ProjectWizard() {
   const navigate = useNavigate();
   const toast = useAppToast();
   const queryClient = useQueryClient();
-  const { isOpen: isRelationsOpen, onToggle: toggleRelations } = useDisclosure();
 
   // Knowledge-base codebook (single source of truth for the 6 dropdown sections)
   const { data: encoding } = useEncodingSections();
@@ -184,8 +144,6 @@ function ProjectWizard() {
   // Project Info
   const [projectName, setProjectName] = useState('');
   const [projectLocation, setProjectLocation] = useState('');
-  const [siteScale, setSiteScale] = useState('');
-  const [projectPhase, setProjectPhase] = useState('');
 
   // Site Context
   const [koppenZone, setKoppenZone] = useState('');
@@ -202,10 +160,6 @@ function ProjectWizard() {
   // Spatial Zones
   const [zones, setZones] = useState<SpatialZone[]>([]);
   const [zoneTypes] = useState(DEFAULT_ZONE_TYPES);
-
-  // Spatial Relations
-  const [relations, setRelations] = useState<SpatialRelation[]>([]);
-  const [relationTypes] = useState(DEFAULT_RELATION_TYPES);
 
   // Saving
   const [saving, setSaving] = useState(false);
@@ -233,8 +187,6 @@ function ProjectWizard() {
           const project = res.data;
           setProjectName(project.project_name);
           setProjectLocation(project.project_location || '');
-          setSiteScale(project.site_scale || '');
-          setProjectPhase(project.project_phase || '');
           setKoppenZone(project.koppen_zone_id || '');
           setCountry(project.country_id || '');
           setSpaceType(project.space_type_id || '');
@@ -253,16 +205,6 @@ function ProjectWizard() {
             description: z.description || '',
           }));
           setZones(loadedZones);
-
-          const loadedRelations: SpatialRelation[] = (project.spatial_relations || []).map((r: { from_zone: string; to_zone: string; relation_type: string; direction?: string }, idx: number) => ({
-            id: `rel_${idx}`,
-            fromZone: r.from_zone,
-            toZone: r.to_zone,
-            relationType: r.relation_type,
-            direction: (r.direction as 'single' | 'double') || 'single',
-          }));
-          setRelations(loadedRelations);
-
         })
         .catch((error) => {
           console.error('Failed to load project:', error);
@@ -293,7 +235,6 @@ function ProjectWizard() {
 
   const removeZone = (id: string) => {
     setZones(prev => prev.filter(z => z.id !== id));
-    setRelations(prev => prev.filter(r => r.fromZone !== id && r.toZone !== id));
   };
 
   const toggleZoneType = (zoneId: string, typeId: string) => {
@@ -307,28 +248,6 @@ function ProjectWizard() {
     updateZone(zoneId, { types: newTypes });
   };
 
-  // ============ Relation Functions ============
-
-  const addRelation = (fromZone: string, toZone: string, relationType: string, direction: 'single' | 'double') => {
-    const exists = relations.some(r =>
-      r.fromZone === fromZone && r.toZone === toZone && r.relationType === relationType
-    );
-    if (exists) return;
-
-    const newRelation: SpatialRelation = {
-      id: `rel_${Date.now()}`,
-      fromZone,
-      toZone,
-      relationType,
-      direction,
-    };
-    setRelations([...relations, newRelation]);
-  };
-
-  const removeRelation = (id: string) => {
-    setRelations(relations.filter(r => r.id !== id));
-  };
-
   // ============ Save Function ============
 
   const handleSave = async () => {
@@ -337,13 +256,26 @@ function ProjectWizard() {
       return;
     }
 
+    // Soft-warn on empty zones: the project can be saved, but the next step
+    // (image upload) will block until at least one zone exists, and the
+    // StepIndicator's Project box will stay grey. Surface that here so the
+    // user doesn't navigate away thinking they're done. Skipped on edits
+    // since the user is intentionally re-saving an existing project.
+    if (!isEditMode && zones.length === 0) {
+      const proceed = window.confirm(
+        "You haven't defined any spatial zones yet.\n\n"
+        + 'Image uploads need at least one zone for assignment, and the Project '
+        + 'step will stay incomplete until you add one.\n\n'
+        + 'Save anyway? (You can edit and add zones later.)'
+      );
+      if (!proceed) return;
+    }
+
     setSaving(true);
     try {
       const projectData = {
         project_name: projectName,
         project_location: projectLocation,
-        site_scale: siteScale,
-        project_phase: projectPhase,
         koppen_zone_id: koppenZone,
         country_id: country,
         space_type_id: spaceType,
@@ -359,12 +291,6 @@ function ProjectWizard() {
           area: z.area,
           status: z.status,
           description: z.description,
-        })),
-        spatial_relations: relations.map(r => ({
-          from_zone: r.fromZone,
-          to_zone: r.toZone,
-          relation_type: r.relationType,
-          direction: r.direction,
         })),
       };
 
@@ -430,22 +356,6 @@ function ProjectWizard() {
                   onChange={(e) => setProjectLocation(e.target.value)}
                   placeholder="e.g., Shenzhen, China"
                 />
-              </FormControl>
-              <FormControl>
-                <FormLabel>Site Scale</FormLabel>
-                <Select value={siteScale} onChange={(e) => setSiteScale(e.target.value)} placeholder="Select scale">
-                  {SITE_SCALES.map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl>
-                <FormLabel>Project Phase</FormLabel>
-                <Select value={projectPhase} onChange={(e) => setProjectPhase(e.target.value)} placeholder="Select phase">
-                  {PROJECT_PHASES.map(p => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </Select>
               </FormControl>
             </SimpleGrid>
           </CardBody>
@@ -786,111 +696,6 @@ function ProjectWizard() {
           </CardBody>
         </Card>
 
-        {/* Section 5: Spatial Relations (Collapsible) */}
-        <Card>
-          <CardHeader cursor="pointer" onClick={toggleRelations}>
-            <HStack justify="space-between">
-              <SectionTitle icon={Link2} title="Spatial Relations (Optional)" subtitle="Define connections between zones" />
-              <Box color="gray.400">
-                {isRelationsOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-              </Box>
-            </HStack>
-          </CardHeader>
-          <Collapse in={isRelationsOpen}>
-            <CardBody>
-              {zones.length < 2 ? (
-                <Box textAlign="center" py={4} color="gray.500">
-                  <Text>Define at least 2 zones to create relations.</Text>
-                </Box>
-              ) : (
-                <VStack spacing={4} align="stretch">
-                  <SimpleGrid columns={{ base: 1, md: 4 }} spacing={3} p={4} bg="gray.50" borderRadius="lg">
-                    <FormControl>
-                      <FormLabel fontSize="sm">From Zone</FormLabel>
-                      <Select size="sm" id="rel-from" placeholder="Select zone">
-                        {zones.map(z => (
-                          <option key={z.id} value={z.id}>{z.name || z.id}</option>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel fontSize="sm">To Zone</FormLabel>
-                      <Select size="sm" id="rel-to" placeholder="Select zone">
-                        {zones.map(z => (
-                          <option key={z.id} value={z.id}>{z.name || z.id}</option>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel fontSize="sm">Relation Type</FormLabel>
-                      <Select size="sm" id="rel-type" placeholder="Select type">
-                        {relationTypes.map(r => (
-                          <option key={r.id} value={r.id}>{r.name}</option>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel fontSize="sm">&nbsp;</FormLabel>
-                      <Button
-                        size="sm"
-                        colorScheme="blue"
-                        w="full"
-                        onClick={() => {
-                          const from = (document.getElementById('rel-from') as HTMLSelectElement).value;
-                          const to = (document.getElementById('rel-to') as HTMLSelectElement).value;
-                          const type = (document.getElementById('rel-type') as HTMLSelectElement).value;
-                          if (from && to && type && from !== to) {
-                            addRelation(from, to, type, 'single');
-                          }
-                        }}
-                      >
-                        Add Relation
-                      </Button>
-                    </FormControl>
-                  </SimpleGrid>
-
-                  {relations.length > 0 && (
-                    <Box>
-                      <Text fontWeight="bold" mb={2}>Relations ({relations.length})</Text>
-                      <VStack spacing={2} align="stretch">
-                        {relations.map(rel => {
-                          const fromZone = zones.find(z => z.id === rel.fromZone);
-                          const toZone = zones.find(z => z.id === rel.toZone);
-                          const relType = relationTypes.find(r => r.id === rel.relationType);
-                          return (
-                            <HStack
-                              key={rel.id}
-                              p={2}
-                              bg="white"
-                              borderWidth={1}
-                              borderRadius="md"
-                              justify="space-between"
-                            >
-                              <HStack>
-                                <Badge>{fromZone?.name || rel.fromZone}</Badge>
-                                <Text color={relType?.color}>&rarr;</Text>
-                                <Badge>{toZone?.name || rel.toZone}</Badge>
-                                <Tag size="sm" colorScheme="blue">{relType?.name}</Tag>
-                              </HStack>
-                              <IconButton
-                                aria-label="Remove relation"
-                                icon={<X size={12} />}
-                                size="xs"
-                                colorScheme="red"
-                                variant="ghost"
-                                onClick={() => removeRelation(rel.id)}
-                              />
-                            </HStack>
-                          );
-                        })}
-                      </VStack>
-                    </Box>
-                  )}
-                </VStack>
-              )}
-            </CardBody>
-          </Collapse>
-        </Card>
 
         {/* Action Buttons */}
         <HStack justify="space-between">

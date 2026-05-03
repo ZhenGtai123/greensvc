@@ -94,6 +94,10 @@ class RecommendationRequest(BaseModel):
     subdimensions: list[str] = Field(default_factory=list)
     design_brief: str = ""
     max_recommendations: int = Field(default=10, ge=1, le=50)
+    # When set, the resulting Stage 1 output is persisted onto the project
+    # (recommendations + relationships + summary + an initial
+    # selected_indicators seeded from the recommendations themselves).
+    project_id: Optional[str] = None
 
 
 class RecommendationResponse(BaseModel):

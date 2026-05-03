@@ -590,6 +590,27 @@ async def reparse_image_gps(
     }
 
 
+# Stage 1 selected-indicators state — separate endpoint because the toggle
+# UI fires a save per click (debounced), and we don't want to round-trip the
+# full project for a tiny list.
+@router.put("/{project_id}/selected-indicators")
+async def update_selected_indicators(
+    project_id: str,
+    indicators: list[dict],
+    _user: UserResponse = Depends(get_current_user),
+):
+    """Persist the user's chosen subset of Stage 1 recommendations."""
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+
+    project.selected_indicators = indicators
+    project.updated_at = datetime.now()
+    store.save(project)
+    return {"success": True, "count": len(indicators)}
+
+
 # Export
 @router.get("/{project_id}/export", response_model=ProjectQuery)
 async def export_project(project_id: str):

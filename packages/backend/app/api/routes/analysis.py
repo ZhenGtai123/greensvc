@@ -781,8 +781,6 @@ async def _execute_project_pipeline(
                 project={
                     "name": project.project_name,
                     "location": project.project_location or None,
-                    "scale": project.site_scale or None,
-                    "phase": project.project_phase or None,
                 },
                 context={
                     "climate": {"koppen_zone_id": project.koppen_zone_id},

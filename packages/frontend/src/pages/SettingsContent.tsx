@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -20,7 +20,7 @@ import {
   Skeleton,
 } from '@chakra-ui/react';
 import { Server, Eye, Brain, Database, Cpu } from 'lucide-react';
-import { useConfig, useHealth, useKnowledgeBaseSummary, useLLMProviders, useProviderModels, queryKeys } from '../hooks/useApi';
+import { useConfig, useHealth, useKnowledgeBaseSummary, useLLMProviders, useProviderModels, useVisionHealth, queryKeys } from '../hooks/useApi';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../api';
 import type { LLMProviderInfo } from '../types';
@@ -74,16 +74,25 @@ export function SettingsContent({ embedded = false }: SettingsContentProps) {
   const activeProviderId = llmProviders?.find((p: LLMProviderInfo) => p.active)?.id;
   const { data: dynamicModels, isLoading: modelsLoading } = useProviderModels(activeProviderId);
 
-  type VisionInfo = NonNullable<Awaited<ReturnType<typeof api.testVision>>['data']['info']>;
-  const [visionHealthy, setVisionHealthy] = useState<boolean | null>(null);
-  const [visionInfo, setVisionInfo] = useState<VisionInfo | null>(null);
+  // Vision health is cached via React Query (2-min staleTime) so the
+  // SettingsDrawer toggling doesn't re-ping the Vision API. The Test
+  // button below invalidates the cache on demand.
+  const { data: visionData, isFetching: testingVision, refetch: refetchVisionHealth } = useVisionHealth();
+  const visionHealthy = visionData ? visionData.healthy : null;
+  const visionInfo = visionData?.info ?? null;
   const [llmStatus, setLlmStatus] = useState<{ configured: boolean; provider: string; model: string | null } | null>(null);
-  const [testingVision, setTestingVision] = useState(false);
   const [testingLLM, setTestingLLM] = useState(false);
   const [switchingProvider, setSwitchingProvider] = useState(false);
   const [customModel, setCustomModel] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [savingKey, setSavingKey] = useState(false);
+  // Vision API URL editor — pre-fills from /api/config and persists via
+  // PUT /api/config/vision-url (writes .env + resets vision client singleton).
+  const [visionUrlInput, setVisionUrlInput] = useState('');
+  const [savingVisionUrl, setSavingVisionUrl] = useState(false);
+  useEffect(() => {
+    if (config?.vision_api_url) setVisionUrlInput(config.vision_api_url);
+  }, [config?.vision_api_url]);
 
   const activeProvider = llmProviders?.find((p: LLMProviderInfo) => p.active);
 
@@ -93,30 +102,18 @@ export function SettingsContent({ embedded = false }: SettingsContentProps) {
     }
   }, [activeProvider?.current_model]);
 
-  const testVisionConnection = async () => {
-    setTestingVision(true);
+  const testVisionConnection = useCallback(async () => {
     try {
-      const response = await api.testVision();
-      setVisionHealthy(response.data.healthy);
-      setVisionInfo(response.data.info);
+      const result = await refetchVisionHealth();
+      const healthy = result.data?.healthy ?? false;
       toast({
-        title: response.data.healthy ? 'Vision API connected' : 'Vision API not available',
-        status: response.data.healthy ? 'success' : 'warning',
+        title: healthy ? 'Vision API connected' : 'Vision API not available',
+        status: healthy ? 'success' : 'warning',
       });
     } catch {
-      setVisionHealthy(false);
-      setVisionInfo(null);
       toast({ title: 'Failed to connect to Vision API', status: 'error' });
     }
-    setTestingVision(false);
-  };
-
-  // Auto-fetch vision info on first mount so the Vision Model card has data
-  // without requiring the user to click Test.
-  useEffect(() => {
-    void testVisionConnection();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refetchVisionHealth, toast]);
 
   const testLLMConnection = async () => {
     setTestingLLM(true);
@@ -181,6 +178,30 @@ export function SettingsContent({ embedded = false }: SettingsContentProps) {
     if (!activeProvider) return;
     queryClient.invalidateQueries({ queryKey: queryKeys.providerModels(activeProvider.id) });
     toast({ title: 'Refreshing model list…', status: 'info' });
+  };
+
+  const handleSaveVisionUrl = async () => {
+    const cleaned = visionUrlInput.trim().replace(/\/+$/, '');
+    if (!cleaned) return;
+    if (!/^https?:\/\//i.test(cleaned)) {
+      toast({ title: 'URL must start with http:// or https://', status: 'error' });
+      return;
+    }
+    setSavingVisionUrl(true);
+    try {
+      await api.updateVisionUrl(cleaned);
+      toast({ title: 'Vision API URL saved', status: 'success' });
+      // Re-fetch the config so the displayed value is the persisted one.
+      // Re-test connection so the System Status badge reflects the new URL.
+      queryClient.invalidateQueries({ queryKey: queryKeys.config });
+      void testVisionConnection();
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        || 'Failed to update Vision API URL';
+      toast({ title: detail, status: 'error' });
+    }
+    setSavingVisionUrl(false);
   };
 
   if (configLoading && !embedded) {
@@ -305,7 +326,7 @@ export function SettingsContent({ embedded = false }: SettingsContentProps) {
                     fontFamily="mono"
                     fontSize="sm"
                   >
-                    {visionInfo.available_depth_models.map((m) => (
+                    {(visionInfo.available_depth_models ?? []).map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.label} — {m.params_billions}B / {m.vram_gb}GB
                       </option>
@@ -314,10 +335,11 @@ export function SettingsContent({ embedded = false }: SettingsContentProps) {
                 </FormControl>
 
                 <VStack align="stretch" spacing={2}>
-                  {visionInfo.available_depth_models.map((m) => {
+                  {(visionInfo.available_depth_models ?? []).map((m) => {
                     const isActive = m.id === visionInfo.depth_model;
                     const fits =
                       visionInfo.gpu_memory_gb === null ||
+                      visionInfo.gpu_memory_gb === undefined ||
                       visionInfo.gpu_memory_gb >= m.vram_gb;
                     return (
                       <Box
@@ -567,9 +589,31 @@ export function SettingsContent({ embedded = false }: SettingsContentProps) {
           <VStack align="stretch" spacing={4}>
             <FormControl>
               <FormLabel>Vision API URL</FormLabel>
-              <Code p={2} borderRadius="md" w="full">
-                {config?.vision_api_url}
-              </Code>
+              <HStack>
+                <Input
+                  value={visionUrlInput}
+                  onChange={(e) => setVisionUrlInput(e.target.value)}
+                  placeholder="http://127.0.0.1:8000"
+                  size="sm"
+                  fontFamily="mono"
+                />
+                <Button
+                  size="sm"
+                  colorScheme="green"
+                  onClick={handleSaveVisionUrl}
+                  isLoading={savingVisionUrl}
+                  isDisabled={
+                    !visionUrlInput.trim()
+                    || visionUrlInput.trim().replace(/\/+$/, '') === config?.vision_api_url
+                  }
+                  flexShrink={0}
+                >
+                  Save
+                </Button>
+              </HStack>
+              <Text fontSize="xs" color="gray.500" mt={1}>
+                Saved to .env and applied immediately. Use Test in System Status above to verify.
+              </Text>
             </FormControl>
 
             <FormControl>
@@ -627,7 +671,7 @@ export function SettingsContent({ embedded = false }: SettingsContentProps) {
             <Text fontSize="sm" color="gray.500" mb={2}>Appendix Sections:</Text>
             <Box maxH="100px" overflowY="auto">
               <Text fontSize="xs" fontFamily="mono">
-                {kbSummary.appendix_sections.join(', ')}
+                {(kbSummary.appendix_sections ?? []).join(', ')}
               </Text>
             </Box>
           </CardBody>

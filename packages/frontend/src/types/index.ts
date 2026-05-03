@@ -50,6 +50,10 @@ export interface Project {
   // Persisted analysis artefacts (server-side source of truth — survive
   // reloads and project switches). Frontend hydrates the Zustand store from
   // these on project mount; localStorage no longer holds them.
+  stage1_recommendations?: IndicatorRecommendation[];
+  stage1_relationships?: IndicatorRelationship[];
+  stage1_summary?: RecommendationSummary | null;
+  selected_indicators?: IndicatorRecommendation[];
   zone_analysis_result?: ZoneAnalysisResult | null;
   design_strategy_result?: DesignStrategyResult | null;
   ai_report?: string | null;

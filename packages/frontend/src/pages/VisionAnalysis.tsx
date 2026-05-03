@@ -45,7 +45,7 @@ import {
 import { Grid as VirtualGrid } from 'react-window';
 import { ScanSearch, Download, Eye, Archive, Lightbulb } from 'lucide-react';
 import JSZip from 'jszip';
-import { useSemanticConfig, useProject, useRecommendIndicators, useCalculators } from '../hooks/useApi';
+import { useSemanticConfig, useProject, useRecommendIndicators, useCalculators, useVisionHealth } from '../hooks/useApi';
 import api from '../api';
 import type { SemanticClass, UploadedImage, IndicatorRecommendation } from '../types';
 import PageShell from '../components/PageShell';
@@ -416,24 +416,15 @@ function VisionAnalysis() {
     [calculators],
   );
 
-  // Vision API health check
-  const [visionHealthy, setVisionHealthy] = useState<boolean | null>(null);
-  const [visionChecking, setVisionChecking] = useState(false);
-
-  const checkVisionHealth = useCallback(async () => {
-    setVisionChecking(true);
-    try {
-      const res = await api.testVision();
-      setVisionHealthy(res.data.healthy);
-    } catch {
-      setVisionHealthy(false);
-    }
-    setVisionChecking(false);
-  }, []);
-
-  useEffect(() => {
-    checkVisionHealth();
-  }, [checkVisionHealth]);
+  // Vision API health — shared cached query (2-min staleTime). Manual
+  // re-check goes through refetch, which Settings Test button also uses.
+  const {
+    data: visionHealthData,
+    isFetching: visionChecking,
+    refetch: refetchVisionHealth,
+  } = useVisionHealth();
+  const visionHealthy = visionHealthData ? visionHealthData.healthy : null;
+  const checkVisionHealth = useCallback(() => { void refetchVisionHealth(); }, [refetchVisionHealth]);
 
   // Form state
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
@@ -487,6 +478,10 @@ function VisionAnalysis() {
       age_group_id: project.age_group_id || '',
       performance_dimensions: project.performance_dimensions,
       design_brief: project.design_brief || '',
+      // Trigger backend persistence so a returning user (different
+      // browser, new tab, or fresh session) sees the same Stage 1 output
+      // their pipeline was built from.
+      project_id: project.id,
     }, {
       onSuccess: (result) => {
         if (result.success) {
@@ -548,6 +543,59 @@ function VisionAnalysis() {
       invalid.forEach(i => removeSelectedIndicator(i.indicator_id));
     }
   }, [calculatorIds]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounce-save selectedIndicators to the backend so toggles survive
+  // reloads / project switches. We compare indicator_ids to avoid writing
+  // when hydrate-from-project just populated the store with the same
+  // values — and to avoid round-tripping the full recommendation objects
+  // on every diff.
+  const lastSavedSelectionRef = useRef<string | null>(null);
+  // Buffer of the latest in-flight selection so the unmount cleanup
+  // (below) can flush a pending save instead of dropping it.
+  const pendingSelectionRef = useRef<IndicatorRecommendation[] | null>(null);
+  useEffect(() => {
+    if (!projectId || !project) return;
+    const currentIds = selectedIndicators.map(i => i.indicator_id).sort().join(',');
+    const persistedIds = (project.selected_indicators ?? [])
+      .map(i => i.indicator_id).sort().join(',');
+    // Initial mount or post-hydrate: store matches what's on the server.
+    // Don't fire a redundant save — record it as the baseline.
+    if (lastSavedSelectionRef.current === null) {
+      lastSavedSelectionRef.current = persistedIds;
+    }
+    if (currentIds === lastSavedSelectionRef.current) return;
+    pendingSelectionRef.current = selectedIndicators;
+    const handle = window.setTimeout(() => {
+      pendingSelectionRef.current = null;
+      api.projects.updateSelectedIndicators(projectId, selectedIndicators)
+        .then(() => {
+          lastSavedSelectionRef.current = currentIds;
+          // Keep the React Query cache in sync so a re-mount hydrates from
+          // the just-saved selection rather than the stale fetched copy.
+          queryClient.setQueryData<typeof project>(['project', projectId], (old) =>
+            old ? { ...old, selected_indicators: selectedIndicators } : old,
+          );
+        })
+        .catch(() => {
+          // Non-fatal — selection still works in-session; user just won't
+          // see it on a different device until they toggle again.
+        });
+    }, 600);
+    return () => window.clearTimeout(handle);
+  }, [selectedIndicators, projectId, project, queryClient]);
+
+  // Flush any pending selection save when the component unmounts (user
+  // navigated away mid-debounce). Fire-and-forget — we don't await
+  // because unmount cleanups can't be async, and worst case the user's
+  // selection lives only in this session, same as before.
+  useEffect(() => {
+    return () => {
+      if (projectId && pendingSelectionRef.current) {
+        api.projects.updateSelectedIndicators(projectId, pendingSelectionRef.current)
+          .catch(() => { /* swallowed */ });
+      }
+    };
+  }, [projectId]);
 
   // Default: select all semantic classes once when config loads
   const classesInitialized = useRef(false);

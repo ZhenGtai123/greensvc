@@ -6,6 +6,7 @@ import type { ProjectCreate, ZoneAnalysisRequest, FullAnalysisRequest, ProjectPi
 export const queryKeys = {
   health: ['health'],
   config: ['config'],
+  visionHealth: ['vision-health'],
   llmProviders: ['llm-providers'],
   projects: ['projects'],
   project: (id: string) => ['project', id],
@@ -31,6 +32,21 @@ export function useConfig() {
   return useQuery({
     queryKey: queryKeys.config,
     queryFn: () => api.getConfig().then((r) => r.data),
+  });
+}
+
+// Vision API health + model info. Cached for a couple minutes so that
+// opening / closing the SettingsDrawer doesn't re-ping a slow Vision API
+// every time. Manual refresh (the Test button) calls
+// queryClient.invalidateQueries({ queryKey: queryKeys.visionHealth }).
+export function useVisionHealth(enabled = true) {
+  return useQuery({
+    queryKey: ['vision-health'],
+    queryFn: () => api.testVision().then((r) => r.data),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: false,
   });
 }
 
@@ -259,6 +275,7 @@ export function useRecommendIndicators() {
       koppen_zone_id?: string;
       lcz_type_id?: string;
       age_group_id?: string;
+      project_id?: string;
     }) => api.indicators.recommend(request).then((r) => r.data),
   });
 }

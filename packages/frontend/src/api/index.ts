@@ -41,17 +41,21 @@ export const api = {
   getConfig: () => apiClient.get<AppConfig>('/api/config'),
   testVision: () => apiClient.post<{
     healthy: boolean;
+    // The backend forwards the upstream Vision service's /health JSON
+    // verbatim. Older Vision builds don't include every field, so anything
+    // beyond the basic status flags is marked optional — render code must
+    // tolerate missing arrays / null GPU info.
     info: {
       status: string;
       gpu_available: boolean;
-      gpu_name: string | null;
-      gpu_memory: string | null;
-      gpu_memory_gb: number | null;
-      models_loaded: boolean;
-      semantic_classes: number;
-      depth_backend: string;
+      gpu_name?: string | null;
+      gpu_memory?: string | null;
+      gpu_memory_gb?: number | null;
+      models_loaded?: boolean;
+      semantic_classes?: number;
+      depth_backend?: string;
       depth_model: string;
-      available_depth_models: Array<{
+      available_depth_models?: Array<{
         id: string;
         label: string;
         params_billions: number;
@@ -70,6 +74,10 @@ export const api = {
     apiClient.put('/api/config/llm-provider', null, { params: { provider, model } }),
   updateLLMApiKey: (provider: string, api_key: string) =>
     apiClient.put('/api/config/llm-api-key', null, { params: { provider, api_key } }),
+  updateVisionUrl: (url: string) =>
+    apiClient.put<{ message: string; vision_api_url: string }>(
+      '/api/config/vision-url', null, { params: { url } },
+    ),
   getProviderModels: (provider: string) =>
     apiClient.get<{ id: string; label: string }[]>(`/api/config/models/${provider}`),
 
@@ -121,6 +129,11 @@ export const api = {
         updated_from_filename: number;
         still_no_gps: number;
       }>(`/api/projects/${projectId}/images/reparse-gps`),
+    updateSelectedIndicators: (projectId: string, indicators: unknown[]) =>
+      apiClient.put<{ success: boolean; count: number }>(
+        `/api/projects/${projectId}/selected-indicators`,
+        indicators,
+      ),
   },
 
   // Metrics/Calculators
@@ -189,6 +202,7 @@ export const api = {
       koppen_zone_id?: string;
       lcz_type_id?: string;
       age_group_id?: string;
+      project_id?: string;
     }) => apiClient.post<RecommendationResponse>('/api/indicators/recommend', request),
 
     recommendStream: (
@@ -202,6 +216,7 @@ export const api = {
         koppen_zone_id?: string;
         lcz_type_id?: string;
         age_group_id?: string;
+        project_id?: string;
       },
       onEvent: (event: { type: string; text?: string; message?: string; data?: RecommendationResponse }) => void,
     ) => {

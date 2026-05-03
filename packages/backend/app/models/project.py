@@ -126,6 +126,15 @@ class ProjectResponse(BaseModel):
     # decoupled from the (much larger) analysis model graph; the pipeline
     # already produces these via model_dump(mode="json") and the frontend
     # consumes them via its own TypeScript types.
+    #
+    # Stage 1 (LLM indicator recommendations + user's selected subset).
+    # Stored on the project so a returning user — possibly in a different
+    # browser — sees the same selection that drove their pipeline run.
+    stage1_recommendations: list[dict[str, Any]] = Field(default_factory=list)
+    stage1_relationships: list[dict[str, Any]] = Field(default_factory=list)
+    stage1_summary: Optional[dict[str, Any]] = None
+    selected_indicators: list[dict[str, Any]] = Field(default_factory=list)
+    # Stage 2.5 / Stage 3 / AI report.
     zone_analysis_result: Optional[dict[str, Any]] = None
     design_strategy_result: Optional[dict[str, Any]] = None
     ai_report: Optional[str] = None
@@ -153,9 +162,7 @@ class ProjectQuery(BaseModel):
             },
             project={
                 "name": project.project_name,
-                "location": project.project_location or None,
-                "scale": project.site_scale or None,
-                "phase": project.project_phase or None
+                "location": project.project_location or None
             },
             context={
                 "climate": {"koppen_zone_id": project.koppen_zone_id},

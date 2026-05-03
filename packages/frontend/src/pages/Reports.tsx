@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -51,16 +51,16 @@ import EmptyState from '../components/EmptyState';
 import {
   CHART_REGISTRY,
   SECTION_ORDER,
+  SECTION_META,
   type ChartSection,
 } from '../components/analysisCharts/registry';
 import { SectionHeading } from '../components/analysisCharts/SectionHeading';
 import { ChartHost, type ChartHostHandle } from '../components/analysisCharts/ChartHost';
+import { ChartLoadingProgress } from '../components/analysisCharts/ChartLoadingProgress';
 import { ChartPicker } from '../components/analysisCharts/ChartPicker';
 import { buildChartContext } from '../components/analysisCharts/ChartContext';
 import { ModeAlert } from '../components/analysisCharts/ModeAlert';
 import { DataQualitySummary } from '../components/analysisCharts/DataQualitySummary';
-import { LayerSelector } from '../components/analysisCharts/LayerSelector';
-import { LAYER_OPTIONS } from '../components/analysisCharts/layerOptions';
 import { AnalysisConfidenceGauge } from '../components/analysisCharts/AnalysisConfidenceGauge';
 import { GlossaryDrawer } from '../components/GlossaryDrawer';
 import {
@@ -243,30 +243,25 @@ function Reports() {
     else chartRefs.current.delete(id);
   }, []);
 
-  // Global layer selector — drives any chart with `layerAware: true`. Synced
-  // to ?layer=... so reloads / shared links keep the view.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialLayer = (() => {
-    const fromUrl = searchParams.get('layer');
-    if (fromUrl && LAYER_OPTIONS.some((o) => o.value === fromUrl)) return fromUrl;
-    return 'full';
-  })();
-  const [selectedLayer, setSelectedLayer] = useState<string>(initialLayer);
-  useEffect(() => {
-    const current = searchParams.get('layer');
-    if (selectedLayer === 'full') {
-      if (current) {
-        const next = new URLSearchParams(searchParams);
-        next.delete('layer');
-        setSearchParams(next, { replace: true });
-      }
-      return;
-    }
-    if (current === selectedLayer) return;
-    const next = new URLSearchParams(searchParams);
-    next.set('layer', selectedLayer);
-    setSearchParams(next, { replace: true });
-  }, [selectedLayer, searchParams, setSearchParams]);
+  // Track which charts have hydrated so the loading progress bar can show
+  // "mounted / total". Reset whenever the analysis mode flips (post-clustering
+  // mode change re-mounts the chart grid with a different set of available
+  // charts).
+  const [mountedChartIds, setMountedChartIds] = useState<Set<string>>(() => new Set());
+  const handleChartMount = useCallback((id: string) => {
+    setMountedChartIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Layer selector retired (PDF #2): all layerAware charts now render
+  // 4-up small multiples. ChartContext still requires a `selectedLayer` value
+  // — pass 'full' as the only consumer left (Zone × Indicator Matrix in
+  // Reference Tables) is full-layer by spec.
+  const selectedLayer = 'full';
 
   // Check if Stage 3 failed in pipeline
   const stage3Failed = pipelineResult?.steps?.some(s => s.step === 'design_strategies' && s.status === 'failed') ?? false;
@@ -313,14 +308,21 @@ function Reports() {
       if (result.skipped) {
         toast({ title: `Clustering skipped: ${result.reason}`, status: 'info', duration: 6000 });
       } else if (result.clustering) {
+        // Closure: archetypes are now first-class zones. Replace zone_diagnostics
+        // with segment_diagnostics, switch the analysis mode to zone_level, and
+        // mark the source as 'cluster' so the ModeAlert + clustering entry panel
+        // both stop rendering. Cross-zone z-scores immediately unlock.
         useAppStore.getState().setZoneAnalysisResult({
           ...zoneAnalysisResult,
           clustering: result.clustering,
           segment_diagnostics: result.segment_diagnostics,
+          zone_diagnostics: result.segment_diagnostics,
+          analysis_mode: 'zone_level',
+          zone_source: 'cluster',
         });
         const gpsNote = result.n_points_with_gps ? ` · ${result.n_points_with_gps}/${result.n_points_used} with GPS` : '';
         toast({
-          title: `${result.clustering.k} archetypes found (silhouette: ${result.clustering.silhouette_score.toFixed(2)})${gpsNote}`,
+          title: `${result.clustering.k} archetypes promoted to zones (silhouette: ${result.clustering.silhouette_score.toFixed(2)})${gpsNote}`,
           status: 'success',
         });
       }
@@ -454,6 +456,36 @@ function Reports() {
     return grouped;
   }, [analysisCharts]);
   const sortedDiagnostics = chartCtx.sortedDiagnostics;
+
+  // Total visible chart count drives the loading progress denominator —
+  // include both sectioned charts and clustering charts (when the gating
+  // panel is open).
+  const showClusteringPanel = chartCtx.analysisMode === 'image_level';
+  const visibleChartIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const c of analysisCharts) {
+      if (c.section === 'clustering' && !showClusteringPanel) continue;
+      if (!c.isAvailable(chartCtx)) continue;
+      ids.push(c.id);
+    }
+    return ids;
+  }, [analysisCharts, showClusteringPanel, chartCtx]);
+
+  // Reset the mounted set when the visible chart roster changes (mode flip,
+  // hidden chart toggle). Effect runs after render so React commits the new
+  // visibleChartIds before we drop stale entries.
+  useEffect(() => {
+    setMountedChartIds((prev) => {
+      const visibleSet = new Set(visibleChartIds);
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (visibleSet.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [visibleChartIds]);
 
   // Pull cached chart-summary captions out of React Query so embedded images
   // get human-readable captions when the user has generated them.
@@ -968,28 +1000,8 @@ function Reports() {
             </TabList>
 
             <TabPanels>
-              {/* ── Tab: Analysis (unified — replaces former Diagnostics + Statistics) ── */}
+              {/* ── Tab: Analysis (5-panel narrative — PDF #7) ── */}
               <TabPanel px={0}>
-                {/* Sticky layer selector — drives any layerAware chart */}
-                <Box
-                  position="sticky"
-                  top={0}
-                  zIndex={2}
-                  bg="white"
-                  borderBottom="1px solid"
-                  borderColor="gray.200"
-                  py={2}
-                  px={1}
-                  mb={3}
-                >
-                  <HStack justify="space-between" flexWrap="wrap" gap={2}>
-                    <LayerSelector value={selectedLayer} onChange={setSelectedLayer} />
-                    <Text fontSize="xs" color="gray.500">
-                      Layer-independent charts ignore this selector.
-                    </Text>
-                  </HStack>
-                </Box>
-
                 {/* Single-zone / image-level mode banner */}
                 <ModeAlert
                   analysisMode={chartCtx.analysisMode}
@@ -1011,6 +1023,9 @@ function Reports() {
                     (aiReportMeta?.data_quality_warning as string | undefined) ?? null
                   }
                 />
+
+                {/* Loading progress — fades out when all visible charts mount */}
+                <ChartLoadingProgress total={visibleChartIds.length} mounted={mountedChartIds.size} />
 
                 {/* Computation warnings */}
                 {zoneAnalysisResult?.computation_metadata?.warnings?.length ? (
@@ -1050,30 +1065,64 @@ function Reports() {
                       ))}
                     </SimpleGrid>
 
-                    {/* Sectioned analysis charts (5.10.2 — narrative ordering) */}
+                    {/* 5-panel narrative (PDF #7). Setup (A) and Reference
+                        Tables (D) are folded by default; Zone Findings (B) and
+                        Indicator Drill-Down (C) render expanded. Clustering (E)
+                        renders below as a special-cased gated block. */}
                     {SECTION_ORDER.filter(s => s !== 'clustering').map(section => {
                       const charts = sectionedCharts[section] ?? [];
                       if (charts.length === 0) return null;
                       const visibleCount = charts.filter(c => c.isAvailable(chartCtx)).length;
                       if (visibleCount === 0) return null;
+                      const meta = SECTION_META[section];
+                      const chartList = (
+                        <VStack spacing={4} align="stretch">
+                          {charts.map(chart => (
+                            <ChartHost
+                              key={chart.id}
+                              ref={setChartRef(chart.id)}
+                              descriptor={chart}
+                              ctx={chartCtx}
+                              onHide={toggleChart}
+                              projectId={routeProjectId ?? null}
+                              projectContext={chartProjectContext}
+                              showAiSummary={showAiSummary}
+                              forceMount={exporting}
+                              onMount={handleChartMount}
+                            />
+                          ))}
+                        </VStack>
+                      );
+
+                      if (meta.defaultCollapsed) {
+                        return (
+                          <Accordion
+                            key={section}
+                            allowToggle
+                            index={exporting ? [0] : undefined}
+                          >
+                            <AccordionItem border="1px solid" borderColor="gray.200" borderRadius="md">
+                              <AccordionButton bg="gray.50" _hover={{ bg: 'gray.100' }}>
+                                <Box flex="1" textAlign="left">
+                                  <Text fontWeight="bold" fontSize="sm" color="gray.700">
+                                    {meta.title}
+                                  </Text>
+                                  <Text fontSize="xs" color="gray.500" mt={0.5}>
+                                    {meta.subtitle}
+                                  </Text>
+                                </Box>
+                                <AccordionIcon />
+                              </AccordionButton>
+                              <AccordionPanel pb={4}>{chartList}</AccordionPanel>
+                            </AccordionItem>
+                          </Accordion>
+                        );
+                      }
+
                       return (
                         <Box key={section}>
                           <SectionHeading section={section} />
-                          <VStack spacing={4} align="stretch">
-                            {charts.map(chart => (
-                              <ChartHost
-                                key={chart.id}
-                                ref={setChartRef(chart.id)}
-                                descriptor={chart}
-                                ctx={chartCtx}
-                                onHide={toggleChart}
-                                projectId={routeProjectId ?? null}
-                                projectContext={chartProjectContext}
-                                showAiSummary={showAiSummary}
-                                forceMount={exporting}
-                              />
-                            ))}
-                          </VStack>
+                          {chartList}
                         </Box>
                       );
                     })}
@@ -1092,9 +1141,13 @@ function Reports() {
                       </Alert>
                     )}
 
-                    {/* Clustering — collapsed group (5.9). Forced open during
-                        report export so the inner ChartHosts get a chance to
-                        render before captureChartsForReport runs. */}
+                    {/* Clustering — one-shot preprocessing for single-zone projects.
+                        Hidden once mode flips to zone_level (either because the
+                        project has multiple user zones, or because clustering has
+                        already been run and archetypes are now treated as zones).
+                        Forced-mounted during report export so the inner ChartHosts
+                        get a chance to render before captureChartsForReport runs. */}
+                    {chartCtx.analysisMode === 'image_level' && (
                     <Accordion allowToggle index={exporting ? [0] : undefined}>
                       <AccordionItem border="1px solid" borderColor="gray.200" borderRadius="md">
                         <AccordionButton bg="gray.50" _hover={{ bg: 'gray.100' }}>
@@ -1152,12 +1205,14 @@ function Reports() {
                                 projectContext={chartProjectContext}
                                 showAiSummary={showAiSummary}
                                 forceMount={exporting}
+                                onMount={handleChartMount}
                               />
                             ))}
                           </VStack>
                         </AccordionPanel>
                       </AccordionItem>
                     </Accordion>
+                    )}
                   </VStack>
                 )}
               </TabPanel>

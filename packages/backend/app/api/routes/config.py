@@ -208,11 +208,34 @@ async def update_vision_url(
     url: str,
     settings: Settings = Depends(get_settings_dep),
 ):
-    """Update Vision API URL (runtime only, not persisted)"""
+    """Update Vision API URL: persist to .env and reset the client singleton.
+
+    The Vision API runs as a separate service; in different deployments it
+    lives at different hostnames. Editing .env + restart is annoying, so we
+    expose a runtime path: write the new URL to .env, mutate the cached
+    settings object in-place, and reset the vision client so the next
+    request uses the new URL.
+    """
+    # Basic shape check — Test button will validate reachability
+    cleaned = url.strip().rstrip("/")
+    if not (cleaned.startswith("http://") or cleaned.startswith("https://")):
+        raise HTTPException(
+            status_code=400,
+            detail="URL must start with http:// or https://",
+        )
+
+    settings.vision_api_url = cleaned
+    update_env_file({"VISION_API_URL": cleaned})
+
+    # Reset the vision client singleton so the next call rebuilds it with
+    # the new base_url. The cached health/config blobs inside the old
+    # client would otherwise show stale data from the previous endpoint.
+    from app.api import deps as _deps
+    _deps._vision_client = None
+
     return {
-        "message": "Vision URL update not implemented in this version",
-        "current_url": settings.vision_api_url,
-        "requested_url": url,
+        "message": "Vision API URL updated",
+        "vision_api_url": cleaned,
     }
 
 

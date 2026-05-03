@@ -1,11 +1,14 @@
 """Indicator recommendation endpoints"""
 
 import json
+import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_gemini_client, get_knowledge_base, get_current_user
+from app.db.project_store import get_project_store
 from app.models.user import UserResponse
 from app.services.gemini_client import RecommendationService
 from app.services.knowledge_base import KnowledgeBase
@@ -15,7 +18,38 @@ from app.models.indicator import (
     IndicatorDefinition,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+def _persist_stage1(project_id: str, response: RecommendationResponse) -> None:
+    """Save Stage 1 output onto the project so it survives reloads.
+
+    Seeds selected_indicators from the recommendation list (initial state =
+    everything selected); the user can refine later via PUT
+    /projects/{id}/selected-indicators.
+    """
+    store = get_project_store()
+    project = store.get(project_id)
+    if project is None:
+        logger.warning("Stage 1 persist: project %s not found", project_id)
+        return
+    payload = response.model_dump(mode="json")
+    project.stage1_recommendations = payload.get("recommendations", [])
+    project.stage1_relationships = payload.get("indicator_relationships", [])
+    project.stage1_summary = payload.get("summary")
+    # Re-seed selection only on the first run, or when the recommendation set
+    # changed enough that the previous selection is meaningless. Cheap proxy:
+    # if existing selection is empty OR all of its indicator_ids are absent
+    # from the new recommendation list, replace it; otherwise keep the user's
+    # previous picks intact.
+    new_ids = {r["indicator_id"] for r in project.stage1_recommendations if "indicator_id" in r}
+    prev_ids = {s["indicator_id"] for s in project.selected_indicators if "indicator_id" in s}
+    if not project.selected_indicators or not (prev_ids & new_ids):
+        project.selected_indicators = list(project.stage1_recommendations)
+    project.updated_at = datetime.now()
+    store.save(project)
 
 
 @router.post("/recommend", response_model=RecommendationResponse)
@@ -49,6 +83,9 @@ async def recommend_indicators(
             detail=response.error or "Failed to get recommendations"
         )
 
+    if request.project_id:
+        _persist_stage1(request.project_id, response)
+
     return response
 
 
@@ -73,6 +110,15 @@ async def recommend_indicators_stream(
         async for event in recommendation_service.recommend_indicators_stream(
             request, knowledge_base
         ):
+            # Intercept the final result and persist it onto the project
+            # before forwarding, so the next page mount can hydrate from
+            # the backend regardless of network conditions on the SSE tail.
+            if request.project_id and event.get("type") == "result":
+                try:
+                    response = RecommendationResponse(**event["data"])
+                    _persist_stage1(request.project_id, response)
+                except Exception as e:
+                    logger.warning("Stage 1 stream persist failed: %s", e)
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

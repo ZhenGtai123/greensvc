@@ -65,22 +65,26 @@ const VIRIDIS: readonly Triple[] = [
   [253, 231, 37],
 ];
 
+// Palette anchors deepened (PDF #6) so low-value points stay legible against a
+// near-white spatial-map background. Starts shifted from #FAFCFA-ish to the
+// PDF's #D4ECD4 / #F4D4D4 / #D4E2F4 anchors; ends darkened to ensure adequate
+// contrast at the high end.
 const INCREASE_GREEN: readonly Triple[] = [
-  [247, 252, 245],
-  [116, 196, 118],
-  [0, 90, 50],
+  [212, 236, 212], // #D4ECD4
+  [80, 168, 100],
+  [20, 63, 30],    // #143F1E
 ];
 
 const DECREASE_RED: readonly Triple[] = [
-  [255, 245, 240],
-  [251, 106, 74],
-  [165, 15, 21],
+  [244, 212, 212], // #F4D4D4
+  [220, 80, 80],
+  [94, 11, 30],    // #5E0B1E
 ];
 
 const NEUTRAL_BLUE: readonly Triple[] = [
-  [247, 251, 255],
-  [107, 174, 214],
-  [8, 48, 107],
+  [212, 226, 244], // #D4E2F4
+  [80, 130, 200],
+  [11, 42, 94],    // #0B2A5E
 ];
 
 export function directionalColor(

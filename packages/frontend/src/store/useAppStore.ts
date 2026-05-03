@@ -87,7 +87,7 @@ interface AppState {
   setAiReportMeta: (m: Record<string, unknown> | null) => void;
 
   clearPipelineResults: () => void;
-  hydrateFromProject: (project: Project, forceClearMissing: boolean) => void;
+  hydrateFromProject: (project: Project) => void;
 
   // Pipeline run state — lives outside React component lifetimes so the run
   // survives Analysis page unmount, and lets every other page show a global
@@ -178,26 +178,37 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   // Hydrate analysis artefacts from a freshly fetched Project. The backend
   // is the source of truth for these — this lets ProjectPipelineLayout
   // restore them on every project mount so reloads / project switches don't
-  // lose the user's work. Pass `forceClearMissing` when switching projects:
-  // the new project may legitimately have no results yet, and we must NOT
-  // leak the previous project's blobs through.
-  hydrateFromProject: (project: Project, forceClearMissing: boolean) => set((s) => {
-    const next: Partial<AppState> = {};
-    if (project.zone_analysis_result !== undefined || forceClearMissing) {
-      next.zoneAnalysisResult = project.zone_analysis_result ?? null;
-    } else if (s.zoneAnalysisResult === null && project.zone_analysis_result) {
-      next.zoneAnalysisResult = project.zone_analysis_result;
-    }
-    if (project.design_strategy_result !== undefined || forceClearMissing) {
-      next.designStrategyResult = project.design_strategy_result ?? null;
-    }
-    if (project.ai_report !== undefined || forceClearMissing) {
-      next.aiReport = project.ai_report ?? null;
-    }
-    if (project.ai_report_meta !== undefined || forceClearMissing) {
-      next.aiReportMeta = project.ai_report_meta ?? null;
-    }
-    return next;
+  // lose the user's work.
+  //
+  // We always overwrite from the project payload (no "preserve local"
+  // branch). That guarantees: a fresh tab opening project A cannot leak
+  // localStorage from a previous session's project B; a returning user
+  // sees exactly what the server has. The only state that survives across
+  // sessions is project-agnostic UI prefs (still in partialize below).
+  hydrateFromProject: (project: Project) => set(() => {
+    // Rebuild visionMaskResults from each image's mask_filepaths so the
+    // VisionAnalysis page renders previews immediately on mount, instead
+    // of inheriting the previous project's masks until that page's own
+    // restoration effect runs.
+    const maskResults = (project.uploaded_images ?? [])
+      .filter((img) => img.mask_filepaths && Object.keys(img.mask_filepaths).length > 0)
+      .map((img) => ({ imageId: img.image_id, maskPaths: img.mask_filepaths }));
+    return {
+      recommendations: project.stage1_recommendations ?? [],
+      indicatorRelationships: project.stage1_relationships ?? [],
+      recommendationSummary: project.stage1_summary ?? null,
+      selectedIndicators: project.selected_indicators ?? [],
+      visionMaskResults: maskResults,
+      zoneAnalysisResult: project.zone_analysis_result ?? null,
+      designStrategyResult: project.design_strategy_result ?? null,
+      // pipelineResult is session-only metadata about the latest pipeline
+      // run (skipped images, calc counts). It's not persisted server-side,
+      // so returning users / project switches start with no run summary;
+      // the actual analysis data still hydrates from zone_analysis_result.
+      pipelineResult: null,
+      aiReport: project.ai_report ?? null,
+      aiReportMeta: project.ai_report_meta ?? null,
+    };
   }),
 
   // Pipeline run state
@@ -332,18 +343,22 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   // fixes "switching projects nukes my AI report" and lets users open the
   // same project from another browser without losing work.
   partialize: (state) => ({
-    // currentProject is NOT persisted — it contains uploaded_images (can be 1000s)
-    // which blows past localStorage's 5-10MB quota. It's re-fetched via React Query
-    // in ProjectPipelineLayout on every /projects/:id/* route.
-    // visionMaskResults is NOT persisted — it scales linearly with image count
-    // (~2KB per image) and each batch-flush during analysis would re-serialize the
-    // growing array to localStorage (O(n²) writes). VisionAnalysis.tsx rebuilds it
-    // from project.uploaded_images[].mask_filepaths on mount if the store is empty.
-    selectedIndicators: state.selectedIndicators,
+    // localStorage now ONLY holds project-agnostic UI prefs. Anything
+    // project-scoped (Stage 1 / 2.5 / 3, AI report, selected indicators,
+    // recommendation summary) lives on the backend ProjectResponse and is
+    // hydrated via hydrateFromProject on every project mount. This means:
+    //
+    //   - currentProject is not persisted — it carries uploaded_images
+    //     (potentially thousands) and would blow past the 5-10MB quota.
+    //     React Query refetches it on every /projects/:id/* route.
+    //   - visionMaskResults is not persisted — scales linearly with image
+    //     count (~2KB per image), and batch flushes during analysis would
+    //     cause O(n²) writes. VisionAnalysis.tsx rebuilds from
+    //     project.uploaded_images[].mask_filepaths on mount.
+    //   - Stage 1 / analysis blobs are not persisted — eliminates the
+    //     "fresh tab leaks last session's recommendations into a different
+    //     project" bug, and keeps storage small.
     visionStatistics: state.visionStatistics,
-    recommendations: state.recommendations,
-    indicatorRelationships: state.indicatorRelationships,
-    recommendationSummary: state.recommendationSummary,
     hiddenChartIds: state.hiddenChartIds,
     showAiSummary: state.showAiSummary,
     colorblindMode: state.colorblindMode,

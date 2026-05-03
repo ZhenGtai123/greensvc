@@ -1248,7 +1248,7 @@ export function ValueSpatialMap({
       <Text fontSize="xs" color="gray.500" mb={1}>
         Color = indicator value ({layer} layer · {targetDirection.toLowerCase()} = better-darker · range p5–p95)
       </Text>
-      <Box overflowX="auto">
+      <Box overflowX="auto" bg="gray.50" borderRadius="md" p={1}>
         <svg width={svgW} height={svgH} style={{ fontFamily: 'system-ui, sans-serif' }}>
           <line x1={margin.l} y1={margin.t} x2={margin.l} y2={margin.t + plotH} stroke="#CBD5E0" />
           <line x1={margin.l} y1={margin.t + plotH} x2={margin.l + plotW} y2={margin.t + plotH} stroke="#CBD5E0" />
