@@ -180,21 +180,90 @@ class DesignEngine:
                 iom_queries, request.max_ioms_per_query, request.project_context
             )
 
-            # Sub-step 3: Strategy Generation
+            # Sub-step 3: Strategy Generation (#3 — enforced 3-5 range with
+            # one retry then rule-based padding).
+            min_n = max(1, request.min_strategies_per_zone)
+            max_n = max(min_n, request.max_strategies_per_zone)
+            fallback_used = False
+            retry_used = False
             try:
                 if use_llm and matched_ioms:
                     design_out = await self._llm_strategy_generation(
                         diag, matched_ioms, request.project_context,
                         zone_analysis,
                         list(allowed) if allowed else [],
-                        request.max_strategies_per_zone,
+                        max_n,
                         diagnosis_data,
+                        min_strategies=min_n,
                     )
+                    # Retry once if the first response is short. Re-running
+                    # the same prompt usually yields a different result with
+                    # any nonzero temperature provider; if the model is
+                    # temperature-locked we still benefit from the second
+                    # roll because the prompt now warns it explicitly.
+                    if len(design_out.get("design_strategies", [])) < min_n:
+                        retry_used = True
+                        retry_out = await self._llm_strategy_generation(
+                            diag, matched_ioms, request.project_context,
+                            zone_analysis,
+                            list(allowed) if allowed else [],
+                            max_n,
+                            diagnosis_data,
+                            min_strategies=min_n,
+                            retry_note=(
+                                f"Previous attempt returned only "
+                                f"{len(design_out.get('design_strategies', []))} "
+                                f"strategies — produce {min_n}-{max_n} this time."
+                            ),
+                        )
+                        if len(retry_out.get("design_strategies", [])) >= len(design_out.get("design_strategies", [])):
+                            design_out = retry_out
                 else:
                     design_out = self._rule_based_strategies(diag, matched_ioms, allowed)
             except Exception as e:
                 logger.warning("LLM strategy gen failed for %s, using fallback: %s", zone_id, e)
                 design_out = self._rule_based_strategies(diag, matched_ioms, allowed)
+                fallback_used = True
+
+            # Pad with rule-based strategies until we hit min_n. Skip
+            # indicators already covered by the LLM output to avoid duplicate
+            # strategies. The padded entries inherit priorities continuing
+            # from the existing list.
+            if len(design_out.get("design_strategies", [])) < min_n and matched_ioms:
+                existing = design_out.get("design_strategies", [])
+                used_inds: set[str] = set()
+                for s in existing:
+                    used_inds.update(s.get("target_indicators") or [])
+                supplement = self._rule_based_strategies(diag, matched_ioms, allowed)
+                for s in supplement.get("design_strategies", []):
+                    if len(existing) >= min_n:
+                        break
+                    targets = s.get("target_indicators") or []
+                    if any(t in used_inds for t in targets):
+                        continue
+                    s["priority"] = len(existing) + 1
+                    existing.append(s)
+                    used_inds.update(targets)
+                design_out["design_strategies"] = existing
+                fallback_used = True
+
+            # Hard cap at max_n in case the LLM ignored the upper bound.
+            if len(design_out.get("design_strategies", [])) > max_n:
+                design_out["design_strategies"] = design_out["design_strategies"][:max_n]
+
+            # Surface fallback / retry markers via the diagnosis dict so the
+            # frontend (and future report writer) can call them out without
+            # changing the strategy schema.
+            if fallback_used:
+                diagnosis_data = {**(diagnosis_data or {}), "strategies_fallback_used": True}
+            if retry_used:
+                diagnosis_data = {**(diagnosis_data or {}), "strategies_retry_used": True}
+            diagnosis_data = {
+                **(diagnosis_data or {}),
+                "strategies_count": len(design_out.get("design_strategies", [])),
+                "strategies_min": min_n,
+                "strategies_max": max_n,
+            }
 
             zones_output[zone_id] = ZoneDesignOutput(
                 zone_id=zone_id,
@@ -713,6 +782,9 @@ Return ONLY valid JSON:
         allowed_ids: list[str],
         max_strategies: int = 5,
         diagnosis_data: dict = None,
+        *,
+        min_strategies: int = 3,
+        retry_note: Optional[str] = None,
     ) -> dict:
         # Group IOMs by indicator (top 3 per)
         by_ind: dict[str, list[dict]] = defaultdict(list)
@@ -774,9 +846,14 @@ Return ONLY valid JSON:
         if diagnosis_data:
             unit_diagnosis = diagnosis_data.get("integrated_diagnosis", "")
 
+        retry_block = (
+            f"\n\nIMPORTANT — RETRY: {retry_note}\n"
+            if retry_note
+            else ""
+        )
         prompt = f"""You are an expert landscape architect. IMPORTANT: Respond ONLY in English.
-Synthesize the matched IOM operations into 3-{min(max_strategies, 5)} concrete, actionable design
-strategies for this spatial unit. Ground every strategy in the provided IOM evidence.
+Synthesize the matched IOM operations into {min_strategies}-{min(max_strategies, 5)} concrete, actionable design
+strategies for this spatial unit. Ground every strategy in the provided IOM evidence.{retry_block}
 
 ## Project
 - Name: {project_context.project.get('name', 'N/A')}
@@ -830,12 +907,12 @@ Each match contains:
 1. Group matched IOMs by indicator and spatial layer
 2. Identify synergies (IOMs that reinforce each other) and conflicts (trade-offs)
 3. Prioritise by: confidence grade > transferability > query priority
-4. Synthesise into 3-{min(max_strategies, 5)} strategies with precise spatial-morphological specifications
+4. Synthesise into {min_strategies}-{min(max_strategies, 5)} strategies with precise spatial-morphological specifications
 5. Describe implementation sequence considering dependencies
 
 CRITICAL: You may ONLY reference indicators from: {allowed_ids}
 
-Generate {min(max_strategies, 5)} concrete design strategies. Return ONLY valid JSON:
+Generate {min_strategies}-{min(max_strategies, 5)} concrete design strategies (must be at least {min_strategies}). Return ONLY valid JSON:
 {{
   "overall_assessment": "2-3 sentence summary of main issues and strategy direction",
   "design_strategies": [

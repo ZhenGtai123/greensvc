@@ -464,6 +464,10 @@ export interface ClusteringByProjectRequest {
 export interface ClusteringResponse {
   clustering: ClusteringResult | null;
   segment_diagnostics: ZoneDiagnostic[];
+  /** #1 — full Stage 2.5 result computed with each cluster acting as a
+   * virtual zone. Drop this into setZoneAnalysisResult to make all charts
+   * (z-score, correlation, radar, layer stats) reflect cluster membership. */
+  zone_analysis?: ZoneAnalysisResult | null;
   skipped: boolean;
   reason: string;
   n_points_used?: number;

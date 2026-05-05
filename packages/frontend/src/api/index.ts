@@ -361,6 +361,9 @@ export const api = {
       project_id: string;
       payload: Record<string, unknown>;
       project_context?: Record<string, unknown> | null;
+      /** #6 — folded into the cache key so toggling Zone vs Cluster view
+       * fetches a fresh interpretation pinned to the active grouping unit. */
+      grouping_mode?: 'zones' | 'clusters';
     }) =>
       apiClient.post<{
         summary: string;
@@ -368,6 +371,16 @@ export const api = {
         cached: boolean;
         model: string;
         error?: string | null;
+        // #6 — structured 4-section output. Null when the LLM failed twice
+        // to return parseable JSON; in that case `degraded` is true and the
+        // legacy `summary` field is the only thing worth rendering.
+        summary_v2?: {
+          overall: string;
+          findings: { point: string; evidence: string }[];
+          local_breakdown: { unit_id: string; unit_label: string; interpretation: string }[];
+          implication: string;
+        } | null;
+        degraded?: boolean;
       }>('/api/analysis/chart-summary', data),
   },
 

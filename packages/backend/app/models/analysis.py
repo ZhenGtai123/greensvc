@@ -294,6 +294,10 @@ class DesignStrategyRequest(BaseModel):
     use_llm: bool = True
     max_ioms_per_query: int = Field(default=6, ge=1, le=20)
     max_strategies_per_zone: int = Field(default=5, ge=1, le=10)
+    # #3 — minimum strategies per grouping unit. DesignEngine retries the
+    # LLM once when the first response is short, then pads with rule-based
+    # fallbacks (marked fallback=true in the unit's diagnosis dict).
+    min_strategies_per_zone: int = Field(default=3, ge=1, le=10)
     # 6.A — Stage 2 chart captions piped into Agent A's diagnosis prompt.
     # Shape: {zone_id: {chart_id: caption_text}}. zone_id "_global" carries
     # captions for charts that aren't per-zone (correlation, distribution, ...).

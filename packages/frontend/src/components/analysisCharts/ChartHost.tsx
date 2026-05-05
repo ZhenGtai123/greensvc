@@ -16,6 +16,8 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
+  MenuDivider,
+  MenuGroup,
   Skeleton,
   Box,
   Text,
@@ -26,11 +28,13 @@ import {
   VStack,
   Icon,
   Badge,
+  useToast,
 } from '@chakra-ui/react';
-import { MoreHorizontal, Download, EyeOff, Sparkles, ChevronRight, ChevronDown } from 'lucide-react';
+import { MoreHorizontal, EyeOff, Sparkles, ChevronRight, ChevronDown, FileImage, FileText, FileSpreadsheet, FileCode } from 'lucide-react';
 import type { ChartDescriptor } from './registry';
 import type { ChartContext } from './ChartContext';
 import { useChartSummary } from '../../hooks/useApi';
+import { exportArtifact, type ExportFormat } from '../../utils/exportChart';
 
 interface ChartHostProps {
   descriptor: ChartDescriptor;
@@ -48,6 +52,171 @@ interface ChartHostProps {
   /** Fired exactly once when the chart body actually hydrates (lazy-mount or
    * forceMount). Used by the page-level loading progress bar. */
   onMount?: (id: string) => void;
+  /** Project slug used as the prefix for export filenames. Falls back to
+   * "project" when missing. */
+  projectSlug?: string | null;
+  /** Active grouping mode (zones | clusters) — appended to export filenames
+   * so zone-mode and cluster-mode artifacts don't overwrite each other. */
+  groupingMode?: 'zones' | 'clusters';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// #6 — structured 4-section interpretation
+// ─────────────────────────────────────────────────────────────────────────
+
+interface ChartSummaryV2Data {
+  overall: string;
+  findings: { point: string; evidence: string }[];
+  local_breakdown: { unit_id: string; unit_label: string; interpretation: string }[];
+  implication: string;
+}
+
+interface ChartSummaryData {
+  summary: string;
+  highlight_points: string[];
+  summary_v2?: ChartSummaryV2Data | null;
+  cached?: boolean;
+  model?: string;
+  error?: string | null;
+  degraded?: boolean;
+}
+
+/** Renders the chart-summary panel. Prefers the structured 4-section v2
+ * payload (overall → findings → local breakdown → implication) when the
+ * backend returned one; falls back to the legacy paragraph + bullets when
+ * v2 parsing failed twice (degraded=true) or for older cached entries. */
+function ChartSummaryView({ data }: { data: ChartSummaryData }) {
+  if (data.error) {
+    return (
+      <Alert status="warning" size="sm" fontSize="xs" borderRadius="md">
+        <AlertIcon />
+        {data.error}
+      </Alert>
+    );
+  }
+
+  const v2 = data.summary_v2 ?? null;
+
+  // ── v2 (structured) ───────────────────────────────────────────────
+  if (v2) {
+    return (
+      <VStack align="stretch" spacing={3}>
+        {/* 1. Overall */}
+        {v2.overall && (
+          <Box>
+            <Text fontSize="2xs" fontWeight="bold" color="gray.500" textTransform="uppercase" mb={1}>
+              Overall
+            </Text>
+            <Text fontSize="sm" color="gray.700" lineHeight="1.6">
+              {v2.overall}
+            </Text>
+          </Box>
+        )}
+
+        {/* 2. Key findings (with evidence chips) */}
+        {v2.findings.length > 0 && (
+          <Box>
+            <Text fontSize="2xs" fontWeight="bold" color="gray.500" textTransform="uppercase" mb={1}>
+              Key findings
+            </Text>
+            <VStack align="stretch" spacing={2}>
+              {v2.findings.map((f, i) => (
+                <Box key={i} borderLeft="2px solid" borderColor="purple.300" pl={3} py={0.5}>
+                  <Text fontSize="sm" color="gray.700" lineHeight="1.5">
+                    {f.point}
+                  </Text>
+                  {f.evidence && (
+                    <Badge variant="subtle" colorScheme="purple" mt={1} fontSize="2xs" whiteSpace="normal">
+                      {f.evidence}
+                    </Badge>
+                  )}
+                </Box>
+              ))}
+            </VStack>
+          </Box>
+        )}
+
+        {/* 3. Local breakdown (per grouping unit) */}
+        {v2.local_breakdown.length > 0 && (
+          <Box>
+            <Text fontSize="2xs" fontWeight="bold" color="gray.500" textTransform="uppercase" mb={1}>
+              Per unit
+            </Text>
+            <VStack align="stretch" spacing={1}>
+              {v2.local_breakdown.map((l, i) => (
+                <HStack key={`${l.unit_id}-${i}`} spacing={2} align="start" fontSize="xs">
+                  <Badge colorScheme="gray" fontSize="2xs" flexShrink={0}>
+                    {l.unit_label || l.unit_id}
+                  </Badge>
+                  <Text color="gray.700" lineHeight="1.5">
+                    {l.interpretation}
+                  </Text>
+                </HStack>
+              ))}
+            </VStack>
+          </Box>
+        )}
+
+        {/* 4. Design implication (highlighted) */}
+        {v2.implication && (
+          <Box bg="blue.50" border="1px solid" borderColor="blue.100" borderRadius="md" p={2}>
+            <Text fontSize="2xs" fontWeight="bold" color="blue.700" textTransform="uppercase" mb={1}>
+              Design implication
+            </Text>
+            <Text fontSize="sm" color="blue.900" lineHeight="1.5">
+              {v2.implication}
+            </Text>
+          </Box>
+        )}
+
+        {data.cached && (
+          <Text fontSize="2xs" color="gray.400">
+            Cached · {data.model || 'unknown model'}
+          </Text>
+        )}
+      </VStack>
+    );
+  }
+
+  // ── v1 fallback (degraded) ────────────────────────────────────────
+  return (
+    <VStack align="stretch" spacing={2}>
+      {data.degraded && (
+        <Alert status="info" size="sm" fontSize="2xs" borderRadius="md">
+          <AlertIcon />
+          Structured view unavailable; showing the model's free-text reply.
+        </Alert>
+      )}
+      <Text fontSize="sm" color="gray.700" lineHeight="1.6">
+        {data.summary || '(no summary returned)'}
+      </Text>
+      {data.highlight_points?.length > 0 && (
+        <Box pl={3}>
+          {data.highlight_points.map((bullet, i) => (
+            <Text
+              key={i}
+              fontSize="xs"
+              color="gray.600"
+              position="relative"
+              _before={{
+                content: '"•"',
+                position: 'absolute',
+                left: '-12px',
+                color: 'purple.400',
+              }}
+            >
+              {bullet}
+            </Text>
+          ))}
+        </Box>
+      )}
+      {data.cached && (
+        <Text fontSize="2xs" color="gray.400">
+          Cached · {data.model || 'unknown model'}
+        </Text>
+      )}
+    </VStack>
+  );
 }
 
 /**
@@ -62,6 +231,10 @@ export interface ChartHostHandle {
   } | null>;
   /** Returns true once the chart body has rendered (hasIntersected === true). */
   isMounted: () => boolean;
+  /** #7-B — direct DOM ref to the Card node for SVG capture. Returning the
+   * node lets exporters serialize the inner <svg> straight from the live DOM
+   * without fragile aria-label CSS selectors. */
+  getNode: () => HTMLElement | null;
 }
 
 /**
@@ -71,13 +244,14 @@ export interface ChartHostHandle {
  */
 export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
   function ChartHost(
-    { descriptor, ctx, onHide, projectId, projectContext, showAiSummary = true, forceMount = false, onMount },
+    { descriptor, ctx, onHide, projectId, projectContext, showAiSummary = true, forceMount = false, onMount, projectSlug, groupingMode = 'zones' },
     ref,
   ) {
     const cardRef = useRef<HTMLDivElement | null>(null);
     const [hasIntersected, setHasIntersected] = useState(false);
     const [aiOpen, setAiOpen] = useState(true);
     const reportedMountRef = useRef(false);
+    const toast = useToast();
 
     // IntersectionObserver lazy mount — defer rendering of heavy chart bodies
     // until the card scrolls near the viewport. Once mounted, stays mounted.
@@ -132,6 +306,7 @@ export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
       project_id: projectId ?? '',
       payload: summaryPayload,
       project_context: projectContext ?? null,
+      grouping_mode: groupingMode,
       enabled: aiQueryEnabled,
     });
 
@@ -167,27 +342,35 @@ export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
         isMounted() {
           return effectiveMounted;
         },
+        getNode() {
+          return cardRef.current;
+        },
       }),
       [effectiveMounted, descriptor, ctx],
     );
 
     if (!descriptor.isAvailable(ctx)) return null;
 
-    const handleDownloadPng = async () => {
-      const canvas = await captureNode();
-      if (!canvas) return;
+    const tabular = descriptor.exportRows ? descriptor.exportRows(ctx) : null;
+    const hasTabular = !!tabular && tabular.rows.length > 0;
+
+    const handleExport = async (format: ExportFormat) => {
       try {
-        canvas.toBlob((blob) => {
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${descriptor.id}.png`;
-          a.click();
-          URL.revokeObjectURL(url);
-        });
+        await exportArtifact(
+          {
+            chartId: descriptor.id,
+            projectSlug,
+            groupingMode,
+            node: cardRef.current,
+            rows: tabular?.rows,
+            columns: tabular?.columns,
+            sheetName: descriptor.title.slice(0, 31),
+          },
+          format,
+        );
       } catch (err) {
-        console.error('PNG export failed', err);
+        const message = err instanceof Error ? err.message : `${format.toUpperCase()} export failed`;
+        toast({ title: message, status: 'error', duration: 4000 });
       }
     };
 
@@ -224,10 +407,32 @@ export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
                 size="xs"
                 variant="ghost"
               />
-              <MenuList minW="160px">
-                <MenuItem icon={<Download size={14} />} fontSize="sm" onClick={handleDownloadPng}>
-                  Download PNG
-                </MenuItem>
+              <MenuList minW="180px">
+                <MenuGroup title="Export" fontSize="2xs" color="gray.500">
+                  <MenuItem icon={<FileCode size={14} />} fontSize="sm" onClick={() => handleExport('svg')}>
+                    SVG (vector)
+                  </MenuItem>
+                  <MenuItem icon={<FileImage size={14} />} fontSize="sm" onClick={() => handleExport('png')}>
+                    PNG (300 dpi)
+                  </MenuItem>
+                  <MenuItem
+                    icon={<FileText size={14} />}
+                    fontSize="sm"
+                    onClick={() => handleExport('csv')}
+                    isDisabled={!hasTabular}
+                  >
+                    CSV {hasTabular ? '' : '(unavailable)'}
+                  </MenuItem>
+                  <MenuItem
+                    icon={<FileSpreadsheet size={14} />}
+                    fontSize="sm"
+                    onClick={() => handleExport('xlsx')}
+                    isDisabled={!hasTabular}
+                  >
+                    XLSX {hasTabular ? '' : '(unavailable)'}
+                  </MenuItem>
+                </MenuGroup>
+                <MenuDivider />
                 <MenuItem
                   icon={<EyeOff size={14} />}
                   fontSize="sm"
@@ -277,43 +482,7 @@ export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
                     </Alert>
                   )}
                   {summaryQuery.data && (
-                    <VStack align="stretch" spacing={2}>
-                      {summaryQuery.data.error ? (
-                        <Alert status="warning" size="sm" fontSize="xs" borderRadius="md">
-                          <AlertIcon />
-                          {summaryQuery.data.error}
-                        </Alert>
-                      ) : (
-                        <Text fontSize="sm" color="gray.700" lineHeight="1.6">
-                          {summaryQuery.data.summary || '(no summary returned)'}
-                        </Text>
-                      )}
-                      {summaryQuery.data.highlight_points?.length > 0 && (
-                        <Box pl={3}>
-                          {summaryQuery.data.highlight_points.map((bullet, i) => (
-                            <Text
-                              key={i}
-                              fontSize="xs"
-                              color="gray.600"
-                              position="relative"
-                              _before={{
-                                content: '"•"',
-                                position: 'absolute',
-                                left: '-12px',
-                                color: 'purple.400',
-                              }}
-                            >
-                              {bullet}
-                            </Text>
-                          ))}
-                        </Box>
-                      )}
-                      {summaryQuery.data.cached && (
-                        <Text fontSize="2xs" color="gray.400">
-                          Cached · {summaryQuery.data.model || 'unknown model'}
-                        </Text>
-                      )}
-                    </VStack>
+                    <ChartSummaryView data={summaryQuery.data} />
                   )}
                 </Box>
               )}

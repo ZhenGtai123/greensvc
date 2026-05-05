@@ -119,6 +119,17 @@ export interface ChartDescriptor {
    * default. Other charts can still be opted in via the Customize panel.
    */
   exportByDefault?: boolean;
+  /**
+   * #7-A — return tabular rows for CSV / XLSX export. Charts without an
+   * `exportRows` only expose SVG and PNG export. Keep rows flat (one record
+   * per row) and keep column keys stable; XLSX column auto-fit reads
+   * `String(value).length` so prefer numbers and short strings over JSON
+   * blobs.
+   */
+  exportRows?: (ctx: ChartContext) => {
+    columns: { key: string; label: string }[];
+    rows: Record<string, unknown>[];
+  } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +196,25 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     section: 'setup',
     description: 'What indicators are we analyzing? Metadata-only list.',
     isAvailable: (ctx) => Object.keys(ctx.indicatorDefs).length > 0,
+    exportRows: (ctx) => ({
+      columns: [
+        { key: 'id', label: 'ID' },
+        { key: 'name', label: 'Full Name' },
+        { key: 'unit', label: 'Unit' },
+        { key: 'target_direction', label: 'Target' },
+        { key: 'category', label: 'Category' },
+        { key: 'n_full', label: 'N (Full)' },
+      ],
+      rows: Object.values(ctx.indicatorDefs).map((d) => ({
+        id: d.id,
+        name: d.name,
+        unit: d.unit,
+        target_direction: d.target_direction,
+        category: d.category,
+        n_full:
+          ctx.globalIndicatorStats.find((s) => s.indicator_id === d.id)?.by_layer?.full?.N ?? '',
+      })),
+    }),
     summaryPayload: (ctx) => ({
       analysis_mode: ctx.analysisMode,
       zone_count: ctx.sortedDiagnostics.length,
@@ -242,6 +272,26 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     section: 'setup',
     description: 'Images per indicator, FMB coverage, normality, correlation method.',
     isAvailable: (ctx) => ctx.dataQuality.length > 0,
+    exportRows: (ctx) => ({
+      columns: [
+        { key: 'indicator_id', label: 'Indicator' },
+        { key: 'total_images', label: 'Total Images' },
+        { key: 'fg_coverage_pct', label: 'FG %' },
+        { key: 'mg_coverage_pct', label: 'MG %' },
+        { key: 'bg_coverage_pct', label: 'BG %' },
+        { key: 'is_normal', label: 'Normality' },
+        { key: 'correlation_method', label: 'Corr. Method' },
+      ],
+      rows: ctx.dataQuality.map((r) => ({
+        indicator_id: r.indicator_id,
+        total_images: r.total_images,
+        fg_coverage_pct: r.fg_coverage_pct,
+        mg_coverage_pct: r.mg_coverage_pct,
+        bg_coverage_pct: r.bg_coverage_pct,
+        is_normal: r.is_normal,
+        correlation_method: r.correlation_method,
+      })),
+    }),
     summaryPayload: (ctx) => ({
       analysis_mode: ctx.analysisMode,
       zone_count: ctx.sortedDiagnostics.length,
@@ -269,6 +319,20 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     exportByDefault: true,
     isAvailable: (ctx) => ctx.sortedDiagnostics.length > 0,
     render: (ctx) => <ZonePriorityChart diagnostics={ctx.sortedDiagnostics} />,
+    exportRows: (ctx) => ({
+      columns: [
+        { key: 'rank', label: 'Rank' },
+        { key: 'zone_name', label: 'Zone' },
+        { key: 'mean_abs_z', label: 'Mean |z|' },
+        { key: 'point_count', label: 'Points' },
+      ],
+      rows: ctx.sortedDiagnostics.map((d) => ({
+        rank: d.rank,
+        zone_name: d.zone_name,
+        mean_abs_z: d.mean_abs_z != null ? Number(d.mean_abs_z.toFixed(3)) : '',
+        point_count: d.point_count,
+      })),
+    }),
     summaryPayload: (ctx) => ({
       analysis_mode: ctx.analysisMode,
       zones: ctx.sortedDiagnostics.map((d) => ({
@@ -316,6 +380,35 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
         colorblindMode={ctx.colorblindMode}
       />
     ),
+    exportRows: (ctx) => {
+      // Long-form (zone, indicator, z) — easier for re-analysis than a wide grid
+      // and still maps 1:1 onto the heatmap cells.
+      const indicators = new Set<string>();
+      const longRows: Record<string, unknown>[] = [];
+      for (const diag of ctx.sortedDiagnostics) {
+        const status = diag.indicator_status || {};
+        for (const [indId, layerData] of Object.entries(status)) {
+          indicators.add(indId);
+          const ld = (layerData as Record<string, { value?: number | null; z_score?: number }>).full;
+          if (!ld) continue;
+          longRows.push({
+            zone_name: diag.zone_name,
+            indicator: indId,
+            value: ld.value ?? '',
+            z_score: ld.z_score != null ? Number(ld.z_score.toFixed(3)) : '',
+          });
+        }
+      }
+      return {
+        columns: [
+          { key: 'zone_name', label: 'Zone' },
+          { key: 'indicator', label: 'Indicator' },
+          { key: 'value', label: 'Value' },
+          { key: 'z_score', label: 'Z-Score' },
+        ],
+        rows: longRows,
+      };
+    },
   },
 
   // ── Spatial Z-Deviation (zone-level finding) ────────────────────────
@@ -474,6 +567,24 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     description:
       'Absolute mean values per zone per indicator (full layer) plus a global-mean reference row.',
     isAvailable: (ctx) => ctx.filteredStats.length > 0,
+    exportRows: (ctx) => ({
+      columns: [
+        { key: 'zone_name', label: 'Zone' },
+        { key: 'indicator_id', label: 'Indicator' },
+        { key: 'mean', label: 'Mean' },
+        { key: 'std', label: 'Std' },
+        { key: 'N', label: 'N' },
+        { key: 'layer', label: 'Layer' },
+      ],
+      rows: ctx.filteredStats.map((s) => ({
+        zone_name: s.zone_name,
+        indicator_id: s.indicator_id,
+        mean: s.mean != null ? Number(s.mean.toFixed(3)) : '',
+        std: s.std != null ? Number(s.std.toFixed(3)) : '',
+        N: s.N,
+        layer: s.layer,
+      })),
+    }),
     summaryPayload: (ctx) => ({
       analysis_mode: ctx.analysisMode,
       zone_count: ctx.sortedDiagnostics.length,
@@ -591,6 +702,43 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
       // drives a given correlation.
       by_layer: correlationByLayer(ctx),
     }),
+    exportRows: (ctx) => {
+      const za = ctx.zoneAnalysisResult;
+      const rows: Record<string, unknown>[] = [];
+      if (za?.correlation_by_layer) {
+        for (const layer of LAYERS_FOR_PAYLOAD) {
+          const corr = za.correlation_by_layer[layer];
+          const pval = za.pvalue_by_layer?.[layer];
+          if (!corr) continue;
+          const inds = Object.keys(corr);
+          for (let i = 0; i < inds.length; i++) {
+            for (let j = i + 1; j < inds.length; j++) {
+              const a = inds[i];
+              const b = inds[j];
+              const r = corr[a]?.[b];
+              if (r == null) continue;
+              rows.push({
+                layer,
+                indicator_a: a,
+                indicator_b: b,
+                correlation: Number(r.toFixed(3)),
+                p_value: pval?.[a]?.[b] != null ? Number(pval[a][b]!.toFixed(4)) : '',
+              });
+            }
+          }
+        }
+      }
+      return {
+        columns: [
+          { key: 'layer', label: 'Layer' },
+          { key: 'indicator_a', label: 'Indicator A' },
+          { key: 'indicator_b', label: 'Indicator B' },
+          { key: 'correlation', label: 'Correlation (r)' },
+          { key: 'p_value', label: 'p-value' },
+        ],
+        rows,
+      };
+    },
   },
 
   // ── Per-indicator detail ─────────────────────────────────────────────
@@ -700,6 +848,35 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     section: 'reference',
     description: 'Per-indicator Mean ± Std by layer, CV, Shapiro-Wilk, Kruskal-Wallis.',
     isAvailable: (ctx) => ctx.globalIndicatorStats.length > 0,
+    exportRows: (ctx) => {
+      const cols = [
+        { key: 'indicator_id', label: 'Indicator' },
+        { key: 'cv_full', label: 'CV (Full)' },
+        { key: 'shapiro_p', label: 'Shapiro-Wilk p' },
+        { key: 'kruskal_p', label: 'Kruskal-Wallis p' },
+        ...LAYERS_FOR_PAYLOAD.flatMap((layer) => [
+          { key: `${layer}_n`, label: `${layer} N` },
+          { key: `${layer}_mean`, label: `${layer} Mean` },
+          { key: `${layer}_std`, label: `${layer} Std` },
+        ]),
+      ];
+      const rows = ctx.globalIndicatorStats.map((s) => {
+        const row: Record<string, unknown> = {
+          indicator_id: s.indicator_id,
+          cv_full: s.cv_full ?? '',
+          shapiro_p: s.shapiro_p ?? '',
+          kruskal_p: s.kruskal_p ?? '',
+        };
+        for (const layer of LAYERS_FOR_PAYLOAD) {
+          const v = s.by_layer?.[layer];
+          row[`${layer}_n`] = v?.N ?? '';
+          row[`${layer}_mean`] = v?.Mean ?? '';
+          row[`${layer}_std`] = v?.Std ?? '';
+        }
+        return row;
+      });
+      return { columns: cols, rows };
+    },
     summaryPayload: (ctx) => ({
       analysis_mode: ctx.analysisMode,
       zone_count: ctx.sortedDiagnostics.length,

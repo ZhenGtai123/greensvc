@@ -261,16 +261,42 @@ function significanceStars(p: number | undefined): string {
   return '';
 }
 
+// Margin helpers shared by both heatmaps. SVG <text> width is browser-dependent
+// at runtime, so we approximate from char count: at fontSize px, a regular
+// system font averages ~0.6 px per character. The rotated label's vertical
+// projection is `length * sin(angle)`; we add padding for the diagonal stub
+// that hangs below the rotation pivot and a top breathing gap.
+const ROTATION_DEG = 45;
+const ROTATION_RAD = (ROTATION_DEG * Math.PI) / 180;
+const CHAR_WIDTH_RATIO = 0.6;
+
+function rotatedLabelTopMargin(maxLabelChars: number, fontSize: number): number {
+  const labelPx = maxLabelChars * fontSize * CHAR_WIDTH_RATIO;
+  // sin(45°) ≈ 0.707 — vertical projection after rotating around the pivot.
+  // +12 baseline pad keeps the longest descender clear of the cells.
+  return Math.ceil(labelPx * Math.sin(ROTATION_RAD)) + 12;
+}
+
 export function CorrelationHeatmap({ corr, pval, indicators, colorblindMode }: CorrelationHeatmapProps) {
   const n = indicators.length;
   const cellSize = Math.max(36, Math.min(48, 400 / Math.max(n, 1)));
-  const labelWidth = 100;
-  const labelHeight = 100;
+  const colLabelFontSize = 10;
+  const rowLabelFontSize = 10;
+  const colLabelMaxChars = 10; // truncation threshold below
+  const rowLabelMaxChars = 10;
+  const labelHeight = rotatedLabelTopMargin(colLabelMaxChars, colLabelFontSize);
+  // Left margin: longest row label (un-rotated) + breathing gap
+  const labelWidth = Math.ceil(rowLabelMaxChars * rowLabelFontSize * CHAR_WIDTH_RATIO) + 14;
+  // Bottom legend block (rect 12px high + 8px above + 8px below the cells)
+  const legendHeight = 12;
+  const legendGap = 8;
+  const legendBottomPad = 8;
 
   if (n === 0) return null;
 
   const svgWidth = labelWidth + n * cellSize;
-  const svgHeight = labelHeight + n * cellSize;
+  const svgHeight = labelHeight + n * cellSize + legendGap + legendHeight + legendBottomPad;
+  const legendY = labelHeight + n * cellSize + legendGap;
 
   return (
     <Box overflowX="auto">
@@ -282,10 +308,10 @@ export function CorrelationHeatmap({ corr, pval, indicators, colorblindMode }: C
             x={labelWidth + col * cellSize + cellSize / 2}
             y={labelHeight - 6}
             textAnchor="end"
-            fontSize={10}
+            fontSize={colLabelFontSize}
             transform={`rotate(-45, ${labelWidth + col * cellSize + cellSize / 2}, ${labelHeight - 6})`}
           >
-            {ind.length > 10 ? ind.slice(0, 10) + '…' : ind}
+            {ind.length > colLabelMaxChars ? ind.slice(0, colLabelMaxChars) + '…' : ind}
           </text>
         ))}
 
@@ -296,9 +322,9 @@ export function CorrelationHeatmap({ corr, pval, indicators, colorblindMode }: C
               x={labelWidth - 6}
               y={labelHeight + ri * cellSize + cellSize / 2 + 4}
               textAnchor="end"
-              fontSize={10}
+              fontSize={rowLabelFontSize}
             >
-              {row.length > 10 ? row.slice(0, 10) + '…' : row}
+              {row.length > rowLabelMaxChars ? row.slice(0, rowLabelMaxChars) + '…' : row}
             </text>
             {indicators.map((col, ci) => {
               const val = corr[row]?.[col];
@@ -346,8 +372,8 @@ export function CorrelationHeatmap({ corr, pval, indicators, colorblindMode }: C
           </g>
         ))}
 
-        {/* Color legend */}
-        <g transform={`translate(${labelWidth}, ${svgHeight - 16})`}>
+        {/* Color legend (positioned below the last row with a fixed 8px gap) */}
+        <g transform={`translate(${labelWidth}, ${legendY})`}>
           <rect width={12} height={12} fill={corrColor(-1, colorblindMode)} rx={2} />
           <text x={16} y={10} fontSize={9} fill="#4A5568">-1</text>
           <rect x={40} width={12} height={12} fill={corrColor(0, colorblindMode)} rx={2} />
@@ -416,10 +442,19 @@ export function PriorityHeatmap({ diagnostics, layer = 'full', colorblindMode }:
 
   const cellW = Math.max(44, Math.min(56, 600 / Math.max(indicators.length, 1)));
   const cellH = 36;
-  const labelW = 120;
-  const labelH = 90;
+  const colLabelFontSize = 9;
+  const rowLabelFontSize = 10;
+  const colLabelMaxChars = 12; // truncation threshold below
+  const rowLabelMaxChars = 14;
+  const labelH = rotatedLabelTopMargin(colLabelMaxChars, colLabelFontSize);
+  const labelW = Math.ceil(rowLabelMaxChars * rowLabelFontSize * CHAR_WIDTH_RATIO) + 14;
+  // Legend: 5 swatches × 80px wide, 12px tall + 8px gap above + 8px below.
+  const legendHeight = 12;
+  const legendGap = 8;
+  const legendBottomPad = 8;
   const svgW = labelW + indicators.length * cellW;
-  const svgH = labelH + zones.length * cellH + 30;
+  const svgH = labelH + zones.length * cellH + legendGap + legendHeight + legendBottomPad;
+  const legendY = labelH + zones.length * cellH + legendGap;
 
   const legendItems = [
     { label: 'z<-1.5', color: '#2B6CB0' },
@@ -439,17 +474,17 @@ export function PriorityHeatmap({ diagnostics, layer = 'full', colorblindMode }:
             x={labelW + ci * cellW + cellW / 2}
             y={labelH - 6}
             textAnchor="end"
-            fontSize={9}
+            fontSize={colLabelFontSize}
             transform={`rotate(-45, ${labelW + ci * cellW + cellW / 2}, ${labelH - 6})`}
           >
-            {ind.length > 12 ? ind.slice(0, 12) + '...' : ind}
+            {ind.length > colLabelMaxChars ? ind.slice(0, colLabelMaxChars) + '...' : ind}
           </text>
         ))}
         {/* Rows */}
         {zones.map((zone, ri) => (
           <g key={zone}>
-            <text x={labelW - 6} y={labelH + ri * cellH + cellH / 2 + 4} textAnchor="end" fontSize={10}>
-              {zone.length > 14 ? zone.slice(0, 14) + '...' : zone}
+            <text x={labelW - 6} y={labelH + ri * cellH + cellH / 2 + 4} textAnchor="end" fontSize={rowLabelFontSize}>
+              {zone.length > rowLabelMaxChars ? zone.slice(0, rowLabelMaxChars) + '...' : zone}
             </text>
             {indicators.map((ind, ci) => {
               const cell = grid[zone]?.[ind];
@@ -483,8 +518,8 @@ export function PriorityHeatmap({ diagnostics, layer = 'full', colorblindMode }:
             })}
           </g>
         ))}
-        {/* Legend */}
-        <g transform={`translate(${labelW}, ${svgH - 22})`}>
+        {/* Legend (positioned below the last row with a fixed 8px gap) */}
+        <g transform={`translate(${labelW}, ${legendY})`}>
           {legendItems.map((item, i) => (
             <g key={item.label} transform={`translate(${i * 80}, 0)`}>
               <rect width={12} height={12} fill={item.color} rx={2} opacity={0.85} />

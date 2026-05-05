@@ -33,6 +33,8 @@ from app.models.analysis import (
     ProjectPipelineProgress,
     SkippedImage,
     IndicatorDefinitionInput,
+    IndicatorLayerValue,
+    ImageRecord,
     ReportRequest,
     ReportResult,
 )
@@ -140,6 +142,11 @@ class ClusteringByProjectRequest(BaseModel):
 class ClusteringResponse(BaseModel):
     clustering: Optional[ClusteringResult] = None
     segment_diagnostics: list = []
+    # #1 — full Stage 2.5 result computed with each cluster acting as a virtual
+    # zone. Frontend can drop this straight into setZoneAnalysisResult so that
+    # z-score / correlation / radar / global stats all reflect cluster
+    # membership instead of the original (often single-zone) project layout.
+    zone_analysis: Optional[ZoneAnalysisResult] = None
     skipped: bool = False
     reason: str = ""
     n_points_used: int = 0
@@ -185,11 +192,108 @@ def run_clustering(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _build_cluster_zone_analysis(
+    project,
+    clustering_result: ClusteringResult,
+    indicator_definitions: dict[str, IndicatorDefinitionInput],
+    indicator_ids: list[str],
+    analyzer: ZoneAnalyzer,
+) -> Optional[ZoneAnalysisResult]:
+    """Re-run Stage 2.5 with clusters acting as virtual zones.
+
+    Without this, the existing chart pipeline keeps the original (often
+    single-zone) zone_statistics / correlations / radar profiles after
+    clustering — making "Run Clustering" feel like a no-op for everything
+    except the zone_diagnostics list. This helper turns each cluster into a
+    pseudo-zone (zone_id="seg_{cid}", zone_name="Cluster {cid}") and feeds
+    the standard analyzer, returning a full ZoneAnalysisResult that the
+    frontend can drop into setZoneAnalysisResult wholesale.
+
+    Returns None if no images map to any cluster (shouldn't happen in
+    practice — ClusteringService rejects projects with too few points).
+    """
+    from collections import defaultdict
+
+    pid_to_cluster: dict[str, int] = {
+        pid: int(cid)
+        for pid, cid in zip(
+            clustering_result.point_ids_ordered,
+            clustering_result.labels_smoothed,
+        )
+    }
+
+    grouped: dict[tuple[str, str, str], list[float]] = defaultdict(list)
+    image_records: list[ImageRecord] = []
+
+    for img in project.uploaded_images:
+        cid = pid_to_cluster.get(img.image_id)
+        if cid is None:
+            continue
+        if not img.metrics_results:
+            continue
+        zone_id = f"seg_{cid}"
+        zone_name = f"Cluster {cid}"
+        for ind_id in indicator_ids:
+            val = img.metrics_results.get(ind_id)
+            if val is not None:
+                grouped[(zone_id, ind_id, "full")].append(val)
+                image_records.append(ImageRecord(
+                    image_id=img.image_id, zone_id=zone_id, zone_name=zone_name,
+                    indicator_id=ind_id, layer="full", value=val,
+                    lat=img.latitude, lng=img.longitude,
+                ))
+            for layer in ("foreground", "middleground", "background"):
+                val = img.metrics_results.get(f"{ind_id}__{layer}")
+                if val is not None:
+                    grouped[(zone_id, ind_id, layer)].append(val)
+                    image_records.append(ImageRecord(
+                        image_id=img.image_id, zone_id=zone_id, zone_name=zone_name,
+                        indicator_id=ind_id, layer=layer, value=val,
+                        lat=img.latitude, lng=img.longitude,
+                    ))
+
+    if not grouped:
+        return None
+
+    zone_statistics: list[IndicatorLayerValue] = []
+    for (zone_id, ind_id, layer), values in grouped.items():
+        cid = zone_id.split("_")[-1]
+        arr = np.array(values, dtype=float)
+        n = len(values)
+        zone_statistics.append(IndicatorLayerValue(
+            zone_id=zone_id,
+            zone_name=f"Cluster {cid}",
+            indicator_id=ind_id,
+            layer=layer,
+            n_images=n,
+            mean=float(np.mean(arr)),
+            std=float(np.std(arr, ddof=1)) if n > 1 else 0.0,
+            min=float(np.min(arr)),
+            max=float(np.max(arr)),
+            unit=indicator_definitions[ind_id].unit if ind_id in indicator_definitions else "",
+            area_sqm=0,
+        ))
+
+    request = ZoneAnalysisRequest(
+        indicator_definitions=indicator_definitions,
+        zone_statistics=zone_statistics,
+        image_records=image_records,
+    )
+    result = analyzer.analyze(request)
+    # Tag the result so the frontend / report writer can label charts with
+    # "by cluster" wording instead of "by zone".
+    result.zone_source = "cluster"
+    result.analysis_mode = "zone_level"
+    result.clustering = clustering_result
+    return result
+
+
 @router.post("/clustering/by-project", response_model=ClusteringResponse)
 def run_clustering_by_project(
     request: ClusteringByProjectRequest,
     service: ClusteringService = Depends(get_clustering_service),
     manager: MetricsManager = Depends(get_metrics_manager),
+    analyzer: ZoneAnalyzer = Depends(get_zone_analyzer),
     _user: UserResponse = Depends(get_current_user),
 ):
     """Run clustering on image-level point metrics built from a project's uploaded_images.
@@ -280,9 +384,33 @@ def run_clustering_by_project(
                 n_points_with_gps=n_with_gps,
             )
         clustering_result, segment_diagnostics = result
+        # Build the cluster-as-zone Stage 2.5 result so every downstream chart
+        # (z-score grid, correlation, radar, layer stats) reflects cluster
+        # membership instead of the user's original zones.
+        cluster_zone_analysis: Optional[ZoneAnalysisResult] = None
+        try:
+            cluster_zone_analysis = _build_cluster_zone_analysis(
+                project=project,
+                clustering_result=clustering_result,
+                indicator_definitions=indicator_definitions,
+                indicator_ids=valid_ids,
+                analyzer=analyzer,
+            )
+            if cluster_zone_analysis is not None:
+                # Carry the segment_diagnostics built by ClusteringService over
+                # to the analysis payload as well, so consumers reading
+                # zone_analysis_result alone still see the full diagnostics
+                # list.
+                cluster_zone_analysis.segment_diagnostics = segment_diagnostics
+        except Exception as e:
+            # Non-fatal: clustering itself succeeded; we just couldn't
+            # re-run the analyzer. Log and return without zone_analysis so
+            # the FE falls back to legacy partial-replacement behaviour.
+            logger.error("Cluster-as-zone analysis failed: %s", e, exc_info=True)
         return ClusteringResponse(
             clustering=clustering_result,
             segment_diagnostics=segment_diagnostics,
+            zone_analysis=cluster_zone_analysis,
             n_points_used=len(clustering_result.point_ids_ordered),
             n_points_with_gps=len(clustering_result.point_lats),
         )
@@ -413,14 +541,44 @@ class ChartSummaryRequest(BaseModel):
     project_id: str
     payload: dict[str, Any]
     project_context: Optional[dict[str, Any]] = None
+    # #6 — grouping mode is folded into the cache key so toggling between
+    # zone- and cluster-based views fetches a fresh interpretation tailored
+    # to the active grouping unit. Defaults to "zones" for older clients.
+    grouping_mode: Optional[str] = "zones"
+
+
+class ChartFinding(BaseModel):
+    point: str
+    evidence: str = ""
+
+
+class ChartLocalDetail(BaseModel):
+    unit_id: str = ""
+    unit_label: str = ""
+    interpretation: str
+
+
+class ChartSummaryV2(BaseModel):
+    overall: str
+    findings: list[ChartFinding]
+    local_breakdown: list[ChartLocalDetail]
+    implication: str
 
 
 class ChartSummaryResponse(BaseModel):
+    # Legacy fields — kept for backward compatibility with older frontend
+    # builds. They are derived from summary_v2 when the LLM produces valid
+    # structured output.
     summary: str
     highlight_points: list[str]
     cached: bool
     model: str = ""
     error: Optional[str] = None
+    # #6 — structured 4-section interpretation. Null when the LLM failed
+    # twice to return parseable JSON; in that case `degraded=True` and the
+    # frontend renders just the legacy paragraph with a hint.
+    summary_v2: Optional[ChartSummaryV2] = None
+    degraded: bool = False
 
 
 @router.post("/chart-summary", response_model=ChartSummaryResponse)
@@ -429,11 +587,11 @@ async def chart_summary(
     service: ChartSummaryService = Depends(get_chart_summary_service),
     _user: UserResponse = Depends(get_current_user),
 ):
-    """Return a short LLM interpretation of a single chart payload.
+    """Return a structured LLM interpretation of a single chart payload.
 
-    Cache-first: identical (chart_id, project_id, hash(payload)) tuples reuse
-    a previous answer without an LLM round-trip. Used by the "What this means"
-    expandable on each ChartHost card.
+    Cache-first: identical (chart_id, project_id, hash(payload + grouping_mode))
+    tuples reuse a previous answer without an LLM round-trip. Used by the
+    "What this means" expandable on each ChartHost card.
     """
     try:
         result = await service.generate(
@@ -443,6 +601,7 @@ async def chart_summary(
             project_id=request.project_id,
             payload=request.payload,
             project_context=request.project_context,
+            grouping_mode=request.grouping_mode,
         )
         return ChartSummaryResponse(**result)
     except Exception as e:

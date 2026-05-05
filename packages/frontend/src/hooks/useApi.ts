@@ -234,6 +234,9 @@ interface ChartSummaryArgs {
   project_id: string;
   payload: Record<string, unknown>;
   project_context?: Record<string, unknown> | null;
+  /** #6 — query key includes this so Zone-mode and Cluster-mode summaries
+   * don't collide in the React Query cache. */
+  grouping_mode?: 'zones' | 'clusters';
   /** When false, the query is held back until the user opens the panel. */
   enabled?: boolean;
 }
@@ -241,7 +244,13 @@ interface ChartSummaryArgs {
 export function useChartSummary(args: ChartSummaryArgs) {
   const { enabled = false, ...body } = args;
   return useQuery({
-    queryKey: ['chart-summary', body.chart_id, body.project_id, body.payload],
+    queryKey: [
+      'chart-summary',
+      body.chart_id,
+      body.project_id,
+      body.grouping_mode ?? 'zones',
+      body.payload,
+    ],
     queryFn: () => api.analysis.chartSummary(body).then(r => r.data),
     enabled,
     staleTime: 1000 * 60 * 60, // 1 hour — backend cache is the real TTL

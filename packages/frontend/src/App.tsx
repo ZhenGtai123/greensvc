@@ -198,10 +198,17 @@ function ProjectPipelineLayout() {
   // fresh tab opening project A cannot leak the previous session's blobs
   // — and switching from A to B atomically swaps in B's data with no
   // intermediate "cleared" state for the UI to flash.
+  //
+  // Order matters: hydrateFromProject inspects state.currentProject?.id to
+  // detect "same project refetch vs. project switch" so it can preserve
+  // session-only state (pipelineResult, cluster snapshot) on refetches.
+  // We hydrate FIRST while currentProject still holds the previous value,
+  // then update currentProject. Reversing this order makes sameProject
+  // always evaluate true.
   useEffect(() => {
     if (!project) return;
-    setCurrentProject(project);
     hydrateFromProject(project);
+    setCurrentProject(project);
   }, [project, setCurrentProject, hydrateFromProject]);
 
   const segment = pathname.split('/').pop() || '';

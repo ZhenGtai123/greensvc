@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -32,6 +32,8 @@ import {
   Tab,
   TabPanel,
   TabPanels,
+  Skeleton,
+  Progress,
   Accordion,
   AccordionItem,
   AccordionButton,
@@ -43,6 +45,7 @@ import { Download, FileText, FileImage, FileSpreadsheet, CheckCircle, AlertTrian
 import useAppStore from '../store/useAppStore';
 import { generateReport } from '../utils/generateReport';
 import { exportAnalysisExcel } from '../utils/exportExcel';
+import { exportBundle } from '../utils/exportBundle';
 import { useGenerateReport, useRunDesignStrategies, useRunClusteringByProject } from '../hooks/useApi';
 import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
@@ -69,6 +72,192 @@ import {
   type CapturedChart,
 } from '../utils/captureCharts';
 import type { ReportRequest, ZoneDiagnostic, ZoneDesignOutput, ClusteringResponse } from '../types';
+
+// ---------------------------------------------------------------------------
+// Pipeline-running card — #2 atomic gate
+// ---------------------------------------------------------------------------
+
+/** While the pipeline is running for the current project we replace the
+ * Analysis tab content with a single progress card so users can't act on
+ * stale or half-baked results. Mirrors the live pipelineRun state in the
+ * zustand store. */
+function PipelineRunningCard({
+  projectName,
+  imageProgress,
+  steps,
+}: {
+  projectName: string | null;
+  imageProgress: { current: number; total: number; filename: string } | null;
+  steps: Array<{ step: string; status: string; detail: string }>;
+}) {
+  const calcDone = steps.some((s) => s.step === 'run_calculations' && s.status === 'completed');
+  const lastStep = steps[steps.length - 1];
+  const pct =
+    !calcDone && imageProgress && imageProgress.total > 0
+      ? (imageProgress.current / imageProgress.total) * 100
+      : null;
+  return (
+    <Card mb={4}>
+      <CardBody>
+        <VStack align="stretch" spacing={4}>
+          <HStack spacing={3}>
+            <Sparkles size={18} color="#3182CE" />
+            <Box flex="1">
+              <Text fontWeight="bold" fontSize="md">
+                Pipeline running · {projectName ?? 'project'}
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                The analysis grid is hidden until the pipeline completes — all charts
+                will appear together once the data is ready.
+              </Text>
+            </Box>
+          </HStack>
+          {pct !== null ? (
+            <Box>
+              <HStack justify="space-between" mb={1}>
+                <Text fontSize="xs" color="gray.600">
+                  Computing image-level metrics — {imageProgress!.current} / {imageProgress!.total}
+                </Text>
+                <Text fontSize="xs" color="gray.500">{pct.toFixed(0)}%</Text>
+              </HStack>
+              <Progress value={pct} size="sm" colorScheme="blue" hasStripe isAnimated borderRadius="full" />
+            </Box>
+          ) : (
+            <Progress size="sm" isIndeterminate colorScheme="blue" borderRadius="full" />
+          )}
+          {steps.length > 0 && (
+            <VStack align="stretch" spacing={1} pt={1}>
+              {steps.map((s, idx) => (
+                <HStack key={`${s.step}-${idx}`} fontSize="xs" color="gray.600">
+                  {s.status === 'completed' ? (
+                    <CheckCircle size={12} color="#38A169" />
+                  ) : s.status === 'failed' ? (
+                    <AlertTriangle size={12} color="#E53E3E" />
+                  ) : (
+                    <Sparkles size={12} color="#3182CE" />
+                  )}
+                  <Text>
+                    <Text as="span" fontWeight="medium">{s.step}</Text>
+                    {' · '}
+                    {s.status}
+                    {s.detail ? ` — ${s.detail}` : ''}
+                  </Text>
+                </HStack>
+              ))}
+              {lastStep && lastStep.status !== 'completed' && (
+                <Text fontSize="2xs" color="gray.400" pl={5}>
+                  {lastStep.detail || 'working…'}
+                </Text>
+              )}
+            </VStack>
+          )}
+        </VStack>
+      </CardBody>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Single-zone hard gate — #1 entry card
+// ---------------------------------------------------------------------------
+
+/** Rendered in place of the entire chart grid when the project has fewer
+ * than 2 user zones AND clustering has not yet been run. Single-zone
+ * analyses produce mathematically meaningless charts (z-scores all 0, no
+ * cross-zone correlations), so we force the user to either add another
+ * zone or run clustering before any charts appear. */
+function SingleZoneEntryGate({
+  projectId,
+  zoneCount,
+  imageCount,
+  onRunClustering,
+  isClusteringRunning,
+  canRunClustering,
+}: {
+  projectId: string | null;
+  zoneCount: number;
+  imageCount: number;
+  onRunClustering: () => void;
+  isClusteringRunning: boolean;
+  canRunClustering: boolean;
+}) {
+  const navigate = useNavigate();
+  return (
+    <Card mb={4} borderColor="orange.300" borderWidth="1px">
+      <CardBody>
+        <VStack align="stretch" spacing={4}>
+          <HStack spacing={3} align="start">
+            <AlertTriangle size={24} color="#DD6B20" />
+            <Box flex="1">
+              <Heading size="sm" mb={1}>
+                Choose a grouping unit before continuing
+              </Heading>
+              <Text fontSize="sm" color="gray.600">
+                This project has only {zoneCount} zone{zoneCount === 1 ? '' : 's'}
+                {' '}({imageCount} image record{imageCount === 1 ? '' : 's'}).
+                Cross-zone z-scores, correlations, and the radar/heatmap charts
+                require at least 2 grouping units to be meaningful — analysing
+                a single zone against itself produces all-zero results.
+              </Text>
+              <Text fontSize="sm" color="gray.600" mt={2}>
+                Pick one of the two paths below. Charts will appear once the
+                grouping unit is established.
+              </Text>
+            </Box>
+          </HStack>
+
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+            <Card variant="outline">
+              <CardBody>
+                <VStack align="stretch" spacing={3}>
+                  <Heading size="xs">Option A — Add another zone</Heading>
+                  <Text fontSize="xs" color="gray.600">
+                    Define a second spatial polygon (e.g. a contrasting site or
+                    a sub-area within the same site). Re-running the pipeline
+                    is needed afterwards.
+                  </Text>
+                  <Button
+                    size="sm"
+                    colorScheme="blue"
+                    variant="outline"
+                    isDisabled={!projectId}
+                    onClick={() => projectId && navigate(`/projects/${projectId}/edit`)}
+                  >
+                    Edit project & add zones
+                  </Button>
+                </VStack>
+              </CardBody>
+            </Card>
+
+            <Card variant="outline">
+              <CardBody>
+                <VStack align="stretch" spacing={3}>
+                  <Heading size="xs">Option B — Run clustering</Heading>
+                  <Text fontSize="xs" color="gray.600">
+                    Group images into archetypes via KMeans on per-image
+                    indicator values. Each cluster is then treated as a virtual
+                    zone for all downstream charts and design strategies.
+                    Recommended when ≥ 10 images have computed metrics.
+                  </Text>
+                  <Button
+                    size="sm"
+                    colorScheme="teal"
+                    onClick={onRunClustering}
+                    isLoading={isClusteringRunning}
+                    isDisabled={!canRunClustering}
+                    loadingText="Clustering…"
+                  >
+                    Run clustering now
+                  </Button>
+                </VStack>
+              </CardBody>
+            </Card>
+          </SimpleGrid>
+        </VStack>
+      </CardBody>
+    </Card>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Non-chart helpers (chart formatting is now in analysisCharts/registry.tsx)
@@ -221,7 +410,20 @@ function Reports() {
     setShowAiSummary,
     colorblindMode,
     setColorblindMode,
+    pipelineRun,
+    groupingMode,
+    setGroupingMode,
+    userZoneAnalysisResult,
+    setUserZoneAnalysisResult,
+    clusterAnalysisResult,
+    setClusterAnalysisResult,
   } = useAppStore();
+
+  // #2 — when the pipeline is actively running for THIS project, the analysis
+  // tab content is hidden behind a single PipelineProgress card so users can't
+  // act on half-baked state. Stale results from previous runs are also masked.
+  const isPipelineRunningHere =
+    pipelineRun.isRunning && pipelineRun.projectId === routeProjectId;
 
   const projectName = currentProject?.project_name || pipelineResult?.project_name || 'Unknown Project';
 
@@ -308,18 +510,28 @@ function Reports() {
       if (result.skipped) {
         toast({ title: `Clustering skipped: ${result.reason}`, status: 'info', duration: 6000 });
       } else if (result.clustering) {
-        // Closure: archetypes are now first-class zones. Replace zone_diagnostics
-        // with segment_diagnostics, switch the analysis mode to zone_level, and
-        // mark the source as 'cluster' so the ModeAlert + clustering entry panel
-        // both stop rendering. Cross-zone z-scores immediately unlock.
-        useAppStore.getState().setZoneAnalysisResult({
+        // #1 — Backend now returns a complete cluster-as-zone Stage 2.5
+        // payload (zone_statistics, correlation, radar, layer_statistics
+        // all rebuilt around clusters). Snapshot the user-zone analysis so
+        // the user can toggle back, then swap the active dataset to the
+        // cluster one and flip groupingMode → 'clusters' so the segmented
+        // control reflects reality.
+        if (!userZoneAnalysisResult) {
+          setUserZoneAnalysisResult(zoneAnalysisResult);
+        }
+        const fullClusterAnalysis = result.zone_analysis ?? {
+          // Legacy fallback for older backends that don't return
+          // zone_analysis: do the partial-replacement we used to do.
           ...zoneAnalysisResult,
           clustering: result.clustering,
           segment_diagnostics: result.segment_diagnostics,
           zone_diagnostics: result.segment_diagnostics,
           analysis_mode: 'zone_level',
           zone_source: 'cluster',
-        });
+        };
+        setClusterAnalysisResult(fullClusterAnalysis);
+        useAppStore.getState().setZoneAnalysisResult(fullClusterAnalysis);
+        setGroupingMode('clusters');
         const gpsNote = result.n_points_with_gps ? ` · ${result.n_points_with_gps}/${result.n_points_used} with GPS` : '';
         toast({
           title: `${result.clustering.k} archetypes promoted to zones (silhouette: ${result.clustering.silhouette_score.toFixed(2)})${gpsNote}`,
@@ -329,7 +541,33 @@ function Reports() {
     } catch {
       toast({ title: 'Clustering failed', status: 'error' });
     }
-  }, [zoneAnalysisResult, currentProject, clusteringMutation, toast]);
+  }, [
+    zoneAnalysisResult,
+    currentProject,
+    clusteringMutation,
+    toast,
+    userZoneAnalysisResult,
+    setUserZoneAnalysisResult,
+    setClusterAnalysisResult,
+    setGroupingMode,
+  ]);
+
+  // #1 — segmented-control toggle. Switching modes is just a setZoneAnalysisResult
+  // swap; both payloads are cached so the toggle is instant. Disabled when
+  // clustering hasn't been run yet (only one option exists).
+  const handleSwitchGroupingMode = useCallback(
+    (mode: 'zones' | 'clusters') => {
+      if (mode === groupingMode) return;
+      if (mode === 'clusters' && clusterAnalysisResult) {
+        useAppStore.getState().setZoneAnalysisResult(clusterAnalysisResult);
+        setGroupingMode('clusters');
+      } else if (mode === 'zones' && userZoneAnalysisResult) {
+        useAppStore.getState().setZoneAnalysisResult(userZoneAnalysisResult);
+        setGroupingMode('zones');
+      }
+    },
+    [groupingMode, clusterAnalysisResult, userZoneAnalysisResult, setGroupingMode],
+  );
 
   const handleGenerateAiReport = useCallback(async () => {
     if (!zoneAnalysisResult) return;
@@ -337,6 +575,7 @@ function Reports() {
     try {
       // Strip image_records before sending — they can be 10K+ entries and
       // the report service doesn't use them.  Keeps the HTTP body small.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { image_records: _ir, ...zoneAnalysisCompact } = zoneAnalysisResult;
       const request: ReportRequest = {
         zone_analysis: zoneAnalysisCompact as typeof zoneAnalysisResult,
@@ -471,6 +710,54 @@ function Reports() {
     return ids;
   }, [analysisCharts, showClusteringPanel, chartCtx]);
 
+  // #1 — single-zone hard gate. Use the analyzer's own `analysis_mode`
+  // signal (image_level == zones < 2 at compute time) instead of the live
+  // project's spatial_zones count, because:
+  //   1. `currentProject` can be null briefly post-pipeline while React
+  //      Query refetches the project payload — relying on it would falsely
+  //      hide a perfectly-good multi-zone analysis result during that gap.
+  //   2. The analyzer is the source of truth: if it produced zone-level
+  //      diagnostics, the data is valid regardless of the project's
+  //      spatial_zones list (which may be stale).
+  // Gate only fires when (a) we have an analysis loaded AND (b) it ran in
+  // image-level (degenerate) mode AND (c) clustering hasn't replaced it.
+  const isClusterDerived =
+    chartCtx.zoneSource === 'cluster' || !!clusterAnalysisResult;
+  const userZoneCount = currentProject?.spatial_zones?.length ?? 0;
+  const singleZoneGated =
+    hasAnalysis &&
+    chartCtx.analysisMode === 'image_level' &&
+    !isClusterDerived;
+
+  // #1 — segmented control eligibility: both zone- and cluster-based
+  // analyses are cached → show toggle. Otherwise hide it (only one option
+  // makes sense to display).
+  const groupingToggleAvailable =
+    !!userZoneAnalysisResult && !!clusterAnalysisResult;
+
+  // #2 — atomic chart reveal. Charts are eagerly mounted (forceMount=true on
+  // every host below) so they all start rendering at once; we keep them
+  // behind a Skeleton overlay until each expanded-section chart has fired
+  // onMount, then fade the overlay out. Charts living inside collapsed
+  // accordions (setup, reference) are excluded — they only mount when the
+  // user expands the section, and we don't want to block the whole grid on
+  // user interaction.
+  const eagerChartIds = useMemo(() => {
+    const collapsedSections = new Set<ChartSection>(
+      (Object.keys(SECTION_META) as ChartSection[]).filter(
+        (s) => SECTION_META[s].defaultCollapsed,
+      ),
+    );
+    return visibleChartIds.filter((id) => {
+      const chart = analysisCharts.find((c) => c.id === id);
+      if (!chart) return false;
+      return !collapsedSections.has(chart.section);
+    });
+  }, [visibleChartIds, analysisCharts]);
+  const allChartsReady =
+    eagerChartIds.length === 0 ||
+    eagerChartIds.every((id) => mountedChartIds.has(id));
+
   // Reset the mounted set when the visible chart roster changes (mode flip,
   // hidden chart toggle). Effect runs after render so React commits the new
   // visibleChartIds before we drop stale entries.
@@ -553,6 +840,69 @@ function Reports() {
       status: 'success',
     });
   }, [zoneAnalysisResult, captureChartsForDownload, projectName, pipelineResult, designStrategyResult, toast]);
+
+  // #7-B — whole-page ZIP bundle. Walks every available chart in the
+  // analysis registry, captures its SVG via DOM lookup (forceMount keeps
+  // bodies present) and pulls tabular data via descriptor.exportRows when
+  // the descriptor opted in. The AI report and a metadata.json round it
+  // out so a researcher can drop the zip straight into a paper repo.
+  const handleExportBundle = useCallback(async () => {
+    if (!zoneAnalysisResult) return;
+    toast({ title: 'Building export bundle…', status: 'info', duration: 2000 });
+    try {
+      const cards = CHART_REGISTRY.filter(
+        (c) => c.tab === 'analysis' && c.isAvailable(chartCtx) && !hiddenChartIds.includes(c.id),
+      );
+      // Use the ChartHostHandle.getNode() refs we already collect for the
+      // PDF / image-capture flow, instead of fishing the cards out of the DOM
+      // by aria-label. aria-label matching breaks when chart titles contain
+      // characters CSS attribute selectors don't like (apostrophes, quotes,
+      // backslashes), and refs are O(1) without any DOM scan.
+      const artifacts = cards.map((c) => {
+        const handle = chartRefs.current.get(c.id);
+        const tab = c.exportRows ? c.exportRows(chartCtx) : null;
+        return {
+          chartId: c.id,
+          title: c.title,
+          node: handle?.getNode() ?? null,
+          rows: tab?.rows,
+          columns: tab?.columns,
+        };
+      });
+      const result = await exportBundle({
+        charts: artifacts,
+        projectSlug: currentProject?.project_name ?? 'project',
+        projectName: currentProject?.project_name ?? null,
+        groupingMode,
+        aiReport: aiReport ?? null,
+        aiReportMeta: aiReportMeta ?? null,
+        extraMetadata: {
+          zone_count: zoneAnalysisResult.zone_diagnostics?.length ?? 0,
+          analysis_mode: zoneAnalysisResult.analysis_mode,
+          zone_source: zoneAnalysisResult.zone_source,
+          design_strategies_present: !!designStrategyResult,
+        },
+      });
+      toast({
+        title: `Bundle ready: ${result.filename}`,
+        description: `${result.charts} chart(s) · ${result.csvs} CSV(s)`,
+        status: 'success',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Bundle export failed';
+      toast({ title: message, status: 'error' });
+    }
+  }, [
+    zoneAnalysisResult,
+    chartCtx,
+    hiddenChartIds,
+    currentProject,
+    groupingMode,
+    aiReport,
+    aiReportMeta,
+    designStrategyResult,
+    toast,
+  ]);
 
   const handleExportJson = () => {
     // Per-image metrics: flatten uploaded_images to id + zone + GPS + metrics
@@ -857,6 +1207,15 @@ function Reports() {
               Raw (.json)
             </Button>
           </Tooltip>
+          <Tooltip
+            label="ZIP bundle: every chart as SVG + CSV, the AI report, and metadata.json. Filename includes the active grouping mode so zone-mode and cluster-mode bundles don't overwrite each other."
+            placement="bottom"
+            hasArrow
+          >
+            <Button size="sm" leftIcon={<Download size={14} />} onClick={handleExportBundle} isDisabled={!hasAnalysis} colorScheme="purple">
+              Bundle (.zip)
+            </Button>
+          </Tooltip>
         </HStack>
       </PageHeader>
 
@@ -1002,6 +1361,58 @@ function Reports() {
             <TabPanels>
               {/* ── Tab: Analysis (5-panel narrative — PDF #7) ── */}
               <TabPanel px={0}>
+                {/* #2 — pipeline-running gate. While the pipeline is in flight
+                    for THIS project, suppress the analysis grid entirely and
+                    surface a single progress card. Stale results from a
+                    previous run stay hidden behind it. */}
+                {isPipelineRunningHere ? (
+                  <PipelineRunningCard
+                    projectName={pipelineRun.projectName}
+                    imageProgress={pipelineRun.imageProgress}
+                    steps={pipelineRun.steps}
+                  />
+                ) : singleZoneGated ? (
+                  // #1 — hard gate: don't render charts at all; force the user
+                  // to either add a zone or run clustering. This makes
+                  // "clustering" a meaningful step instead of a no-op.
+                  <SingleZoneEntryGate
+                    projectId={routeProjectId ?? null}
+                    zoneCount={userZoneCount}
+                    imageCount={chartCtx.imageRecords.length}
+                    onRunClustering={handleRunClustering}
+                    isClusteringRunning={clusteringMutation.isPending}
+                    canRunClustering={!!currentProject}
+                  />
+                ) : (
+                  <>
+                {/* #1 — Zone / Cluster segmented control. Only renders when
+                    both modes are cached so the toggle is instant. */}
+                {groupingToggleAvailable && (
+                  <HStack mb={4} spacing={0} align="center">
+                    <Text fontSize="xs" fontWeight="bold" color="gray.600" mr={3}>
+                      Grouping:
+                    </Text>
+                    <Button
+                      size="sm"
+                      variant={groupingMode === 'zones' ? 'solid' : 'outline'}
+                      colorScheme="blue"
+                      borderRightRadius={0}
+                      onClick={() => handleSwitchGroupingMode('zones')}
+                    >
+                      Zone view ({userZoneAnalysisResult?.zone_diagnostics?.length ?? 0})
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={groupingMode === 'clusters' ? 'solid' : 'outline'}
+                      colorScheme="blue"
+                      borderLeftRadius={0}
+                      onClick={() => handleSwitchGroupingMode('clusters')}
+                    >
+                      Cluster view ({clusterAnalysisResult?.zone_diagnostics?.length ?? 0})
+                    </Button>
+                  </HStack>
+                )}
+
                 {/* Single-zone / image-level mode banner */}
                 <ModeAlert
                   analysisMode={chartCtx.analysisMode}
@@ -1024,8 +1435,12 @@ function Reports() {
                   }
                 />
 
-                {/* Loading progress — fades out when all visible charts mount */}
-                <ChartLoadingProgress total={visibleChartIds.length} mounted={mountedChartIds.size} />
+                {/* Loading progress — kept as a thin status strip; the
+                    primary loading UX now comes from the Skeleton overlay
+                    over the chart grid (see #2). */}
+                {!allChartsReady && (
+                  <ChartLoadingProgress total={eagerChartIds.length} mounted={mountedChartIds.size} />
+                )}
 
                 {/* Computation warnings */}
                 {zoneAnalysisResult?.computation_metadata?.warnings?.length ? (
@@ -1043,7 +1458,33 @@ function Reports() {
                 ) : null}
 
                 {sortedDiagnostics.length > 0 && (
-                  <VStack spacing={6} align="stretch">
+                  <Box position="relative">
+                  {/* Skeleton overlay — covers the chart grid until every
+                      eagerly-mounted chart has fired onMount, so the user
+                      sees one synchronous reveal instead of a progressive
+                      drip-feed of cards. */}
+                  {!allChartsReady && (
+                    <Box
+                      position="absolute"
+                      inset={0}
+                      zIndex={2}
+                      bg="white"
+                      borderRadius="md"
+                      p={4}
+                    >
+                      <VStack spacing={4} align="stretch">
+                        <Skeleton height="120px" borderRadius="md" />
+                        <Skeleton height="240px" borderRadius="md" />
+                        <Skeleton height="200px" borderRadius="md" />
+                        <Skeleton height="200px" borderRadius="md" />
+                      </VStack>
+                    </Box>
+                  )}
+                  <VStack
+                    spacing={6}
+                    align="stretch"
+                    style={{ visibility: allChartsReady ? 'visible' : 'hidden' }}
+                  >
                     {/* Zone Cards */}
                     <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing={4}>
                       {sortedDiagnostics.map((diag: ZoneDiagnostic) => (
@@ -1087,8 +1528,9 @@ function Reports() {
                               projectId={routeProjectId ?? null}
                               projectContext={chartProjectContext}
                               showAiSummary={showAiSummary}
-                              forceMount={exporting}
+                              forceMount
                               onMount={handleChartMount}
+                              projectSlug={currentProject?.project_name ?? null}
                             />
                           ))}
                         </VStack>
@@ -1204,8 +1646,9 @@ function Reports() {
                                 projectId={routeProjectId ?? null}
                                 projectContext={chartProjectContext}
                                 showAiSummary={showAiSummary}
-                                forceMount={exporting}
+                                forceMount
                                 onMount={handleChartMount}
+                                projectSlug={currentProject?.project_name ?? null}
                               />
                             ))}
                           </VStack>
@@ -1214,6 +1657,9 @@ function Reports() {
                     </Accordion>
                     )}
                   </VStack>
+                  </Box>
+                )}
+                  </>
                 )}
               </TabPanel>
 

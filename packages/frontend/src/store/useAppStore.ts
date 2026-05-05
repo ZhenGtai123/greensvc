@@ -113,6 +113,22 @@ interface AppState {
   setShowAiSummary: (v: boolean) => void;
   colorblindMode: boolean;
   setColorblindMode: (v: boolean) => void;
+
+  // #1 — global grouping mode (zones | clusters). Drives which dataset feeds
+  // the ChartContext. zoneAnalysisResult always holds the data for the active
+  // mode; the inactive mode's data lives in clusterAnalysisResult /
+  // userZoneAnalysisResult so the toggle is instant.
+  groupingMode: 'zones' | 'clusters';
+  setGroupingMode: (m: 'zones' | 'clusters') => void;
+  /** Snapshot of the user-zone Stage 2.5 result so we can swap back when the
+   * user toggles from Cluster view back to Zone view. Set on first cluster
+   * promotion; cleared on project switch / pipeline rerun. */
+  userZoneAnalysisResult: ZoneAnalysisResult | null;
+  setUserZoneAnalysisResult: (r: ZoneAnalysisResult | null) => void;
+  /** Cluster-as-zone Stage 2.5 result (full payload) returned by the
+   * /clustering/by-project endpoint. */
+  clusterAnalysisResult: ZoneAnalysisResult | null;
+  setClusterAnalysisResult: (r: ZoneAnalysisResult | null) => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -173,6 +189,11 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     pipelineResult: null,
     aiReport: null,
     aiReportMeta: null,
+    // Reset grouping-mode caches too — stale cluster snapshots from an old
+    // pipeline run shouldn't leak into a fresh project.
+    groupingMode: 'zones',
+    userZoneAnalysisResult: null,
+    clusterAnalysisResult: null,
   }),
 
   // Hydrate analysis artefacts from a freshly fetched Project. The backend
@@ -185,7 +206,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   // localStorage from a previous session's project B; a returning user
   // sees exactly what the server has. The only state that survives across
   // sessions is project-agnostic UI prefs (still in partialize below).
-  hydrateFromProject: (project: Project) => set(() => {
+  hydrateFromProject: (project: Project) => set((state) => {
     // Rebuild visionMaskResults from each image's mask_filepaths so the
     // VisionAnalysis page renders previews immediately on mount, instead
     // of inheriting the previous project's masks until that page's own
@@ -193,21 +214,49 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     const maskResults = (project.uploaded_images ?? [])
       .filter((img) => img.mask_filepaths && Object.keys(img.mask_filepaths).length > 0)
       .map((img) => ({ imageId: img.image_id, maskPaths: img.mask_filepaths }));
+
+    // pipelineResult is session-only metadata about the latest pipeline run
+    // (skipped images, calc counts). It is NOT persisted server-side. Two
+    // hydration paths to support:
+    //   1. Project switch (A → B): drop the previous project's run summary
+    //      so it doesn't bleed into the new project's Analysis page.
+    //   2. Same-project refetch: preserve the in-memory result, otherwise a
+    //      React-Query refetch (window focus, default staleTime=0 revalidate)
+    //      RIGHT after a successful pipeline silently nukes the freshly-set
+    //      result and bounces the Analysis page back to the empty state.
+    const previousProjectId = state.currentProject?.id ?? state.pipelineResult?.project_id ?? null;
+    const sameProject = previousProjectId === project.id;
+    const preservedPipelineResult = sameProject ? state.pipelineResult : null;
+
+    // Cluster grouping caches are also session-only — drop on project switch
+    // so we don't show project A's archetypes on project B.
+    const preservedGroupingMode = sameProject ? state.groupingMode : 'zones';
+    const preservedUserZone = sameProject ? state.userZoneAnalysisResult : null;
+    const preservedClusterAnalysis = sameProject ? state.clusterAnalysisResult : null;
+
+    // The active zoneAnalysisResult might be the cluster-derived view (set
+    // by handleRunClustering), which isn't persisted to the project payload.
+    // When refetching the same project, keep whichever view the user is in.
+    const inClusterView =
+      sameProject && state.groupingMode === 'clusters' && !!state.clusterAnalysisResult;
+    const nextZoneAnalysis = inClusterView
+      ? state.clusterAnalysisResult
+      : project.zone_analysis_result ?? null;
+
     return {
       recommendations: project.stage1_recommendations ?? [],
       indicatorRelationships: project.stage1_relationships ?? [],
       recommendationSummary: project.stage1_summary ?? null,
       selectedIndicators: project.selected_indicators ?? [],
       visionMaskResults: maskResults,
-      zoneAnalysisResult: project.zone_analysis_result ?? null,
+      zoneAnalysisResult: nextZoneAnalysis,
       designStrategyResult: project.design_strategy_result ?? null,
-      // pipelineResult is session-only metadata about the latest pipeline
-      // run (skipped images, calc counts). It's not persisted server-side,
-      // so returning users / project switches start with no run summary;
-      // the actual analysis data still hydrates from zone_analysis_result.
-      pipelineResult: null,
+      pipelineResult: preservedPipelineResult,
       aiReport: project.ai_report ?? null,
       aiReportMeta: project.ai_report_meta ?? null,
+      groupingMode: preservedGroupingMode,
+      userZoneAnalysisResult: preservedUserZone,
+      clusterAnalysisResult: preservedClusterAnalysis,
     };
   }),
 
@@ -303,12 +352,34 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     }
     if (finalResult) {
       const result = finalResult as ProjectPipelineResult;
-      set((s) => ({
-        pipelineResult: result,
-        zoneAnalysisResult: result.zone_analysis ?? null,
-        designStrategyResult: result.design_strategies ?? null,
-        pipelineRun: { ...s.pipelineRun, isRunning: false },
-      }));
+      set((s) => {
+        // Cross-project guard: if the user navigated away from the running
+        // project mid-pipeline, the current store holds project B's hydrated
+        // state. Overwriting zoneAnalysisResult here would paint A's
+        // analysis onto B's pages. The backend has already persisted the
+        // result to project A's record (see analysis.py:project.zone_analysis_result
+        // assignment), so when the user navigates back to A,
+        // hydrateFromProject will pull it in. We only flip isRunning off
+        // here; the rest of the state stays correct for B.
+        const stillViewingPipelineProject = s.currentProject?.id === projectId;
+        if (!stillViewingPipelineProject) {
+          return { pipelineRun: { ...s.pipelineRun, isRunning: false } };
+        }
+        return {
+          pipelineResult: result,
+          zoneAnalysisResult: result.zone_analysis ?? null,
+          designStrategyResult: result.design_strategies ?? null,
+          pipelineRun: { ...s.pipelineRun, isRunning: false },
+          // A fresh pipeline run produces a brand-new user-zone analysis. Any
+          // previously cached cluster snapshot or zone-snapshot belongs to the
+          // OLD analysis — toggling back to them would render stale data.
+          // Reset both halves of the grouping toggle so the segmented control
+          // disappears until the user re-runs clustering.
+          groupingMode: 'zones',
+          userZoneAnalysisResult: null,
+          clusterAnalysisResult: null,
+        };
+      });
       onComplete?.(result);
     } else {
       set((s) => ({ pipelineRun: { ...s.pipelineRun, isRunning: false } }));
@@ -334,6 +405,14 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   setShowAiSummary: (v) => set({ showAiSummary: v }),
   colorblindMode: false,
   setColorblindMode: (v) => set({ colorblindMode: v }),
+
+  // #1 — grouping mode + cached payloads for instant toggle
+  groupingMode: 'zones',
+  setGroupingMode: (m) => set({ groupingMode: m }),
+  userZoneAnalysisResult: null,
+  setUserZoneAnalysisResult: (r) => set({ userZoneAnalysisResult: r }),
+  clusterAnalysisResult: null,
+  setClusterAnalysisResult: (r) => set({ clusterAnalysisResult: r }),
 }), {
   name: 'scenerx-store',
   // localStorage now holds ONLY UI prefs and pre-pipeline state. The big
