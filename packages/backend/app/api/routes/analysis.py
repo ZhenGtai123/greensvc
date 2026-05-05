@@ -37,6 +37,7 @@ from app.models.analysis import (
     ImageRecord,
     ReportRequest,
     ReportResult,
+    GroupingMode,
 )
 from app.services.zone_analyzer import ZoneAnalyzer
 from app.services.design_engine import DesignEngine
@@ -523,7 +524,12 @@ async def generate_report(
         project = store.get(request.project_id)
         if project is not None:
             project.ai_report = result.content
-            project.ai_report_meta = result.metadata
+            # Stamp the active grouping_mode into the persisted metadata so
+            # hydrateFromProject can detect a stale report after the user
+            # toggles modes (zone <-> cluster) without regenerating.
+            meta = dict(result.metadata or {})
+            meta["grouping_mode"] = request.grouping_mode
+            project.ai_report_meta = meta
             project.analysis_results_updated_at = datetime.now()
             store.save(project)
     return result
@@ -544,7 +550,7 @@ class ChartSummaryRequest(BaseModel):
     # #6 — grouping mode is folded into the cache key so toggling between
     # zone- and cluster-based views fetches a fresh interpretation tailored
     # to the active grouping unit. Defaults to "zones" for older clients.
-    grouping_mode: Optional[str] = "zones"
+    grouping_mode: GroupingMode = "zones"
 
 
 class ChartFinding(BaseModel):

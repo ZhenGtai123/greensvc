@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api';
-import type { ProjectCreate, ZoneAnalysisRequest, FullAnalysisRequest, ProjectPipelineRequest, ReportRequest, ClusteringRequest, ClusteringByProjectRequest, MergedExportRequest } from '../types';
+import type { ProjectCreate, ZoneAnalysisRequest, FullAnalysisRequest, ProjectPipelineRequest, ReportRequest, ClusteringRequest, ClusteringByProjectRequest, MergedExportRequest, GroupingMode } from '../types';
 
 // Query keys
 export const queryKeys = {
@@ -236,7 +236,7 @@ interface ChartSummaryArgs {
   project_context?: Record<string, unknown> | null;
   /** #6 — query key includes this so Zone-mode and Cluster-mode summaries
    * don't collide in the React Query cache. */
-  grouping_mode?: 'zones' | 'clusters';
+  grouping_mode?: GroupingMode;
   /** When false, the query is held back until the user opens the panel. */
   enabled?: boolean;
 }

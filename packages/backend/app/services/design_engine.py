@@ -35,6 +35,7 @@ from app.models.analysis import (
 )
 from app.services.knowledge_base import KnowledgeBase
 from app.services.llm_client import LLMClient
+from app.services.project_context_builder import build_project_header
 from app.services.transferability import compute_transferability
 
 logger = logging.getLogger(__name__)
@@ -494,6 +495,12 @@ class DesignEngine:
                 "Z-scores are computed across zones; cross-zone comparisons are valid.\n"
             )
 
+        # #20 — shared Project header (Agent A needs target_dimensions to
+        # ground its direction inference).
+        project_header_a = build_project_header(
+            project_context, include_target_dimensions=True
+        )
+
         prompt = f"""You are an expert landscape analyst. IMPORTANT: Respond ONLY in English.
 Analyze this spatial unit's indicator data and generate IOM queries
 (which indicators to change, in what direction) for the IOM matching engine.
@@ -504,12 +511,7 @@ declared target_direction may be INCREASE, DECREASE, NEUTRAL, or CONTEXT —
 treat this as a general hint, NOT a binding instruction. Your direction judgment
 must be based on the design brief, project context, and indicator relationships.
 
-## Project
-- Name: {project_context.project.get('name', 'N/A')}
-- Climate: {project_context.context.get('climate', {}).get('koppen_zone_id', 'N/A')}
-- Setting: {project_context.context.get('urban_form', {}).get('space_type_id', 'N/A')}
-- Design brief: {(project_context.performance_query.get('design_brief', '') or '')[:500]}
-- Target dimensions: {json.dumps(project_context.performance_query.get('dimensions', []))}
+{project_header_a}
 
 ## Project-Wide Indicator Overview (ALL indicators, project-level)
 These are the project-wide averages for ALL computed indicators.
@@ -851,15 +853,14 @@ Return ONLY valid JSON:
             if retry_note
             else ""
         )
+        # #20 — shared Project header. Agent B doesn't need the target
+        # dimensions list (those are an Agent A direction-inference input).
+        project_header_b = build_project_header(project_context)
         prompt = f"""You are an expert landscape architect. IMPORTANT: Respond ONLY in English.
 Synthesize the matched IOM operations into {min_strategies}-{min(max_strategies, 5)} concrete, actionable design
 strategies for this spatial unit. Ground every strategy in the provided IOM evidence.{retry_block}
 
-## Project
-- Name: {project_context.project.get('name', 'N/A')}
-- Climate: {project_context.context.get('climate', {}).get('koppen_zone_id', 'N/A')}
-- Setting: {project_context.context.get('urban_form', {}).get('space_type_id', 'N/A')}
-- Design brief: {(project_context.performance_query.get('design_brief', '') or '')[:500]}
+{project_header_b}
 
 ## Spatial Unit: {diag.zone_name} ({diag.zone_id})
 - Diagnosis: {unit_diagnosis}

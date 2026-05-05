@@ -47,6 +47,7 @@ import { generateReport } from '../utils/generateReport';
 import { exportAnalysisExcel } from '../utils/exportExcel';
 import { exportBundle } from '../utils/exportBundle';
 import { useGenerateReport, useRunDesignStrategies, useRunClusteringByProject } from '../hooks/useApi';
+import { useGroupingUnits } from '../hooks/useGroupingUnits';
 import useAppToast from '../hooks/useAppToast';
 import PageShell from '../components/PageShell';
 import PageHeader from '../components/PageHeader';
@@ -71,7 +72,7 @@ import {
   waitForPaint,
   type CapturedChart,
 } from '../utils/captureCharts';
-import type { ReportRequest, ZoneDiagnostic, ZoneDesignOutput, ClusteringResponse } from '../types';
+import type { ReportRequest, ZoneDiagnostic, ZoneDesignOutput, ClusteringResponse, GroupingMode } from '../types';
 
 // ---------------------------------------------------------------------------
 // Pipeline-running card — #2 atomic gate
@@ -260,6 +261,57 @@ function SingleZoneEntryGate({
 }
 
 // ---------------------------------------------------------------------------
+// Cluster-mode empty hint — #1 acceptance criterion
+// ---------------------------------------------------------------------------
+
+/** Rendered inside the Analysis tab when the user has flipped the segmented
+ * control to "Cluster view" but clustering has not yet been run. The hint
+ * keeps the toggle visible (so the user can flip back) while explaining
+ * the missing prerequisite, instead of silently rendering a blank chart
+ * grid backed by zone-mode data. */
+function ClusterEmptyHint({
+  onRunClustering,
+  isClusteringRunning,
+  canRunClustering,
+}: {
+  onRunClustering: () => void;
+  isClusteringRunning: boolean;
+  canRunClustering: boolean;
+}) {
+  return (
+    <Card mb={6} borderColor="teal.200" borderWidth="1px" bg="teal.50">
+      <CardBody>
+        <HStack spacing={4} align="start">
+          <Sparkles size={22} color="#319795" />
+          <Box flex="1">
+            <Heading size="sm" mb={1} color="teal.800">
+              Cluster view selected — clustering hasn't been run yet
+            </Heading>
+            <Text fontSize="sm" color="teal.900">
+              Run KMeans clustering on per-image indicator values to group
+              the project into archetypes. Each archetype then drives the
+              charts in this view as a virtual zone (z-scores, correlations,
+              radar profiles all rebuilt around clusters).
+            </Text>
+          </Box>
+          <Button
+            size="sm"
+            colorScheme="teal"
+            onClick={onRunClustering}
+            isLoading={isClusteringRunning}
+            isDisabled={!canRunClustering}
+            loadingText="Clustering…"
+            flexShrink={0}
+          >
+            Run Clustering
+          </Button>
+        </HStack>
+      </CardBody>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Non-chart helpers (chart formatting is now in analysisCharts/registry.tsx)
 // ---------------------------------------------------------------------------
 
@@ -360,29 +412,85 @@ function renderMarkdown(md: string) {
  * by the design-strategies endpoint. All current registry summaries are
  * cross-zone, so we file them under "_global".
  */
+/** Build the narrative-block payload that Stage 3 (DesignEngine Agent A)
+ * pipes into its diagnosis prompt. Reads chart-summary entries out of the
+ * React Query cache and emits per-zone + global blobs.
+ *
+ * Prefers the v2 structured fields (overall, findings[], local_breakdown[],
+ * implication) when the backend produced them, since they cite specific
+ * z-scores / r-values / unit labels and match exactly what the user sees on
+ * each card. v1 (summary + highlight_points) is the fallback for old
+ * cached entries or degraded responses.
+ *
+ * v2 `local_breakdown` entries are routed to their owning unit_id (zone or
+ * cluster) so Agent A's per-unit prompt receives unit-specific narratives
+ * instead of the same global blob for every unit.
+ */
 function collectAnalysisNarratives(
   queryClient: ReturnType<typeof useQueryClient>,
   projectId: string | null | undefined,
 ): Record<string, Record<string, string>> {
   if (!projectId) return {};
   const queries = queryClient.getQueryCache().findAll({ queryKey: ['chart-summary'] });
-  const globals: Record<string, string> = {};
+  const out: Record<string, Record<string, string>> = {};
+  const ensure = (zoneId: string): Record<string, string> => {
+    if (!out[zoneId]) out[zoneId] = {};
+    return out[zoneId];
+  };
+
   for (const q of queries) {
     const key = q.queryKey as unknown[];
     if (key[2] !== projectId) continue;
     const data = q.state.data as
-      | { summary?: string; highlight_points?: string[] }
+      | {
+          summary?: string;
+          highlight_points?: string[];
+          summary_v2?: {
+            overall: string;
+            findings: { point: string; evidence: string }[];
+            local_breakdown: { unit_id: string; unit_label: string; interpretation: string }[];
+            implication: string;
+          } | null;
+        }
       | undefined;
-    if (!data?.summary) continue;
+    if (!data) continue;
     const chartId = String(key[1] ?? '');
     if (!chartId) continue;
-    const bullets = data.highlight_points?.length
-      ? '\n  • ' + data.highlight_points.join('\n  • ')
-      : '';
-    globals[chartId] = `${data.summary}${bullets}`;
+
+    const v2 = data.summary_v2 ?? null;
+    if (v2) {
+      // v2 → rich per-unit + global text. The "global" blob omits
+      // local_breakdown (those are routed to their unit instead) so we
+      // don't double-feed each unit's interpretation under both keys.
+      const findingLines = v2.findings
+        .filter((f) => f.point)
+        .map((f) => (f.evidence ? `- ${f.point} (${f.evidence})` : `- ${f.point}`))
+        .join('\n');
+      const globalParts: string[] = [];
+      if (v2.overall) globalParts.push(`Overall: ${v2.overall}`);
+      if (findingLines) globalParts.push(`Key findings:\n${findingLines}`);
+      if (v2.implication) globalParts.push(`Design implication: ${v2.implication}`);
+      const globalText = globalParts.join('\n\n');
+      if (globalText) ensure('_global')[chartId] = globalText;
+
+      for (const lb of v2.local_breakdown) {
+        if (!lb.interpretation) continue;
+        const zoneId = lb.unit_id || lb.unit_label;
+        if (!zoneId) continue;
+        // Per-unit narrative: prepend the chart's overall stance so Agent A
+        // sees the global picture even when reading unit-scoped section.
+        const lead = v2.overall ? `${v2.overall}\n` : '';
+        ensure(zoneId)[chartId] = `${lead}This unit (${lb.unit_label || zoneId}): ${lb.interpretation}`;
+      }
+    } else if (data.summary) {
+      // v1 fallback — single global blob with bullets.
+      const bullets = data.highlight_points?.length
+        ? '\n  • ' + data.highlight_points.join('\n  • ')
+        : '';
+      ensure('_global')[chartId] = `${data.summary}${bullets}`;
+    }
   }
-  if (Object.keys(globals).length === 0) return {};
-  return { _global: globals };
+  return out;
 }
 
 function Reports() {
@@ -485,9 +593,9 @@ function Reports() {
       useAppStore.getState().setDesignStrategyResult(result);
       // Stage 3 changed → backend cleared the cached AI report; mirror that
       // locally so the Report step's "done" indicator and the AI-report
-      // card don't show stale content.
-      useAppStore.getState().setAiReport(null);
-      useAppStore.getState().setAiReportMeta(null);
+      // card don't show stale content. #21 — go through the centralized
+      // invalidator so all "upstream changed" sites stay in lockstep.
+      useAppStore.getState().invalidateAiReport();
       toast({ title: 'Design strategies generated', status: 'success' });
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
@@ -552,19 +660,32 @@ function Reports() {
     setGroupingMode,
   ]);
 
-  // #1 — segmented-control toggle. Switching modes is just a setZoneAnalysisResult
-  // swap; both payloads are cached so the toggle is instant. Disabled when
-  // clustering hasn't been run yet (only one option exists).
+  // #1 — segmented-control toggle. Switching modes is a setZoneAnalysisResult
+  // swap (both payloads are cached so the toggle is instant). When the
+  // target mode has no data yet — e.g., user clicks "Cluster view" before
+  // running clustering — we just update groupingMode; the chart grid will
+  // render the ClusterEmptyHint card below instead of the standard charts.
+  // #8.5 — switching mode also invalidates the AI report, since the report
+  // text describes the prior mode's units. The user can regenerate it from
+  // the new mode whenever they're ready.
   const handleSwitchGroupingMode = useCallback(
-    (mode: 'zones' | 'clusters') => {
+    (mode: GroupingMode) => {
       if (mode === groupingMode) return;
-      if (mode === 'clusters' && clusterAnalysisResult) {
-        useAppStore.getState().setZoneAnalysisResult(clusterAnalysisResult);
+      const store = useAppStore.getState();
+      if (mode === 'clusters') {
+        if (clusterAnalysisResult) {
+          store.setZoneAnalysisResult(clusterAnalysisResult);
+        }
         setGroupingMode('clusters');
-      } else if (mode === 'zones' && userZoneAnalysisResult) {
-        useAppStore.getState().setZoneAnalysisResult(userZoneAnalysisResult);
+      } else {
+        if (userZoneAnalysisResult) {
+          store.setZoneAnalysisResult(userZoneAnalysisResult);
+        }
         setGroupingMode('zones');
       }
+      // #21 — centralized invalidator. The cached report was generated
+       // against the prior grouping mode; toggling means it's stale.
+      store.invalidateAiReport();
     },
     [groupingMode, clusterAnalysisResult, userZoneAnalysisResult, setGroupingMode],
   );
@@ -597,10 +718,13 @@ function Reports() {
         } : undefined,
         format: 'markdown',
         project_id: routeProjectId ?? undefined,
+        grouping_mode: groupingMode,
       };
       const result = await generateReportMutation.mutateAsync(request);
       setAiReport(result.content);
-      setAiReportMeta(result.metadata);
+      // #8.5 — snapshot the grouping mode the report was generated under
+      // so we can warn the user later if they switch to a different view.
+      setAiReportMeta({ ...(result.metadata ?? {}), grouping_mode: groupingMode });
       const wc = Number(result.metadata?.word_count ?? 0);
       const dataWarning = result.metadata?.data_quality_warning as string | undefined;
       if (dataWarning) {
@@ -695,6 +819,10 @@ function Reports() {
     return grouped;
   }, [analysisCharts]);
   const sortedDiagnostics = chartCtx.sortedDiagnostics;
+  // #22 — mode-uniform unit list: { id, name, colorScheme, bg, rank, ... }
+  // for the cards/legends below. Decouples the rendering from "which Z-score
+  // → which Chakra color" so future palette changes happen in one place.
+  const groupingUnits = useGroupingUnits(sortedDiagnostics, groupingMode);
 
   // Total visible chart count drives the loading progress denominator —
   // include both sectioned charts and clustering charts (when the gating
@@ -729,11 +857,18 @@ function Reports() {
     chartCtx.analysisMode === 'image_level' &&
     !isClusterDerived;
 
-  // #1 — segmented control eligibility: both zone- and cluster-based
-  // analyses are cached → show toggle. Otherwise hide it (only one option
-  // makes sense to display).
+  // #1 — segmented control eligibility: show whenever the project has
+  // enough zones to make clustering meaningful (≥ 2 user zones in zone
+  // mode, or any cluster snapshot already cached). When the user clicks
+  // "Cluster view" before running clustering, we still render the toggle
+  // and surface a ClusterEmptyHint card explaining the next step (per
+  // spec acceptance criterion: "未执行聚类时切到 Cluster 视图，给出
+  // 「请先执行聚类」的引导，而不是空白图表").
   const groupingToggleAvailable =
-    !!userZoneAnalysisResult && !!clusterAnalysisResult;
+    !singleZoneGated &&
+    (sortedDiagnostics.length >= 2 || !!clusterAnalysisResult);
+  const wantsClusterButMissing =
+    groupingMode === 'clusters' && !clusterAnalysisResult;
 
   // #2 — atomic chart reveal. Charts are eagerly mounted (forceMount=true on
   // every host below) so they all start rendering at once; we keep them
@@ -1342,6 +1477,36 @@ function Reports() {
               </CardHeader>
               {aiReport && (
                 <CardBody pt={0}>
+                  {/* #8.5 — warn when the active grouping mode differs from
+                      the one the report was written for. The report's prose
+                      names units (zones vs. clusters) that may not match
+                      what the user is currently looking at. */}
+                  {aiReportMeta?.grouping_mode && aiReportMeta.grouping_mode !== groupingMode && (
+                    <Alert status="warning" mb={3} borderRadius="md" alignItems="flex-start">
+                      <AlertIcon mt={1} />
+                      <Box flex="1">
+                        <Text fontSize="sm" fontWeight="bold">
+                          This report was written for the {String(aiReportMeta.grouping_mode)} view —
+                          you're now viewing {groupingMode}.
+                        </Text>
+                        <Text fontSize="xs" color="gray.600" mt={1}>
+                          Unit names and statistics in the prose may not line up with the charts above.
+                          Regenerate the report to refresh it for the current view.
+                        </Text>
+                      </Box>
+                      <Button
+                        size="xs"
+                        colorScheme="orange"
+                        variant="outline"
+                        onClick={handleGenerateAiReport}
+                        isLoading={generateReportMutation.isPending}
+                        loadingText="Regenerating..."
+                        flexShrink={0}
+                      >
+                        Regenerate
+                      </Button>
+                    </Alert>
+                  )}
                   <Box maxH="70vh" overflowY="auto" p={4} bg="white" borderRadius="md" border="1px solid" borderColor="gray.100">
                     {renderMarkdown(aiReport)}
                   </Box>
@@ -1385,8 +1550,10 @@ function Reports() {
                   />
                 ) : (
                   <>
-                {/* #1 — Zone / Cluster segmented control. Only renders when
-                    both modes are cached so the toggle is instant. */}
+                {/* #1 — Zone / Cluster segmented control. Renders whenever
+                    the project supports both modes — clicking Cluster
+                    before clustering has been run drops a hint card below
+                    instead of swapping to empty data. */}
                 {groupingToggleAvailable && (
                   <HStack mb={4} spacing={0} align="center">
                     <Text fontSize="xs" fontWeight="bold" color="gray.600" mr={3}>
@@ -1399,7 +1566,7 @@ function Reports() {
                       borderRightRadius={0}
                       onClick={() => handleSwitchGroupingMode('zones')}
                     >
-                      Zone view ({userZoneAnalysisResult?.zone_diagnostics?.length ?? 0})
+                      Zone view ({(userZoneAnalysisResult ?? zoneAnalysisResult)?.zone_diagnostics?.length ?? 0})
                     </Button>
                     <Button
                       size="sm"
@@ -1408,9 +1575,19 @@ function Reports() {
                       borderLeftRadius={0}
                       onClick={() => handleSwitchGroupingMode('clusters')}
                     >
-                      Cluster view ({clusterAnalysisResult?.zone_diagnostics?.length ?? 0})
+                      Cluster view {clusterAnalysisResult ? `(${clusterAnalysisResult.zone_diagnostics?.length ?? 0})` : '(not run)'}
                     </Button>
                   </HStack>
+                )}
+
+                {/* #1 acceptance — guidance when Cluster view selected
+                    without clustering having been run. */}
+                {wantsClusterButMissing && (
+                  <ClusterEmptyHint
+                    onRunClustering={handleRunClustering}
+                    isClusteringRunning={clusteringMutation.isPending}
+                    canRunClustering={!!currentProject}
+                  />
                 )}
 
                 {/* Single-zone / image-level mode banner */}
@@ -1457,7 +1634,7 @@ function Reports() {
                   </Alert>
                 ) : null}
 
-                {sortedDiagnostics.length > 0 && (
+                {sortedDiagnostics.length > 0 && !wantsClusterButMissing && (
                   <Box position="relative">
                   {/* Skeleton overlay — covers the chart grid until every
                       eagerly-mounted chart has fired onMount, so the user
@@ -1485,21 +1662,22 @@ function Reports() {
                     align="stretch"
                     style={{ visibility: allChartsReady ? 'visible' : 'hidden' }}
                   >
-                    {/* Zone Cards */}
+                    {/* Zone Cards — driven by useGroupingUnits so the same
+                        layout works for zone-mode and cluster-mode views. */}
                     <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing={4}>
-                      {sortedDiagnostics.map((diag: ZoneDiagnostic) => (
-                        <Card key={diag.zone_id} bg={deviationBgColor(diag.mean_abs_z)}>
+                      {groupingUnits.map((u) => (
+                        <Card key={u.id} bg={u.bg}>
                           <CardBody>
                             <VStack align="stretch" spacing={2}>
                               <HStack justify="space-between">
                                 <HStack spacing={1}>
-                                  {diag.rank > 0 && <Badge colorScheme="purple" fontSize="xs">#{diag.rank}</Badge>}
-                                  <Text fontWeight="bold" fontSize="sm" noOfLines={1}>{diag.zone_name}</Text>
+                                  {u.rank > 0 && <Badge colorScheme="purple" fontSize="xs">#{u.rank}</Badge>}
+                                  <Text fontWeight="bold" fontSize="sm" noOfLines={1}>{u.name}</Text>
                                 </HStack>
-                                <Badge colorScheme={deviationColorScheme(diag.mean_abs_z)}>|z|={diag.mean_abs_z?.toFixed(2) ?? '—'}</Badge>
+                                <Badge colorScheme={u.colorScheme}>|z|={u.meanAbsZ?.toFixed(2) ?? '—'}</Badge>
                               </HStack>
-                              <HStack justify="space-between"><Text fontSize="xs" color="gray.600">Mean |z|</Text><Text fontWeight="bold">{diag.mean_abs_z?.toFixed(2) ?? '—'}</Text></HStack>
-                              <HStack justify="space-between"><Text fontSize="xs" color="gray.600">Points</Text><Text fontWeight="bold">{diag.point_count}</Text></HStack>
+                              <HStack justify="space-between"><Text fontSize="xs" color="gray.600">Mean |z|</Text><Text fontWeight="bold">{u.meanAbsZ?.toFixed(2) ?? '—'}</Text></HStack>
+                              <HStack justify="space-between"><Text fontSize="xs" color="gray.600">Points</Text><Text fontWeight="bold">{u.pointCount}</Text></HStack>
                             </VStack>
                           </CardBody>
                         </Card>
@@ -1784,6 +1962,94 @@ function Reports() {
                                         <Wrap>{strategy.supporting_ioms.map((iom, i) => <WrapItem key={i}><Tag size="sm" variant="outline" colorScheme="gray"><TagLabel>{iom}</TagLabel></Tag></WrapItem>)}</Wrap>
                                       </Box>
                                     )}
+
+                                    {/* #3 — collapsible Evidence panel: per-indicator z-scores
+                                        for THIS unit, plus fallback / retry flags from Agent A.
+                                        The z-scores tell the user exactly what numerical
+                                        signal motivated the strategy, so they can sanity-check
+                                        the LLM's reasoning. */}
+                                    <Accordion allowToggle>
+                                      <AccordionItem border="none">
+                                        <AccordionButton px={0} py={1} _hover={{ bg: 'transparent' }}>
+                                          <Text fontSize="xs" color="gray.500" fontWeight="medium">
+                                            Evidence
+                                          </Text>
+                                          <AccordionIcon ml={1} boxSize={4} color="gray.400" />
+                                        </AccordionButton>
+                                        <AccordionPanel px={0} py={2}>
+                                          <VStack align="stretch" spacing={2} fontSize="xs">
+                                            {(() => {
+                                              const diag = zoneAnalysisResult?.zone_diagnostics?.find(
+                                                (d) => d.zone_id === zoneId,
+                                              );
+                                              const rows = strategy.target_indicators
+                                                .map((ind) => {
+                                                  const layerData = diag?.indicator_status?.[ind] as
+                                                    | Record<string, { value?: number | null; z_score?: number }>
+                                                    | undefined;
+                                                  const full = layerData?.full;
+                                                  return {
+                                                    ind,
+                                                    value: full?.value ?? null,
+                                                    z: full?.z_score ?? null,
+                                                  };
+                                                });
+                                              return (
+                                                <Box>
+                                                  <Text fontWeight="bold" mb={1}>
+                                                    Indicator deltas in {zone.zone_name}
+                                                  </Text>
+                                                  <SimpleGrid columns={3} spacingX={3} spacingY={1}>
+                                                    <Text color="gray.500">Indicator</Text>
+                                                    <Text color="gray.500" textAlign="right">value</Text>
+                                                    <Text color="gray.500" textAlign="right">z-score</Text>
+                                                    {rows.map((r) => (
+                                                      <Box key={r.ind} display="contents">
+                                                        <Text fontFamily="mono">{r.ind}</Text>
+                                                        <Text textAlign="right">
+                                                          {r.value != null ? Number(r.value).toFixed(3) : '—'}
+                                                        </Text>
+                                                        <Text
+                                                          textAlign="right"
+                                                          color={
+                                                            r.z == null
+                                                              ? 'gray.400'
+                                                              : Math.abs(r.z) >= 1
+                                                                ? 'red.500'
+                                                                : 'gray.700'
+                                                          }
+                                                        >
+                                                          {r.z != null ? Number(r.z).toFixed(2) : '—'}
+                                                        </Text>
+                                                      </Box>
+                                                    ))}
+                                                  </SimpleGrid>
+                                                </Box>
+                                              );
+                                            })()}
+                                            {(zone.diagnosis?.strategies_fallback_used ||
+                                              zone.diagnosis?.strategies_retry_used) && (
+                                              <HStack spacing={2} pt={1}>
+                                                {!!zone.diagnosis?.strategies_retry_used && (
+                                                  <Badge fontSize="2xs" colorScheme="yellow">LLM retried</Badge>
+                                                )}
+                                                {!!zone.diagnosis?.strategies_fallback_used && (
+                                                  <Badge fontSize="2xs" colorScheme="orange">rule-based padding</Badge>
+                                                )}
+                                              </HStack>
+                                            )}
+                                            {zone.diagnosis?.integrated_diagnosis && (
+                                              <Box pt={1}>
+                                                <Text fontWeight="bold" mb={1}>Agent A diagnosis</Text>
+                                                <Text color="gray.700" lineHeight="1.5">
+                                                  {String(zone.diagnosis.integrated_diagnosis)}
+                                                </Text>
+                                              </Box>
+                                            )}
+                                          </VStack>
+                                        </AccordionPanel>
+                                      </AccordionItem>
+                                    </Accordion>
                                   </VStack>
                                 </CardBody>
                               </Card>

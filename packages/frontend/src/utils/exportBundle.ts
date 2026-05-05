@@ -14,6 +14,7 @@
 import JSZip from 'jszip';
 
 import type { ExportColumn } from './exportChart';
+import type { GroupingMode } from '../types';
 
 export interface BundleChartArtifact {
   /** Stable chart id (used as filename stem). */
@@ -35,7 +36,7 @@ export interface BundleOptions {
   projectName?: string | null;
   /** Active grouping mode (zones | clusters). Tagged into the filename so
    * zone-mode and cluster-mode bundles never overwrite each other. */
-  groupingMode: 'zones' | 'clusters';
+  groupingMode: GroupingMode;
   /** Optional rendered AI report markdown — written as report.md. */
   aiReport?: string | null;
   /** Optional structured metadata about the AI report (model, word count). */

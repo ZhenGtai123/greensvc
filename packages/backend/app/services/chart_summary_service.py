@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from app.services.llm_client import LLMClient
+from app.models.analysis import GroupingMode
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +130,7 @@ _V2_COLUMNS = [
 ]
 
 
-def _payload_hash(payload: dict[str, Any], grouping_mode: str | None = None) -> str:
+def _payload_hash(payload: dict[str, Any], grouping_mode: GroupingMode | None = None) -> str:
     """Stable hash of payload — sort keys so semantically identical payloads
     produce the same hash regardless of dict ordering. The grouping mode is
     folded in so a chart looked at under "zones" vs "clusters" produces
@@ -246,7 +247,7 @@ class ChartSummaryService:
         project_id: str,
         payload: dict[str, Any],
         project_context: dict[str, Any] | None = None,
-        grouping_mode: str | None = "zones",
+        grouping_mode: GroupingMode | None = "zones",
     ) -> dict[str, Any]:
         """Return a {summary, highlight_points, summary_v2, cached, model,
         degraded} dict. summary_v2 carries the structured 4-section output
@@ -297,7 +298,14 @@ class ChartSummaryService:
 
             v2 = _parse_v2(raw)
             if v2 is not None:
-                break
+                # Post-validate: dedupe overall vs findings (≥0.85 token Jaccard
+                # → drop the redundant finding) and clamp local_breakdown to
+                # the unit_labels list so the LLM can't hallucinate extra
+                # units. Both rules are tolerated as long as findings stays
+                # non-empty afterwards.
+                v2 = _post_validate_v2(v2, unit_labels)
+                if v2 is not None:
+                    break
 
         if v2 is not None:
             summary, highlights = _v2_to_legacy(v2)
@@ -452,6 +460,71 @@ def _parse_v1_fallback(raw: str) -> tuple[str, list[str]]:
         except json.JSONDecodeError:
             pass
     return text[:600].strip(), []
+
+
+_TOKEN_RE = __import__("re").compile(r"[A-Za-z][A-Za-z0-9_-]+")
+
+
+def _tokens(s: str) -> set[str]:
+    """Lowercased tokenization for similarity comparison. Strips short tokens
+    (≤2 chars) to avoid noise dominating the Jaccard score."""
+    return {t.lower() for t in _TOKEN_RE.findall(s) if len(t) > 2}
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    if not a and not b:
+        return 1.0
+    inter = len(a & b)
+    union = len(a | b)
+    return inter / union if union else 0.0
+
+
+def _post_validate_v2(
+    v2: dict[str, Any],
+    unit_labels: list[str],
+) -> dict[str, Any] | None:
+    """Final clean-up after _parse_v2 accepts the JSON.
+
+    1. Dedup `findings` against `overall` — if a finding's `point` overlaps
+       overall too heavily (Jaccard ≥ 0.85 on tokenized words), drop it.
+       The LLM sometimes restates the overall in the first finding, which
+       turns the panel into noise.
+    2. Trim `local_breakdown` so it never exceeds the project's actual
+       grouping unit count. When unit_labels is empty (chart is global),
+       local_breakdown is required to be empty as well — anything else is
+       fabrication.
+    3. If after pruning `findings` becomes empty, treat the response as
+       unusable and return None so the caller retries / degrades.
+    """
+    overall_tokens = _tokens(v2.get("overall", ""))
+    pruned_findings: list[dict[str, str]] = []
+    for f in v2.get("findings", []):
+        f_tokens = _tokens(f.get("point", ""))
+        if _jaccard(overall_tokens, f_tokens) >= 0.85:
+            continue
+        pruned_findings.append(f)
+    if not pruned_findings:
+        return None
+
+    if not unit_labels:
+        local: list[dict[str, str]] = []
+    else:
+        # Prefer entries whose unit_id/unit_label matches one of the actual
+        # unit names. Anything else is hallucinated and should be dropped.
+        label_set = {l.lower() for l in unit_labels}
+        local = []
+        for lb in v2.get("local_breakdown", []):
+            label = (lb.get("unit_label") or lb.get("unit_id") or "").lower()
+            if label and label in label_set:
+                local.append(lb)
+        # Cap at the actual unit count.
+        local = local[: len(unit_labels)]
+
+    return {
+        **v2,
+        "findings": pruned_findings,
+        "local_breakdown": local,
+    }
 
 
 def _v2_to_legacy(v2: dict[str, Any]) -> tuple[str, list[str]]:

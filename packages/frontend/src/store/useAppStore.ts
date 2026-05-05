@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Project, IndicatorRecommendation, IndicatorRelationship, RecommendationSummary, ZoneAnalysisResult, DesignStrategyResult, ProjectPipelineResult, ProjectPipelineStreamEvent } from '../types';
+import type { Project, IndicatorRecommendation, IndicatorRelationship, RecommendationSummary, ZoneAnalysisResult, DesignStrategyResult, ProjectPipelineResult, ProjectPipelineStreamEvent, GroupingMode } from '../types';
 import api from '../api';
 import { extractErrorMessage } from '../utils/errorMessage';
 
@@ -85,6 +85,11 @@ interface AppState {
   setAiReport: (r: string | null) => void;
   aiReportMeta: Record<string, unknown> | null;
   setAiReportMeta: (m: Record<string, unknown> | null) => void;
+  /** #21 — single entry-point for "the upstream context changed, drop the
+   * cached report." Used after regenerating Stage 3 strategies and when the
+   * user toggles grouping mode. Returns true if anything was actually
+   * cleared, so callers can avoid a no-op render. */
+  invalidateAiReport: () => boolean;
 
   clearPipelineResults: () => void;
   hydrateFromProject: (project: Project) => void;
@@ -118,8 +123,8 @@ interface AppState {
   // the ChartContext. zoneAnalysisResult always holds the data for the active
   // mode; the inactive mode's data lives in clusterAnalysisResult /
   // userZoneAnalysisResult so the toggle is instant.
-  groupingMode: 'zones' | 'clusters';
-  setGroupingMode: (m: 'zones' | 'clusters') => void;
+  groupingMode: GroupingMode;
+  setGroupingMode: (m: GroupingMode) => void;
   /** Snapshot of the user-zone Stage 2.5 result so we can swap back when the
    * user toggles from Cluster view back to Zone view. Set on first cluster
    * promotion; cleared on project switch / pipeline rerun. */
@@ -176,6 +181,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   setAiReport: (r) => set({ aiReport: r }),
   aiReportMeta: null,
   setAiReportMeta: (m) => set({ aiReportMeta: m }),
+  invalidateAiReport: () => {
+    const s = get();
+    if (s.aiReport == null && s.aiReportMeta == null) return false;
+    set({ aiReport: null, aiReportMeta: null });
+    return true;
+  },
 
   clearPipelineResults: () => set({
     visionMaskResults: [],
@@ -243,6 +254,14 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       ? state.clusterAnalysisResult
       : project.zone_analysis_result ?? null;
 
+    // #21 — drop a stale AI report on hydration. The backend persists the
+    // mode it was generated under in `ai_report_meta.grouping_mode`; if the
+    // user is now viewing a different mode (e.g. switched zone -> cluster
+    // and reloaded), the cached report describes the wrong units.
+    const reportMeta = project.ai_report_meta ?? null;
+    const reportMode = (reportMeta as { grouping_mode?: string } | null)?.grouping_mode ?? 'zones';
+    const reportStale = reportMode !== preservedGroupingMode;
+
     return {
       recommendations: project.stage1_recommendations ?? [],
       indicatorRelationships: project.stage1_relationships ?? [],
@@ -252,8 +271,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       zoneAnalysisResult: nextZoneAnalysis,
       designStrategyResult: project.design_strategy_result ?? null,
       pipelineResult: preservedPipelineResult,
-      aiReport: project.ai_report ?? null,
-      aiReportMeta: project.ai_report_meta ?? null,
+      aiReport: reportStale ? null : project.ai_report ?? null,
+      aiReportMeta: reportStale ? null : reportMeta,
       groupingMode: preservedGroupingMode,
       userZoneAnalysisResult: preservedUserZone,
       clusterAnalysisResult: preservedClusterAnalysis,

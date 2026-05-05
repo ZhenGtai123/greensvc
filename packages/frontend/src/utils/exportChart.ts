@@ -18,6 +18,8 @@
  * grouping_mode store exists the caller will pass it through.
  */
 
+import type { GroupingMode } from '../types';
+
 export type ExportFormat = 'svg' | 'png' | 'csv' | 'xlsx';
 
 export interface ExportColumn {
@@ -31,7 +33,7 @@ export interface ExportableArtifact {
   /** Project slug; falls back to "project" when unavailable. */
   projectSlug?: string | null;
   /** Active grouping mode (zones | clusters). */
-  groupingMode?: 'zones' | 'clusters';
+  groupingMode?: GroupingMode;
   /** DOM node of the chart card; SVG/PNG capture only. */
   node?: HTMLElement | null;
   /** Tabular rows for CSV/XLSX export. Optional — disables those formats. */

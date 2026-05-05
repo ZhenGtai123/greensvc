@@ -1,3 +1,11 @@
+// ---------------------------------------------------------------------------
+// #8.1 — single source of truth for the grouping mode literal. Imported by
+// the store, hooks, api client, and any chart/export utility that has to
+// decide which dataset (zone-level vs. cluster-derived) to use.
+// ---------------------------------------------------------------------------
+export type GroupingMode = 'zones' | 'clusters';
+export const GROUPING_MODES: readonly GroupingMode[] = ['zones', 'clusters'];
+
 // Project types
 export interface SpatialZone {
   zone_id: string;
@@ -553,6 +561,11 @@ export interface ReportRequest {
   stage1_recommendations?: Record<string, unknown>[] | null;
   project_context?: { project?: Record<string, unknown>; context?: Record<string, unknown>; performance_query?: Record<string, unknown> };
   format?: 'markdown' | 'pdf';
+  project_id?: string;
+  /** Grouping mode the request is generated under. Persisted into the
+   * project's ai_report_meta so a later mode switch can detect staleness
+   * during hydrateFromProject. */
+  grouping_mode?: GroupingMode;
 }
 
 export interface ReportResult {

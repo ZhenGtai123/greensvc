@@ -35,6 +35,7 @@ import type { ChartDescriptor } from './registry';
 import type { ChartContext } from './ChartContext';
 import { useChartSummary } from '../../hooks/useApi';
 import { exportArtifact, type ExportFormat } from '../../utils/exportChart';
+import type { GroupingMode } from '../../types';
 
 interface ChartHostProps {
   descriptor: ChartDescriptor;
@@ -57,7 +58,7 @@ interface ChartHostProps {
   projectSlug?: string | null;
   /** Active grouping mode (zones | clusters) — appended to export filenames
    * so zone-mode and cluster-mode artifacts don't overwrite each other. */
-  groupingMode?: 'zones' | 'clusters';
+  groupingMode?: GroupingMode;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

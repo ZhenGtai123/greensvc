@@ -28,6 +28,7 @@ import type {
   ClusteringByProjectRequest,
   ClusteringResponse,
   MergedExportRequest,
+  GroupingMode,
   EncodingEntry,
   EncodingSections,
 } from '../types';
@@ -363,7 +364,7 @@ export const api = {
       project_context?: Record<string, unknown> | null;
       /** #6 — folded into the cache key so toggling Zone vs Cluster view
        * fetches a fresh interpretation pinned to the active grouping unit. */
-      grouping_mode?: 'zones' | 'clusters';
+      grouping_mode?: GroupingMode;
     }) =>
       apiClient.post<{
         summary: string;

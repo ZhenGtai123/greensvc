@@ -1,8 +1,20 @@
 """Pydantic models for Stage 2.5 + Stage 3 analysis pipeline"""
 
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 from pydantic import BaseModel, Field
 from datetime import datetime
+
+
+# ---------------------------------------------------------------------------
+# Shared literal types
+# ---------------------------------------------------------------------------
+
+# #19 — single source of truth for the grouping-mode literal. Mirrors the
+# frontend `GroupingMode` in packages/frontend/src/types/index.ts so the
+# wire format on both sides is locked to the same set of values. Pydantic
+# validates incoming requests against this; an unknown value yields a 422
+# instead of silently falling back to "zones".
+GroupingMode = Literal["zones", "clusters"]
 
 
 # ---------------------------------------------------------------------------
@@ -327,6 +339,10 @@ class ReportRequest(BaseModel):
     # When set, the generated report content + metadata are persisted onto
     # the project so they survive page reloads and project switches.
     project_id: Optional[str] = None
+    # The grouping mode the request is being generated against. Persisted
+    # into ai_report_meta so hydrateFromProject can drop a stale report
+    # whose mode no longer matches the user's active view.
+    grouping_mode: GroupingMode = "zones"
 
 
 class ReportResult(BaseModel):
