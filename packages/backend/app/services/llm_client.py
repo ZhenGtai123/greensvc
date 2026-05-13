@@ -14,6 +14,27 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+# v4 / Module 13 — Output token budget for the AI Report path.
+#
+# Why 32000? The full Section 4 of an 8-cluster × 3-strategies report costs
+# ~3600 words ≈ 5400 tokens; the rest of the report adds another ~4000 words
+# ≈ 6000 tokens; total ~9500 tokens. Padding to 32K gives plenty of headroom
+# for K=15+ cluster reports and longer strategy entries without forcing the
+# model to truncate mid-cluster (which was the silent reason 8-cluster
+# reports were only listing 4 clusters).
+#
+# Per-provider clamping (SDKs silently clamp to provider max when needed):
+#   - Gemini 2.5 Flash       → 8192   (provider cap)
+#   - Gemini 2.5 Pro         → 65536
+#   - Gemini 3 Pro Preview   → 64000+ (varies by snapshot)
+#   - GPT-4o                 → 16384
+#   - Claude Sonnet 4        → 64000
+# 32K stays under every cap above 16K but is well above what we actually
+# need for typical K=4-12 reports. Bump higher (up to 64000) only if a
+# specific report keeps getting truncated near the limit.
+DEFAULT_MAX_OUTPUT_TOKENS = 32000
+
+
 # ---------------------------------------------------------------------------
 # Provider registry
 # ---------------------------------------------------------------------------
@@ -31,10 +52,34 @@ LLM_PROVIDERS = {
 # ---------------------------------------------------------------------------
 
 class LLMClient(ABC):
-    """Abstract LLM client for text generation."""
+    """Abstract LLM client for text generation.
+
+    After every ``generate()`` call, the following side-effect attributes
+    are set on the client so the caller can check whether the response was
+    truncated by the output-token cap:
+
+      * ``last_finish_reason``: provider-native finish reason string
+        (e.g. Gemini ``"MAX_TOKENS"``, OpenAI ``"length"``, Anthropic
+        ``"max_tokens"``). ``None`` if the SDK didn't surface one.
+      * ``last_truncated``: True when ``last_finish_reason`` matches one of
+        the known "hit token cap" sentinels above. The caller (typically
+        ReportService) reads this immediately after ``await generate()``
+        and uses it to attach a warning to the response metadata.
+      * ``last_output_tokens``: the actual number of output tokens the
+        model emitted, when the SDK reports it. Useful for tuning
+        DEFAULT_MAX_OUTPUT_TOKENS.
+
+    These attributes are NOT thread-safe across concurrent ``generate()``
+    calls on the same client instance — but our usage is sequential per
+    request, so this is fine. If we ever fan out report generation, we
+    should refactor ``generate()`` to return a result dataclass instead.
+    """
 
     provider: str
     model: str
+    last_finish_reason: Optional[str] = None
+    last_truncated: bool = False
+    last_output_tokens: Optional[int] = None
 
     @abstractmethod
     async def generate(self, prompt: str) -> str:
@@ -50,6 +95,57 @@ class LLMClient(ABC):
         """Yield text chunks. Default fallback: single yield of full response."""
         text = await self.generate(prompt)
         yield text
+
+
+# Provider-native sentinels that mean "stopped because we hit max_tokens".
+# Any other finish_reason (STOP / end_turn / content_filter / SAFETY / etc.)
+# is treated as a non-truncation completion.
+_TRUNCATION_FINISH_REASONS = {
+    "MAX_TOKENS",       # Gemini
+    "max_tokens",       # Anthropic
+    "length",           # OpenAI / DeepSeek
+}
+
+
+def _is_truncated(finish_reason: Optional[str]) -> bool:
+    return bool(finish_reason) and str(finish_reason) in _TRUNCATION_FINISH_REASONS
+
+
+# When a generate() call returns truncated, this map suggests a higher-capacity
+# alternative. Match is by (case-insensitive) substring on the model name so
+# Gemini snapshot variants ("gemini-3-pro-preview-0925", etc.) all hit the same
+# row. Matched in order — first hit wins, so put more specific keys first.
+# `None` means "no obvious upgrade in the same provider"; the caller should
+# tell the user to reduce K (cluster count) or split the report instead.
+_MODEL_UPGRADE_SUGGESTIONS: list[tuple[str, Optional[str], str]] = [
+    # (substring match, suggested next model, human-readable rationale)
+    ("gemini-2.5-flash",   "gemini-2.5-pro",        "2.5 Pro raises the output cap from 8K to 65K tokens."),
+    ("gemini-2.0-flash",   "gemini-2.5-pro",        "Newer Pro tier raises the output cap to 65K tokens."),
+    ("gemini-1.5-flash",   "gemini-1.5-pro",        "1.5 Pro raises the output cap from 8K to 8K (with longer context)."),
+    ("gemini-2.5-pro",     "gemini-3-pro-preview",  "3 Pro Preview keeps the high output cap and reasons more deeply."),
+    ("gemini-3-pro",       None,                     "Already on top-tier Gemini. Try reducing the cluster count K, or split the report into two halves."),
+    ("gpt-4o-mini",        "gpt-4o",                "GPT-4o doubles the output cap (16K) and handles long structured outputs better."),
+    ("gpt-4o",             None,                     "Already on GPT-4o. Try reducing the cluster count K, or split the report into two halves."),
+    ("claude-haiku",       "claude-sonnet-4",       "Sonnet 4 raises the output cap from 8K to 64K tokens."),
+    ("claude-sonnet",      None,                     "Already on Claude Sonnet 4 (64K output). Try reducing the cluster count K."),
+    ("deepseek-chat",      "deepseek-reasoner",     "DeepSeek Reasoner has a higher output budget for structured reports."),
+]
+
+
+def suggest_model_upgrade(current_model: str) -> tuple[Optional[str], str]:
+    """Return (recommended_model, rationale) for the given model.
+
+    ``recommended_model`` is None when the user is already on the top tier;
+    in that case ``rationale`` explains an alternative remedy (typically
+    reducing K). Returns ``(None, generic message)`` for unknown models.
+    """
+    if not current_model:
+        return None, "Try a higher-output-token model, or reduce the cluster count K."
+    needle = current_model.lower()
+    for key, target, rationale in _MODEL_UPGRADE_SUGGESTIONS:
+        if key in needle:
+            return target, rationale
+    return None, "Try a higher-output-token model, or reduce the cluster count K."
 
 
 # ---------------------------------------------------------------------------
@@ -72,13 +168,53 @@ class GeminiLLM(LLMClient):
 
     async def generate(self, prompt: str) -> str:
         import asyncio
+        from google.genai import types as genai_types
 
         client = self._get_client()
-        response = await asyncio.to_thread(
-            client.models.generate_content,
-            model=self.model,
-            contents=prompt,
+        # v4 / Module 13 — explicit max_output_tokens. Without this Gemini's
+        # default cap (1024 tokens for some models, 8192 for newer ones) is
+        # the silent reason long reports get truncated mid-section. Set to
+        # the provider hard cap so 8-cluster × 3-strategy reports finish.
+        config = genai_types.GenerateContentConfig(
+            max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
         )
+        # 5-min hard timeout so a hung Gemini call can't block the request forever.
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.models.generate_content,
+                    model=self.model,
+                    contents=prompt,
+                    config=config,
+                ),
+                timeout=300.0,  # 5 minutes
+            )
+        except asyncio.TimeoutError as e:
+            logger.error(f"Gemini call timed out after 300s for model={self.model}")
+            raise RuntimeError(f"Gemini API call timed out (5 min). Check network/proxy or VPN to generativelanguage.googleapis.com") from e
+        # Capture finish-reason / token usage for truncation detection. Reset
+        # to defaults first so a flaky candidate / missing usage doesn't leak
+        # values from the previous call.
+        self.last_finish_reason = None
+        self.last_truncated = False
+        self.last_output_tokens = None
+        try:
+            cand = (response.candidates or [None])[0]
+            if cand is not None:
+                fr = getattr(cand, "finish_reason", None)
+                # Gemini's enum stringifies to "FinishReason.MAX_TOKENS" or "MAX_TOKENS"
+                # depending on SDK version — normalize.
+                fr_str = getattr(fr, "name", str(fr) if fr is not None else None)
+                self.last_finish_reason = fr_str
+                self.last_truncated = _is_truncated(fr_str)
+            usage = getattr(response, "usage_metadata", None)
+            if usage is not None:
+                self.last_output_tokens = (
+                    getattr(usage, "candidates_token_count", None)
+                    or getattr(usage, "total_token_count", None)
+                )
+        except Exception:  # pragma: no cover — diagnostic capture must not break flow
+            logger.debug("Gemini finish-reason capture failed", exc_info=True)
         # Safely extract text — thinking models may have no text part
         try:
             return response.text or ""
@@ -92,14 +228,18 @@ class GeminiLLM(LLMClient):
             return ""
 
     async def generate_stream(self, prompt: str) -> AsyncIterator[str]:
+        from google.genai import types as genai_types
         client = self._get_client()
         queue: asyncio.Queue = asyncio.Queue()
         loop = asyncio.get_running_loop()
+        config = genai_types.GenerateContentConfig(
+            max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
+        )
 
         def _produce():
             try:
                 for chunk in client.models.generate_content_stream(
-                    model=self.model, contents=prompt,
+                    model=self.model, contents=prompt, config=config,
                 ):
                     text = ""
                     try:
@@ -170,7 +310,22 @@ class OpenAILLM(LLMClient):
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
+                max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
             )
+            # Capture finish-reason / usage for truncation detection.
+            self.last_finish_reason = None
+            self.last_truncated = False
+            self.last_output_tokens = None
+            try:
+                choice = response.choices[0]
+                fr = getattr(choice, "finish_reason", None)
+                self.last_finish_reason = fr
+                self.last_truncated = _is_truncated(fr)
+                usage = getattr(response, "usage", None)
+                if usage is not None:
+                    self.last_output_tokens = getattr(usage, "completion_tokens", None)
+            except Exception:  # pragma: no cover
+                logger.debug("OpenAI finish-reason capture failed", exc_info=True)
             return response.choices[0].message.content or ""
 
         return await asyncio.to_thread(_call)
@@ -185,6 +340,7 @@ class OpenAILLM(LLMClient):
                 response = client.chat.completions.create(
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
+                    max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
                     stream=True,
                 )
                 for chunk in response:
@@ -242,9 +398,22 @@ class AnthropicLLM(LLMClient):
             client = self._get_client()
             response = client.messages.create(
                 model=self.model,
-                max_tokens=4096,
+                max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
             )
+            # Capture stop_reason / usage for truncation detection.
+            self.last_finish_reason = None
+            self.last_truncated = False
+            self.last_output_tokens = None
+            try:
+                fr = getattr(response, "stop_reason", None)
+                self.last_finish_reason = fr
+                self.last_truncated = _is_truncated(fr)
+                usage = getattr(response, "usage", None)
+                if usage is not None:
+                    self.last_output_tokens = getattr(usage, "output_tokens", None)
+            except Exception:  # pragma: no cover
+                logger.debug("Anthropic stop-reason capture failed", exc_info=True)
             return response.content[0].text if response.content else ""
 
         return await asyncio.to_thread(_call)
@@ -258,7 +427,7 @@ class AnthropicLLM(LLMClient):
                 client = self._get_client()
                 with client.messages.stream(
                     model=self.model,
-                    max_tokens=4096,
+                    max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
                     messages=[{"role": "user", "content": prompt}],
                 ) as stream:
                     for text in stream.text_stream:
@@ -295,15 +464,4 @@ class AnthropicLLM(LLMClient):
 # ---------------------------------------------------------------------------
 
 def create_llm_client(
-    provider: str, api_key: str, model: str, **kwargs
-) -> LLMClient:
-    """Create an LLM client for the given provider."""
-    if provider == "gemini":
-        return GeminiLLM(api_key, model)
-    if provider == "openai":
-        return OpenAILLM(api_key, model)
-    if provider == "anthropic":
-        return AnthropicLLM(api_key, model)
-    if provider == "deepseek":
-        return OpenAILLM(api_key, model, base_url="https://api.deepseek.com")
-    raise ValueError(f"Unknown LLM provider: {provider}")
+    provid

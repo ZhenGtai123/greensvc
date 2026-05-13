@@ -38,43 +38,10 @@ INDICATOR = {
     
     # TYPE A Configuration
     "calc_type": "ratio",
-    
-    # Target Classes - Vertical Elements (organized by type)
-    "target_classes": {
-        # Buildings and structures
-        "buildings": [
-            "building;edifice",
-            "house",
-            "skyscraper",
-            "hovel;hut;hutch;shack;shanty",
-            "booth;cubicle;stall;kiosk",
-            "tower"
-        ],
-        # Walls and barriers
-        "walls_barriers": [
-            "wall",
-            "fence;fencing",
-            "railing;rail",
-            "bannister;banister;balustrade;balusters;handrail"
-        ],
-        # Trees and vertical vegetation
-        "vegetation": [
-            "tree",
-            "palm;palm;tree",
-            "plant;flora;plant;life"
-        ],
-        # Vertical infrastructure
-        "infrastructure": [
-            "column;pillar",
-            "pole",
-            "streetlight;street;lamp",
-            "signboard;sign",
-            "awning;sunshade;sunblind"
-        ]
-    },
-    
-    # Flatten all classes for calculation
-    "all_target_classes": [
+
+    # Target Classes - flat list of all vertical-element classes
+    # (used for calculation; matches the schema expected by CalculatorInfo.target_classes: list[str])
+    "target_classes": [
         # Buildings
         "building;edifice",
         "house",
@@ -98,6 +65,37 @@ INDICATOR = {
         "signboard;sign",
         "awning;sunshade;sunblind"
     ],
+
+    # Same target classes grouped by category (for breakdown reporting only;
+    # not part of the canonical CalculatorInfo schema).
+    "target_classes_by_category": {
+        "buildings": [
+            "building;edifice",
+            "house",
+            "skyscraper",
+            "hovel;hut;hutch;shack;shanty",
+            "booth;cubicle;stall;kiosk",
+            "tower"
+        ],
+        "walls_barriers": [
+            "wall",
+            "fence;fencing",
+            "railing;rail",
+            "bannister;banister;balustrade;balusters;handrail"
+        ],
+        "vegetation": [
+            "tree",
+            "palm;palm;tree",
+            "plant;flora;plant;life"
+        ],
+        "infrastructure": [
+            "column;pillar",
+            "pole",
+            "streetlight;street;lamp",
+            "signboard;sign",
+            "awning;sunshade;sunblind"
+        ]
+    },
     
     # Metadata
     "variables": {
@@ -121,7 +119,7 @@ TARGET_RGB_BY_CATEGORY = {}
 print(f"\nBuilding color lookup for vertical element classes:")
 
 # Build lookup by category
-for category, class_list in INDICATOR.get('target_classes', {}).items():
+for category, class_list in INDICATOR.get('target_classes_by_category', {}).items():
     TARGET_RGB_BY_CATEGORY[category] = {}
     print(f"\n {category}:")
     
@@ -182,7 +180,7 @@ def calculate_indicator(image_path: str) -> Dict:
         flat_pixels = pixels.reshape(-1, 3)
         
         # Step 2: Count pixels by category
-        category_counts = {category: 0 for category in INDICATOR.get('target_classes', {}).keys()}
+        category_counts = {category: 0 for category in INDICATOR.get('target_classes_by_category', {}).keys()}
         class_breakdown = {}
         total_vertical_pixels = 0
         

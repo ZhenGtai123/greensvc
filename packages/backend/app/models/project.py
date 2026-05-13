@@ -137,8 +137,24 @@ class ProjectResponse(BaseModel):
     # Stage 2.5 / Stage 3 / AI report.
     zone_analysis_result: Optional[dict[str, Any]] = None
     design_strategy_result: Optional[dict[str, Any]] = None
+    # Legacy single-slot fields. Kept for backward compat with old project
+    # rows that pre-date the per-view split below — read at hydration as a
+    # fallback into the 'zones' slot. New writes go through ai_reports.
     ai_report: Optional[str] = None
     ai_report_meta: Optional[dict[str, Any]] = None
+    # v4 / Module 12 — per-view AI reports. The Reports page can be
+    # toggled between zones view (original user zones) and clusters view
+    # (cluster-as-zone payload). Each view gets its own independently
+    # generated narrative report. Keys are 'zones' or 'clusters'.
+    ai_reports: dict[str, Optional[str]] = Field(default_factory=dict)
+    ai_report_metas: dict[str, Optional[dict[str, Any]]] = Field(default_factory=dict)
+    # v4 / Module 14 — per-view design strategies (parallel to ai_reports).
+    # In Option C the user can toggle Strategies tab between zones-derived
+    # and clusters-derived strategies; each must persist independently so
+    # toggling doesn't lose work. ``design_strategy_result`` (legacy) still
+    # mirrors whichever slot was last written, for backward compat with
+    # older clients.
+    design_strategy_results: dict[str, Optional[dict[str, Any]]] = Field(default_factory=dict)
     analysis_results_updated_at: Optional[datetime] = None
 
 

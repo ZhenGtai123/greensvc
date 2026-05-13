@@ -31,7 +31,7 @@ from typing import Dict
 INDICATOR = {
     # Basic Information
     "id": "IND_ASV",
-    "name": "Artificial Surface Visibility",
+    "name": "Artificial Surface View",
     "unit": "%",
     "formula": "(Sum(Artificial_Surface_Pixels) / Sum(Total_Pixels)) × 100",
     "target_direction": "DECREASE",

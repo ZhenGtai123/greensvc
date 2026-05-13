@@ -455,6 +455,7 @@ function VisionAnalysis() {
     selectedIndicators, addSelectedIndicator, removeSelectedIndicator,
     indicatorRelationships, setIndicatorRelationships,
     recommendationSummary, setRecommendationSummary,
+    recommendInFlight, setRecommendInFlight,
     pipelineRun,
   } = useAppStore();
 
@@ -469,6 +470,11 @@ function VisionAnalysis() {
 
   const handleRunRecommendation = useCallback(() => {
     if (!project || !project.performance_dimensions?.length) return;
+    // Layer 2 — mark in-flight so a hard refresh during the call shows
+    // "Resuming…" instead of the empty Get-Recommendations state. The
+    // backend's Layer 1 dedup ensures re-firing the request after refresh
+    // attaches to the existing Gemini call instead of starting a new one.
+    setRecommendInFlight({ projectId: project.id, startedAt: Date.now() });
     recommendMutation.mutate({
       project_name: project.project_name,
       project_location: project.project_location || '',
@@ -484,6 +490,7 @@ function VisionAnalysis() {
       project_id: project.id,
     }, {
       onSuccess: (result) => {
+        setRecommendInFlight(null);
         if (result.success) {
           setRecommendations(result.recommendations);
           setIndicatorRelationships(result.indicator_relationships || []);
@@ -494,11 +501,65 @@ function VisionAnalysis() {
         }
       },
       onError: (err) => {
+        setRecommendInFlight(null);
         const msg = err instanceof Error ? err.message : 'Recommendation request failed';
         toast({ title: msg, status: 'error' });
       },
     });
-  }, [project, recommendMutation, toast]);
+  }, [project, recommendMutation, toast, setRecommendInFlight]);
+
+  // Layer 2 — on mount, if the persisted store says a recommendation was
+  // in flight for THIS project and recently (< 10 min), auto re-fire so the
+  // backend Layer-1 dedup attaches us to the running Gemini call. Stale
+  // markers (> 10 min) are dropped — the user can re-click Get
+  // Recommendations explicitly.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!project) return;
+    if (!recommendInFlight) return;
+    if (recommendInFlight.projectId !== project.id) return;
+    const ageMs = Date.now() - recommendInFlight.startedAt;
+    if (ageMs > 10 * 60 * 1000) {
+      // Stale — drop it.
+      setRecommendInFlight(null);
+      return;
+    }
+    if (recommendMutation.isPending) return;
+    if (recommendations.length > 0) return;
+    // Re-fire the same request; backend dedup re-attaches.
+    handleRunRecommendation();
+  }, [project?.id]);
+
+  // Layer 2 — live elapsed-time ticker for the "Resuming…" / in-flight UI.
+  // Updates once per second only while a recommendation is in flight, so
+  // the rest of the page doesn't re-render needlessly.
+  const [recNowTick, setRecNowTick] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (!recommendInFlight && !recommendMutation.isPending) return;
+    setRecNowTick(Date.now());
+    const id = window.setInterval(() => setRecNowTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [recommendInFlight, recommendMutation.isPending]);
+
+  const recElapsedLabel = useMemo(() => {
+    if (!recommendInFlight) return null;
+    const ms = Math.max(0, recNowTick - recommendInFlight.startedAt);
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }, [recommendInFlight, recNowTick]);
+
+  // True when a marker exists for this project that pre-dates the current
+  // mount — i.e. we just hard-refreshed and are reattaching to a running
+  // backend call. Used to swap "Running…" copy for "Resuming…".
+  const componentMountedAtRef = useRef<number>(Date.now());
+  const isResumingRecommendation =
+    !!recommendInFlight &&
+    !!project &&
+    recommendInFlight.projectId === project.id &&
+    // marker was set at least 2s before this mount → it's from a prior session
+    recommendInFlight.startedAt < componentMountedAtRef.current - 2000;
 
   // Preview: how many of the selected images are already processed (eligible for resume/skip)
   const resumePreview = useMemo(() => {
@@ -1325,6 +1386,38 @@ function VisionAnalysis() {
                 </HStack>
               )}
 
+              {/* v4 polish — explain WHY the button is disabled, instead of
+                  silently graying it out. Without `performance_dimensions`
+                  on the project, the Stage 1 LLM has no goal to recommend
+                  indicators for, so the request would 422 anyway. Surface
+                  this with a one-click route to the Edit Project page. */}
+              {project && (!project.performance_dimensions || project.performance_dimensions.length === 0) && (
+                <Alert status="warning" mb={3} borderRadius="md" alignItems="flex-start" fontSize="sm">
+                  <AlertIcon mt={0.5} />
+                  <Box flex={1}>
+                    <Text fontWeight="bold" fontSize="sm">
+                      No performance dimensions set
+                    </Text>
+                    <Text fontSize="xs" color="gray.700" mt={1}>
+                      The recommendation engine needs at least one performance
+                      dimension (e.g. <i>Thermal Comfort</i>, <i>Mental Restoration</i>)
+                      to know what indicators to suggest. Open the project's edit
+                      page and pick one or more dimensions, then come back here.
+                    </Text>
+                    <Button
+                      size="xs"
+                      colorScheme="orange"
+                      variant="outline"
+                      mt={2}
+                      as={Link}
+                      to={`/projects/${routeProjectId}/edit`}
+                    >
+                      Edit project to add dimensions
+                    </Button>
+                  </Box>
+                </Alert>
+              )}
+
               {/* Run button */}
               <Button
                 colorScheme="blue"
@@ -1338,10 +1431,32 @@ function VisionAnalysis() {
                 {recommendations.length > 0 ? 'Re-run Recommendations' : 'Get Recommendations'}
               </Button>
 
-              {recommendMutation.isPending && (
-                <Alert status="info" mt={2}>
+              {(recommendMutation.isPending || isResumingRecommendation) && (
+                <Alert
+                  status={isResumingRecommendation ? 'warning' : 'info'}
+                  mt={2}
+                  alignItems="flex-start"
+                >
                   <AlertIcon />
-                  <Text fontSize="xs">LLM is analyzing {project?.performance_dimensions?.length || 0} dimensions. This typically takes 2-4 minutes.</Text>
+                  <Box flex={1}>
+                    <HStack justify="space-between" align="baseline" mb={0.5}>
+                      <Text fontSize="xs" fontWeight="bold">
+                        {isResumingRecommendation
+                          ? 'Resuming Stage 1 recommendation…'
+                          : `Analyzing ${project?.performance_dimensions?.length || 0} dimension${(project?.performance_dimensions?.length || 0) === 1 ? '' : 's'}`}
+                      </Text>
+                      {recElapsedLabel && (
+                        <Badge fontSize="2xs" colorScheme={isResumingRecommendation ? 'orange' : 'blue'}>
+                          {recElapsedLabel} elapsed
+                        </Badge>
+                      )}
+                    </HStack>
+                    <Text fontSize="xs" color="gray.600">
+                      {isResumingRecommendation
+                        ? 'Reattaching to the running backend call — your previous request is still being processed.'
+                        : 'LLM is analyzing dimensions. This typically takes 2-4 minutes; safe to refresh or navigate.'}
+                    </Text>
+                  </Box>
                 </Alert>
               )}
 
@@ -1355,13 +1470,31 @@ function VisionAnalysis() {
                     const visibleRecs = calculatorIds.size > 0
                       ? recommendations.filter(rec => calculatorIds.has(rec.indicator_id))
                       : recommendations;
-                    const hidden = recommendations.length - visibleRecs.length;
+                    const hiddenRecs = calculatorIds.size > 0
+                      ? recommendations.filter(rec => !calculatorIds.has(rec.indicator_id))
+                      : [];
+                    const hidden = hiddenRecs.length;
                     return (
                       <>
                         {hidden > 0 && (
-                          <Text fontSize="xs" color="gray.500">
-                            {hidden} recommendation{hidden > 1 ? 's' : ''} hidden (no calculator available).
-                          </Text>
+                          <Box
+                            fontSize="xs"
+                            color="gray.600"
+                            p={2}
+                            bg="orange.50"
+                            borderRadius="md"
+                            borderLeft="3px solid"
+                            borderColor="orange.300"
+                          >
+                            <Text fontWeight="semibold" mb={0.5}>
+                              {hidden} recommendation{hidden > 1 ? 's' : ''} hidden — no calculator available
+                            </Text>
+                            <Text>
+                              {hiddenRecs
+                                .map(r => `${r.indicator_id} (${r.indicator_name})`)
+                                .join('; ')}
+                            </Text>
+                          </Box>
                         )}
                         <Accordion allowMultiple>
                           {visibleRecs.map((rec) => (

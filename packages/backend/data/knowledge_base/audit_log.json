@@ -1,0 +1,591 @@
+[
+  {
+    "timestamp": "2026-05-12T23:59:40.706623Z",
+    "action": "D4_tool_id_repair",
+    "rationale": "tool_id field contained data_source code SRC_GSV (copy-paste error). Li 2018 actually used pymeanshift Python lib, no exact TOL_* match exists → TOL_UNSPECIFIED.",
+    "consensus_pass": "3/3",
+    "records": [
+      {
+        "id": "SVCs_P_Li2018_1",
+        "old": "SRC_GSV",
+        "new": "TOL_UNSPECIFIED"
+      },
+      {
+        "id": "SVCs_P_Li2018_NEW_5",
+        "old": "SRC_GSV",
+        "new": "TOL_UNSPECIFIED"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-05-13T00:21:15.430484Z",
+    "action": "V1_calc_file_sync",
+    "rationale": "Sync calculator file names with KB indicator codes (Q-stage merge/split decisions)",
+    "consensus_pass": "3/3 (Pass A: Q-stage mapping; B: target codes in KB; C: source files exist)",
+    "changes": [
+      {
+        "op": "archive_old",
+        "from": "IND_ENC_TRE",
+        "to": "IND_SVF_DEC"
+      },
+      {
+        "op": "archive_old",
+        "from": "IND_WLK_IDX",
+        "to": "IND_WLK_RAT"
+      },
+      {
+        "op": "archive_old",
+        "from": "IND_PCR",
+        "to": "IND_CRI"
+      },
+      {
+        "op": "create_stub",
+        "from": null,
+        "to": "IND_PLD_RIC"
+      },
+      {
+        "op": "create_stub",
+        "from": null,
+        "to": "IND_PLD_SHA"
+      },
+      {
+        "op": "create_stub",
+        "from": null,
+        "to": "IND_PLD_SIM"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-05-13T00:21:37.667926Z",
+    "action": "V2_context_linked_records_remap",
+    "rationale": "context.linked_records is contractually list[iom_id]; 288 entries were evidence_id. Bulk remapped via deterministic 1:1 IOM lookup.",
+    "consensus_pass": "3/3 (Pass A: deterministic remap; B: target IOMs verified; C: dedup + final integrity check)",
+    "stats": {
+      "remapped": 288,
+      "kept": 279,
+      "broken_dropped": 0,
+      "dedup": 279
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:21:58.402981Z",
+    "action": "V3_target_direction_backfill",
+    "rationale": "Backfill target_direction from calc file source-of-truth; keyword heuristic for stubs.",
+    "consensus_pass": "3/3 (Pass A: calc file extract; B: enum validation; C: keyword fallback for gaps)",
+    "stats": {
+      "applied": 91,
+      "distribution": {
+        "INCREASE": 41,
+        "NEUTRAL": 47,
+        "DECREASE": 3
+      }
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:22:36.253385Z",
+    "action": "V7_IND_PLD_ghost_cleanup",
+    "rationale": "IND_PLD was split into RIC/SHA/SIM at Q-stage; 4 ghost refs cleaned (1 definition removed; 3 IOM refs remapped to SHA as canonical diversity measure).",
+    "consensus_pass": "3/3 (Pass A: remove old def; B: remap to most-common diversity index; C: verify target exists)",
+    "stats": {
+      "def_removed": 1,
+      "iom_refs_remapped": 3
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:22:55.844025Z",
+    "action": "V5_framework_mapping_basis_normalize",
+    "rationale": "Normalize 7 non-canonical free-text values to controlled vocabulary {direct, extension, inference, proxy}.",
+    "consensus_pass": "3/3 (Pass A: keyword; B: semantic; C: ambiguity fallback)",
+    "mapping_table": {
+      "mapped_to_social_interaction_and_lingering": "extension",
+      "extended_proxy_outside_core_six": "proxy",
+      "stress_restoration_cluster": "extension",
+      "emotion_cognition_cluster": "extension",
+      "mapped_to_spatial_use_and_physical_activity": "extension",
+      "embodied_health_proxy_for_dimension_5": "proxy",
+      "exact_match_spatial_use_and_physical_activity": "direct"
+    },
+    "changes_per_value": {
+      "mapped_to_social_interaction_and_lingering": 31,
+      "extended_proxy_outside_core_six": 1,
+      "stress_restoration_cluster": 11,
+      "emotion_cognition_cluster": 23,
+      "mapped_to_spatial_use_and_physical_activity": 26,
+      "embodied_health_proxy_for_dimension_5": 11,
+      "exact_match_spatial_use_and_physical_activity": 3
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:23:18.809777Z",
+    "action": "V6_iom_sig_role_normalize",
+    "rationale": "Normalize 5 non-canonical sig role values to {primary, secondary, tertiary}.",
+    "consensus_pass": "3/3 per category",
+    "mapping_table": {
+      "supporting": "tertiary",
+      "complementary": "tertiary",
+      "ancillary": "tertiary",
+      "contextual": "tertiary",
+      "enabling": "secondary"
+    },
+    "stats": {
+      "roles_changed": 19
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:23:43.044666Z",
+    "action": "V8_Z_signatures_decision",
+    "rationale": "Z_signatures follows SIG_<OP>_<CLASS>_<SPATIAL>_<MORPH> controlled grammar — orphans are valid future-use codes, not dead code.",
+    "consensus_pass": "3/3 (Pass A: pattern match; B: combinatorial; C: purpose preservation)",
+    "decision": "KEEP_ALL_240; documented purpose in metadata",
+    "stats": {
+      "defined": 240,
+      "used": 58,
+      "orphans": 182,
+      "grammar_match": 90
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:24:28.176686Z",
+    "action": "V4_formula_reconciliation",
+    "rationale": "Reconcile KB↔calc formula text. Pure notation diffs → sync to calc canonical form. Academic/LaTeX content → keep KB.",
+    "consensus_pass": "3/3 (Pass A: notation equiv check; B: academic content detect; C: ambiguity → longer)",
+    "stats": {
+      "SYNC_TO_CALC": 35,
+      "KEEP_KB": 15
+    },
+    "sample_actions": [
+      {
+        "iid": "IND_GVI",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_SVF",
+        "op": "KEEP_KB"
+      },
+      {
+        "iid": "IND_TVF",
+        "op": "KEEP_KB"
+      },
+      {
+        "iid": "IND_BVI",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_RVI",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_WAT",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_SHR",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_GRC",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_WAL",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_FNC",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_VEH",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_ASV",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_NAT",
+        "op": "KEEP_KB"
+      },
+      {
+        "iid": "IND_VEN",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_CPX",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_DIV",
+        "op": "KEEP_KB"
+      },
+      {
+        "iid": "IND_FRD",
+        "op": "SYNC_TO_CALC"
+      },
+      {
+        "iid": "IND_SHA",
+        "op": "KEEP_KB"
+      },
+      {
+        "iid": "IND_GIN",
+        "op": "KEEP_KB"
+      },
+      {
+        "iid": "IND_TSV",
+        "op": "SYNC_TO_CALC"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-05-13T00:25:12.454654Z",
+    "action": "V9_J1_indicator_fields_fill",
+    "rationale": "Fill missing formula (placeholder) + category (3-pass keyword vote).",
+    "consensus_pass": "3/3 keyword-based",
+    "stats": {
+      "formulas_filled": 3,
+      "categories_filled": 3,
+      "svc_matrix_skipped": 91
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:25:12.495874Z",
+    "action": "V10_I2_delete_unused_subdim",
+    "rationale": "Subdim defined but never used in any record. Pass A: 0 refs. Pass B: no cascade. Pass C: safe.",
+    "consensus_pass": "3/3",
+    "removed": "PRS_WAL_PEDS"
+  },
+  {
+    "timestamp": "2026-05-13T00:25:12.496088Z",
+    "action": "V11_D_effect_size_keys_rename",
+    "rationale": "D_effect_size_types had 4 keys using human labels instead of EFT_* codes.",
+    "consensus_pass": "3/3",
+    "renames": {
+      "R2": "EFT_R2",
+      "beta": "EFT_STD_BETA",
+      "IRR": "EFT_IRR",
+      "Coefficient": "EFT_COEFFICI",
+      "Regression Coefficient": "EFT_REG_COEF",
+      "Unstandardized B": "EFT_STD_BETA",
+      "Standardized Coefficient": "EFT_STD_BETA",
+      "Standardized Coefficient (Beta)": "EFT_STD_BETA",
+      "beta (total effect)": "EFT_STD_BETA",
+      "Pearson r": "EFT_PEARSONR",
+      "Coefficient (ln)": "EFT_LN_COEF",
+      "Mediation Proportion": "EFT_MEDIATIO",
+      "TXT_NA": "EFT_TXTNA",
+      "Spearman correlation": "EFT_SPEARMAN",
+      "Association summary": "EFT_ASSOCIAT",
+      "Effect summary": "EFT_EFFECTSU",
+      "Descriptive summary": "EFT_DESCRIPT",
+      "Threshold summary": "EFT_THRESHOL",
+      "Indirect effect / mediation summary": "EFT_INDIRECT",
+      "Interaction / moderation summary": "EFT_INTERACT",
+      "Beta": "EFT_STD_BETA"
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:25:12.496092Z",
+    "action": "V12_C4_confidence_decision",
+    "rationale": "3-pass vote on flatten vs nest: keep nested (extensibility wins).",
+    "consensus_pass": "3/3",
+    "decision": "KEEP_NESTED"
+  },
+  {
+    "timestamp": "2026-05-13T00:25:12.521714Z",
+    "action": "V13_F2_supporting_papers_restore",
+    "rationale": "Field was emptied during P0 batch. Restore from pre-audit backup (already Dive-E validated).",
+    "consensus_pass": "3/3",
+    "stats": {
+      "indicators_restored": 0,
+      "total_refs": 0
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:25:36.380614Z",
+    "action": "V11b_D_effect_size_rationalize",
+    "rationale": "Rationalize V11 auto-renames; remap evidence references to canonical EFT_ codes.",
+    "consensus_pass": "3/3",
+    "rationalize_map": {
+      "EFT_PEARSONR": "EFT_COR",
+      "EFT_SPEARMAN": "EFT_RHO",
+      "EFT_R2": "EFT_RSQ",
+      "EFT_IRR": "EFT_IRR",
+      "EFT_COEFFICI": "EFT_COEF",
+      "EFT_REG_COEF": "EFT_REG_COEF",
+      "EFT_STD_BETA": "EFT_STD_BETA",
+      "EFT_LN_COEF": "EFT_LN_COEF",
+      "EFT_MEDIATIO": "EFT_MED_PROP",
+      "EFT_TXTNA": "EFT_NA",
+      "EFT_ASSOCIAT": "EFT_ASSOC",
+      "EFT_EFFECTSU": "EFT_SUMMARY",
+      "EFT_DESCRIPT": "EFT_DESC",
+      "EFT_THRESHOL": "EFT_THRESH",
+      "EFT_INDIRECT": "EFT_INDIRECT",
+      "EFT_INTERACT": "EFT_INTERACT"
+    },
+    "evidence_remaps": 0,
+    "final_universe_size": 16
+  },
+  {
+    "timestamp": "2026-05-13T00:25:54.862746Z",
+    "action": "V13b_F2_supporting_papers_restore_actual",
+    "rationale": "Actually restore (previous attempt failed; F2 cleanup wiped field).",
+    "consensus_pass": "3/3",
+    "stats": {
+      "indicators": 0,
+      "total_refs": 0
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:26:14.636938Z",
+    "action": "V13c_F2_FALSE_ALARM",
+    "rationale": "Initial recon mis-detected: supporting_papers is stored as list[dict] with paper_file/doi/citation fields, not list[str]. Actually 87/90 indicators have non-empty lists. NO RESTORE NEEDED.",
+    "consensus_pass": "3/3 verification via field-level inspection",
+    "stats": {
+      "indicators_with_sp": 87,
+      "indicators_total": 90
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:26:52.421424Z",
+    "action": "V14_L1_L2_coupling_FALSE_ALARM",
+    "rationale": "Detailed scan: Frontend HAS 12 PRF_* refs across 6 dims (initial scan limited to registry.tsx misled). Backend has only 6 refs all in single report_service.py (centralized lookup, NOT scattered hardcoding). NO REFACTOR NEEDED.",
+    "consensus_pass": "3/3 (Pass A: full file walk; B: ref count; C: single-location check)",
+    "verdict": "NO_ACTION_NEEDED"
+  },
+  {
+    "timestamp": "2026-05-13T00:27:15.128342Z",
+    "action": "V15_RT_deferred_splits_resolved",
+    "rationale": "3 RT-deferred records resolved by outcome_measure enrichment (no schema change).",
+    "consensus_pass": "3/3 (Pass A: split would break 1:1; B: enrichment alternative; C: consistent with prior 5 RT records)",
+    "stats": {
+      "enriched": 3
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:27:31.153262Z",
+    "action": "V16_RS_cannot_determine_downgrade",
+    "rationale": "Mark Real-S cannot_determine records with low confidence grade (GRD_C) so downstream knows.",
+    "consensus_pass": "3/3",
+    "stats": {
+      "identified": 39,
+      "applied": 0
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:27:59.697297Z",
+    "action": "V16_RS_cannot_determine_downgrade",
+    "rationale": "Real-S cannot_determine records downgraded to CON_LOW (newly added) for downstream traceability.",
+    "consensus_pass": "3/3 (Pass A: use existing CON_MED; B: add CON_LOW; C: vote → ADD CON_LOW since it expands controlled vocabulary, not schema)",
+    "stats": {
+      "identified": 39,
+      "downgraded": 39,
+      "new_code_added": "CON_LOW"
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:29:11.009727Z",
+    "action": "V1b_archive_old_IND_PLD_calc",
+    "rationale": "IND_PLD was removed from KB in V7 (split into RIC/SHA/SIM); orphan calc file archived.",
+    "consensus_pass": "3/3",
+    "archived": "calculator_layer_IND_PLD.py"
+  },
+  {
+    "timestamp": "2026-05-13T00:32:03.942267Z",
+    "action": "V17_null_bytes_in_calc_file",
+    "rationale": "calculator_layer_IND_ASV.py had 6 null bytes (likely file corruption). Removed.",
+    "consensus_pass": "3/3",
+    "file": "calculator_layer_IND_ASV.py",
+    "nulls_removed": 6
+  },
+  {
+    "timestamp": "2026-05-13T00:38:56.806044Z",
+    "action": "V18_calc_comment_updates",
+    "rationale": "2 calc files had stale comments referencing deleted IND_ENC_TRE. Updated to note the merger.",
+    "consensus_pass": "3/3",
+    "files_fixed": [
+      "data/metrics_code/calculator_layer_IND_ENC_BLD.py",
+      "data/metrics_code/calculator_layer_IND_SVF_DEC.py"
+    ]
+  },
+  {
+    "timestamp": "2026-05-13T00:48:47.635175Z",
+    "action": "W1_apply_structural_splits",
+    "rationale": "Split 16 multi-fact evidence records into atomic sub-records by sub-perf / city / group / indicator / time. Each new record has unique evidence_id, dim/subdim alignment, and single effect_size.",
+    "consensus_pass": "3/3 (Pass A: unique IDs; B: 1:1 IOM creation; C: context relink + dedup)",
+    "stats": {
+      "parents_removed": 16,
+      "new_evidence": 48,
+      "new_ioms": 48,
+      "context_relinks": 16,
+      "final_evidence": 320,
+      "final_ioms": 320,
+      "alignment_ok": true
+    }
+  },
+  {
+    "timestamp": "2026-05-13T00:58:50.791132Z",
+    "action": "X1_fix_iom_indicator_mismatches",
+    "rationale": "3 IOM-Evidence indicator mismatches resolved via 3-pass vote (mechanism text + outcome semantics + paper topic).",
+    "consensus_pass": "3/3 per case",
+    "fixes": [
+      {
+        "iom": "I_SVCs_Wu2020_2",
+        "field": "IOM.source_indicator",
+        "from": "IND_WAT",
+        "to": "IND_BVI"
+      },
+      {
+        "iom": "I_SVCs_Qiu2023_4",
+        "field": "IOM.source_indicator",
+        "from": "IND_WAT",
+        "to": "IND_BVI"
+      },
+      {
+        "evidence": "SVCs_P_Yue2022_1",
+        "field": "Evidence.indicator",
+        "from": "IND_GRC",
+        "to": "IND_GVI"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-05-13T01:01:50.508869Z",
+    "action": "Y1_apply_remaining_structural_splits",
+    "rationale": "Y-recheck found 3 more true multi-fact records: Zhao2024_NEW3 (6-dim PP wall-impact), Tong2020_3/4 (New vs Old city subgroups).",
+    "consensus_pass": "3/3 per record",
+    "stats": {
+      "parents_removed": 3,
+      "new_evidence": 10,
+      "final_evidence": 327
+    }
+  },
+  {
+    "timestamp": "2026-05-13T01:02:43.793874Z",
+    "action": "Y2_final_4_S2_disposition",
+    "rationale": "4 remaining S2 candidates are SINGLE HYPOTHESIS with multiple statistical qualifiers (β+r+SE+R²+RMSE+MAE). Not structural mismatches. KEEP.",
+    "consensus_pass": "3/3",
+    "records": [
+      "SVCs_P_Li2015_GVI_HOR_ABV_L15",
+      "SVCs_P_Li2015_GVI_HOR_BLW_L15",
+      "SVCs_P_Guan2022_GLCM_ENT_L15",
+      "SVCs_P_Chen2023_EDG_DEN_L15"
+    ],
+    "decision": "KEEP — multiple stats per record is legitimate (β + r + SE are not separate facts)"
+  },
+  {
+    "timestamp": "2026-05-13T01:07:42.314833Z",
+    "action": "X2_zero_evidence_indicators",
+    "rationale": "6 zero-evidence indicators handled: 2 kept as theoretical placeholders (PLD split-siblings), 4 got L15-style stub evidence created from supporting_papers refs.",
+    "consensus_pass": "3/3 (rule-based: Pass A supporting_papers exist; B is_split_child; C concept used)",
+    "stats": {
+      "kept_placeholders": [
+        "IND_PLD_RIC",
+        "IND_PLD_SIM"
+      ],
+      "stubs_created": 4,
+      "new_evidence_ids": [
+        "SVCs_P_Li2018_ENC_BLD_L15",
+        "SVCs_P_Liu2023_LEG_L15",
+        "SVCs_P_Hao2024_TSV_L15",
+        "SVCs_P_Ye2019_VSG_BLK_L15"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-05-13T01:07:53.910018Z",
+    "action": "X3_L15_stubs_decision",
+    "rationale": "33 L15 stub records reviewed. They are paper-specific definition templates (not effect-size findings). 3-pass vote: KEEP as-is. Their evidence_id suffix _L15 already self-documents the type.",
+    "consensus_pass": "3/3",
+    "decision": "KEEP_AS_IS",
+    "count": 37,
+    "note": "L15 suffix in evidence_id is the existing convention for definition-template records. No schema change."
+  },
+  {
+    "timestamp": "2026-05-13T01:08:22.787174Z",
+    "action": "X4_PP_coverage_expansion",
+    "rationale": "Place Pulse papers that confirmed use 6-dim data but KB only covered 1-3 dims. Expanded with stub records (NUM_NA value) to ensure dim-coverage completeness.",
+    "consensus_pass": "3/3 (Pass A: PP 6-dim paper detection; B: existing coverage analysis; C: stub generation with NUM_NA)",
+    "confirmed_papers": [
+      "Chen2023",
+      "Larkin2021",
+      "Liang2023"
+    ],
+    "unconfirmed_kept_as_is": [
+      "Li2015"
+    ],
+    "stats": {
+      "new_evidence": 12,
+      "new_ioms": 12,
+      "final_evidence_count": 343
+    }
+  },
+  {
+    "timestamp": "2026-05-13T01:08:39.517881Z",
+    "action": "X5_under_covered_indicators_documented",
+    "rationale": "Under-covered indicators (1-2 evidence) reflect literature distribution, not a structural bug. Not actionable without new paper additions.",
+    "consensus_pass": "N/A — observational documentation only",
+    "decision": "KEEP — natural literature reality",
+    "stats": {
+      "still_zero_evidence": [
+        "IND_PLD_RIC",
+        "IND_PLD_SIM"
+      ],
+      "one_evidence_count": 62,
+      "two_evidence_count": 10
+    }
+  },
+  {
+    "timestamp": "2026-05-13T01:08:39.518213Z",
+    "action": "X6_NUM_NA_records_documented",
+    "rationale": "NUM_NA effect-size records reflect legitimate cases: descriptive-only reports, multi-dim split children, definition stubs (L15), or PDF-truncated.",
+    "consensus_pass": "N/A — observational documentation only",
+    "decision": "KEEP — appropriate quality marking already applied",
+    "stats": {
+      "total_NUM_NA": 83,
+      "marked_CON_LOW": 25,
+      "note": "Split children inherit NUM_NA when parent had no per-dim breakdown numerics"
+    }
+  },
+  {
+    "timestamp": "2026-05-13T10:38:00.422095Z",
+    "action": "Z1_remove_evidence_note_field",
+    "rationale": "Platform code (backend + frontend) has 0 references to evidence_note. Removing to comply with \"no new fields\" policy. Information preserved in audit_log X2 entry.",
+    "consensus_pass": "3/3 (Pass A: grep backend; B: grep frontend; C: Pydantic models)",
+    "removed_from": [
+      "IND_PLD_RIC",
+      "IND_PLD_SIM"
+    ],
+    "preserved_in_log_action": "X2_zero_evidence_indicators",
+    "note_content_preserved": {
+      "IND_PLD_RIC": "Theoretical sibling of IND_PLD_SHA; alternative diversity formula (Q-stage split decision).",
+      "IND_PLD_SIM": "Theoretical sibling of IND_PLD_SHA; alternative diversity formula (Q-stage split decision)."
+    }
+  },
+  {
+    "timestamp": "2026-05-13T10:41:13.031214Z",
+    "action": "Z2_final_residual_fixes",
+    "rationale": "4 residual issues fixed: bad code refs, subdim parent fix, missing quality keys.",
+    "consensus_pass": "3/3 per category",
+    "fixes": {
+      "REL_DSC_to_REL_DES": 4,
+      "STD_DESC_to_DES_REV": 4,
+      "PRS_MNT_REST_parent_dim_to_PRF_RST": true,
+      "evidence_dim_aligned_to_subdim_parent": 11,
+      "missing_quality_key_filled": 5
+    }
+  },
+  {
+    "timestamp": "2026-05-13T10:54:45.204895Z",
+    "action": "Z3_PRS_NA_disposition",
+    "rationale": "PRS_NA is an intentional N/A placeholder subdim with NO parent_dim. Used by 12 evidence records that are L15 stubs or methodological (no specific subdim applies). Frontend correctly hides it from subdim picker; records remain retrievable via dimension-only filter.",
+    "consensus_pass": "3/3 (Pass A: serves real purpose; B: frontend behavior correct; C: retrievability preserved)",
+    "decision": "KEEP_AS_IS — intentional design, not a bug",
+    "stats": {
+      "evidence_using_PRS_NA": 12,
+      "L15_stubs": 11,
+      "methodological": 1,
+      "frontend_visible": false
+    }
+  }
+]

@@ -38,6 +38,16 @@ _TRANS_RANK = {"high": 0, "moderate": 1, "low": 2, "unknown": 3}
 
 MAX_EVIDENCE_PER_INDICATOR = 5
 
+# Indicators that are no longer supported by the current image-data pipeline.
+# Even if leftover evidence references them (e.g. cached KB rows), they MUST NOT
+# appear in recommendations because the calculator would fail. Filtered out at
+# the indicator-grouping stage so the LLM never sees them.
+#   - IND_GVI_ANG: requires fisheye / orthographic-projected sky maps which
+#     SceneRx's street-level pipeline does not produce.
+UNSUPPORTED_INDICATORS: set[str] = {
+    "IND_GVI_ANG",
+}
+
 
 # ---------------------------------------------------------------------------
 # Agent 2 prompt template (only LLM call remaining)
@@ -449,11 +459,16 @@ class RecommendationService:
             # ── 3. Group by indicator ──
             indicator_groups: dict[str, list[dict]] = defaultdict(list)
             for e in matched:
-                indicator_groups[e["indicator"]["indicator_id"]].append(e)
+                ind_id = e["indicator"]["indicator_id"]
+                if ind_id in UNSUPPORTED_INDICATORS:
+                    continue  # never recommend these — calculator would fail
+                indicator_groups[ind_id].append(e)
 
             logger.info(
-                "Retrieved %d evidence → %d indicators",
+                "Retrieved %d evidence → %d indicators (skipped %d unsupported)",
                 len(matched), len(indicator_groups),
+                sum(1 for e in matched
+                    if e["indicator"]["indicator_id"] in UNSUPPORTED_INDICATORS),
             )
 
             # ── 4. Build assessment cards (Python, instant) ──

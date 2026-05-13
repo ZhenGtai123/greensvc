@@ -31,9 +31,14 @@ function buildImageMetricsRows(images: UploadedImage[]) {
   const metricKeys = Array.from(keySet).sort();
 
   return images.map(img => {
+    // v4 polish — put `filename` (the human-readable upload name) FIRST so
+    // users opening the .xlsx can identify each image at a glance instead
+    // of having to map the UUID-style image_id back to their source. The
+    // image_id column is preserved as a stable internal ID for cross-
+    // referencing with raw JSON exports.
     const row: Record<string, unknown> = {
-      image_id: img.image_id,
       filename: img.filename,
+      image_id: img.image_id,
       zone_id: img.zone_id ?? '',
       has_gps: img.has_gps,
       latitude: img.latitude,

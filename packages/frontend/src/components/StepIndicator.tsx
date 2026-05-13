@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { HStack, Box, Text } from '@chakra-ui/react';
-import { Check } from 'lucide-react';
+import { HStack, Box, Text, Tooltip } from '@chakra-ui/react';
+import { Check, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { StageStatus } from '../utils/pipelineStatus';
 import useAppStore from '../store/useAppStore';
@@ -51,9 +51,26 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
         const status = stageStatuses[idx];
         const isDone = status?.done ?? false;
         const isReady = status?.ready ?? false;
+        // Layer 2 — stale: this step had output that got wiped by upstream
+        // edits. Renders as an amber `!` instead of a gray number to tell
+        // the user "you finished this once, please re-run." Suppressed when
+        // the step is currently active (the active pulse takes precedence)
+        // or when it's already done (nothing stale about completed work).
+        const isStale = (status?.stale ?? false) && !isDone;
         const isActive = s.step === currentStep;
         const isLocked = !isDone && !isReady && !isActive;
         const connector = idx < STEPS.length - 1;
+
+        // Tooltip copy explaining why a stale step needs attention. Step 3
+        // and Step 4 are the only ones that surface this state in
+        // pipelineStatus.ts; copy is tailored to each.
+        const staleHint = !isStale
+          ? null
+          : s.step === 3
+            ? 'Out of date — new images need processing or recommendations were cleared. Re-run Prepare.'
+            : s.step === 4
+              ? 'Out of date — analysis was cleared after an upstream change. Re-run Pipeline.'
+              : 'Out of date — re-run this step to refresh.';
 
         // Build link path
         let linkTo: string;
@@ -65,45 +82,78 @@ function StepIndicator({ currentStep, projectId, stageStatuses }: StepIndicatorP
           linkTo = `/projects/${projectId}`;
         }
 
+        // Visual decision tree for the circle:
+        //   active → blue pulsing
+        //   done   → green check
+        //   stale  → amber `!`  (NEW in Layer 2)
+        //   else   → gray step number
+        const circleBg = isActive
+          ? 'blue.500'
+          : isDone
+            ? 'brand.500'
+            : isStale
+              ? 'orange.400'
+              : 'gray.200';
+        const circleFg = isActive || isDone || isStale ? 'white' : 'gray.500';
+        const labelColor = isDone
+          ? 'brand.600'
+          : isActive
+            ? 'blue.600'
+            : isStale
+              ? 'orange.600'
+              : 'gray.500';
+
+        const circleContent = isActive ? (
+          <MotionBox
+            w={7}
+            h={7}
+            borderRadius="full"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            fontSize="xs"
+            fontWeight="bold"
+            bg={circleBg}
+            color={circleFg}
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            {s.step}
+          </MotionBox>
+        ) : (
+          <Box
+            w={7}
+            h={7}
+            borderRadius="full"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            fontSize="xs"
+            fontWeight="bold"
+            bg={circleBg}
+            color={circleFg}
+          >
+            {isDone
+              ? <Check size={12} />
+              : isStale
+                ? <AlertCircle size={14} />
+                : s.step}
+          </Box>
+        );
+
         const inner = (
           <>
-            {isActive ? (
-              <MotionBox
-                w={7}
-                h={7}
-                borderRadius="full"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                fontSize="xs"
-                fontWeight="bold"
-                bg="blue.500"
-                color="white"
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              >
-                {s.step}
-              </MotionBox>
+            {staleHint ? (
+              <Tooltip label={staleHint} placement="top" hasArrow openDelay={200}>
+                {circleContent}
+              </Tooltip>
             ) : (
-              <Box
-                w={7}
-                h={7}
-                borderRadius="full"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                fontSize="xs"
-                fontWeight="bold"
-                bg={isDone ? 'brand.500' : 'gray.200'}
-                color={isDone ? 'white' : 'gray.500'}
-              >
-                {isDone ? <Check size={12} /> : s.step}
-              </Box>
+              circleContent
             )}
             <Text
               fontSize="xs"
-              fontWeight={isActive ? 'bold' : 'normal'}
-              color={isDone ? 'brand.600' : isActive ? 'blue.600' : 'gray.500'}
+              fontWeight={isActive || isStale ? 'bold' : 'normal'}
+              color={labelColor}
               whiteSpace="nowrap"
             >
               {s.label}

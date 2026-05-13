@@ -188,6 +188,15 @@ export function useRunClusteringByProject() {
   });
 }
 
+/** Within-zone HDBSCAN: cluster each zone's images independently, return a
+ *  composite ZoneAnalysisResult treating sub-clusters as virtual sub-zones. */
+export function useRunClusteringWithinZones() {
+  return useMutation({
+    mutationFn: (data: ClusteringByProjectRequest) =>
+      api.analysis.runClusteringWithinZones(data).then(r => r.data),
+  });
+}
+
 export function useExportMerged() {
   return useMutation({
     mutationFn: (data: MergedExportRequest) =>

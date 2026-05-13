@@ -95,6 +95,24 @@ _CHART_TEMPLATE_HINTS: dict[str, str] = {
         "\nCall out the most-deviating cells (|z| ≥ 1) by unit + indicator.",
     "zone-deviation-overview":
         "\nRank by mean |z|; explain what makes the top unit distinctive.",
+    "silhouette-curve":
+        "\nIMPORTANT LOGIC for this chart:\n"
+        "(1) If ANY K→silhouette data points are visible (e.g. K=2→0.45), "
+        "that PROVES HDBSCAN + GMM both failed and KMeans fallback ran. Do "
+        "NOT claim 'chart is empty' or 'HDBSCAN succeeded'.\n"
+        "(2) The selected K is NOT necessarily the silhouette peak — it's a "
+        "multi-criterion vote (silhouette + Davies-Bouldin + Calinski-"
+        "Harabasz). Check the `is_selected` flag in payload. If silhouette "
+        "peaks at K=2 but `is_selected=true` at K=4, explain that Davies-"
+        "Bouldin and Calinski-Harabasz disagreed with silhouette and "
+        "selected K=4 to avoid silhouette's known bias toward small K.\n"
+        "(3) Interpret silhouette honestly: ≥0.5 strong, 0.25-0.5 weak/"
+        "overlapping, ≤0.25 no real structure. If ALL K give silhouette "
+        "≤0.25, the honest finding is 'this dataset does not have rich "
+        "cluster structure beyond K=2' — do not pretend otherwise.\n"
+        "(4) Design implication should be conservative: with weak silhouette "
+        "the planner should treat archetypes as descriptive bins, not as "
+        "fundamentally distinct landscape types.",
 }
 
 
