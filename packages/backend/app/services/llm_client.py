@@ -464,4 +464,15 @@ class AnthropicLLM(LLMClient):
 # ---------------------------------------------------------------------------
 
 def create_llm_client(
-    provid
+    provider: str, api_key: str, model: str, **kwargs
+) -> LLMClient:
+    """Create an LLM client for the given provider."""
+    if provider == "gemini":
+        return GeminiLLM(api_key, model)
+    if provider == "openai":
+        return OpenAILLM(api_key, model)
+    if provider == "anthropic":
+        return AnthropicLLM(api_key, model)
+    if provider == "deepseek":
+        return OpenAILLM(api_key, model, base_url="https://api.deepseek.com")
+    raise ValueError(f"Unknown LLM provider: {provider}")
