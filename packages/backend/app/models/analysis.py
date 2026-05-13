@@ -191,6 +191,18 @@ class ClusteringResult(BaseModel):
     labels_smoothed: list[int] = Field(default_factory=list)  # labels after KNN smoothing
     # Ward hierarchical clustering linkage matrix (for dendrogram). Rows: [id1, id2, dist, count].
     dendrogram_linkage: list[list[float]] = Field(default_factory=list)
+    # ── HDBSCAN-specific fields (v6.1) ──
+    # Per-cluster persistence (HDBSCAN stability under density variation).
+    # Higher = more robust cluster. Map: cluster_id (str) → score.
+    cluster_persistence: dict[str, float] = Field(default_factory=dict)
+    # Per-point silhouette coefficient (against final labels, noise → None).
+    silhouette_per_point: list[Optional[float]] = Field(default_factory=list)
+    # Number of points HDBSCAN labelled as noise (-1) before reassignment.
+    noise_count: int = 0
+    noise_point_ids: list[str] = Field(default_factory=list)
+    # HDBSCAN condensed-tree edges for D3 visualization.
+    # Each edge: {parent: int, child: int, lambda_val: float, child_size: int}.
+    condensed_tree: list[dict] = Field(default_factory=list)
 
 
 class ZoneAnalysisResult(BaseModel):
@@ -317,6 +329,21 @@ class DesignStrategyRequest(BaseModel):
     # When set, the resulting strategies are persisted onto the project so
     # they survive page reloads and project switches.
     project_id: Optional[str] = None
+    # v4 / Module 14 — the grouping mode this request is being generated
+    # against. Persisted into ``project.design_strategy_results[mode]`` so
+    # the Strategies tab on the Reports page can swap between zones-derived
+    # and clusters-derived strategies in Option C, parallel to the
+    # per-view AI report behaviour.
+    grouping_mode: GroupingMode = "zones"
+    # v4 / Phase C — multi-view extension. When provided, this is the
+    # full view id the request belongs to (e.g., "parent_zones",
+    # "within_zone:zone_3"). The backend uses view_id (when set) as the
+    # slot key in project.design_strategy_results; otherwise it falls
+    # back to grouping_mode for backward compat with old clients. The
+    # Stage 3 prompt itself still uses grouping_mode (which the frontend
+    # collapses cluster-derived viewIds back to 'clusters' for) so the
+    # LLM keeps its existing single-zone vs multi-zone branching logic.
+    view_id: Optional[str] = None
 
 
 class DesignStrategyResult(BaseModel):
@@ -343,6 +370,10 @@ class ReportRequest(BaseModel):
     # into ai_report_meta so hydrateFromProject can drop a stale report
     # whose mode no longer matches the user's active view.
     grouping_mode: GroupingMode = "zones"
+    # v4 / Phase C — full view id for multi-view persistence. Same role
+    # as DesignStrategyRequest.view_id above: takes precedence over
+    # grouping_mode for the slot key, falls back when absent.
+    view_id: Optional[str] = None
 
 
 class ReportResult(BaseModel):

@@ -18,7 +18,7 @@ import json
 import logging
 import re
 from collections import Counter, defaultdict
-from typing import Any, Optional
+from typing import Any, Awaitable, Callable, Optional
 
 import numpy as np
 
@@ -142,8 +142,29 @@ class DesignEngine:
     # ------------------------------------------------------------------
 
     async def generate_design_strategies(
-        self, request: DesignStrategyRequest
+        self,
+        request: DesignStrategyRequest,
+        on_progress: Optional[Callable[[dict], Awaitable[None]]] = None,
     ) -> DesignStrategyResult:
+        """Generate design strategies for every zone/cluster in the analysis.
+
+        Parameters
+        ----------
+        request: DesignStrategyRequest
+            The strategy generation request.
+        on_progress: optional async callback
+            If provided, awaited once per sub-step inside the per-unit loop with
+            a dict shaped like:
+              {
+                "stage": "diagnosis" | "strategies" | "unit_done",
+                "unit_index": int,        # 0-based
+                "unit_total": int,        # total number of zones/clusters
+                "unit_id": str,           # zone_id (or segment_id for clusters)
+                "unit_label": str,        # human-readable name
+              }
+            Errors raised from the callback are swallowed so progress reporting
+            can never break strategy generation itself.
+        """
         zone_analysis = request.zone_analysis
         allowed = set(request.allowed_indicator_ids) if request.allowed_indicator_ids else None
         use_llm = request.use_llm and self.llm.check_connection()
@@ -157,9 +178,27 @@ class DesignEngine:
         project_indicators = self._build_project_indicators(zone_analysis, diagnostics)
 
         zones_output: dict[str, ZoneDesignOutput] = {}
+        unit_total = len(diagnostics)
 
-        for diag in diagnostics:
+        async def _emit(stage: str, idx: int, diag_obj) -> None:
+            """Best-effort progress emit. Never raises."""
+            if on_progress is None:
+                return
+            try:
+                await on_progress({
+                    "stage": stage,
+                    "unit_index": idx,
+                    "unit_total": unit_total,
+                    "unit_id": diag_obj.zone_id,
+                    "unit_label": diag_obj.zone_name or diag_obj.zone_id,
+                })
+            except Exception:  # pragma: no cover  – progress must not break LLM flow
+                logger.debug("on_progress callback raised; swallowing", exc_info=True)
+
+        for unit_index, diag in enumerate(diagnostics):
             zone_id = diag.zone_id
+
+            await _emit("diagnosis", unit_index, diag)
 
             # Sub-step 1: Diagnosis → IOM queries (Agent A determines direction)
             diagnosis_data = {}
@@ -180,6 +219,8 @@ class DesignEngine:
             matched_ioms = self._match_ioms(
                 iom_queries, request.max_ioms_per_query, request.project_context
             )
+
+            await _emit("strategies", unit_index, diag)
 
             # Sub-step 3: Strategy Generation (#3 — enforced 3-5 range with
             # one retry then rule-based padding).
@@ -277,6 +318,8 @@ class DesignEngine:
                 implementation_sequence=design_out.get("implementation_sequence", ""),
                 synergies=design_out.get("synergies", ""),
             )
+
+            await _emit("unit_done", unit_index, diag)
 
         return DesignStrategyResult(
             zones=zones_output,
@@ -903,6 +946,7 @@ Each match contains:
 | C5 | Note transferability caveats for strategies based on low-transferability IOMs |
 | C6 | Use the 4-axis signature system to specify spatial interventions precisely |
 | C7 | Output valid JSON only |
+| C8 | strategy_name verb MUST match the IOM's direction. Use "Increase <indicator>" when direction=increase, "Reduce <indicator>" when direction=decrease, "Adjust <indicator>" otherwise. Never use "Improve" — it's ambiguous (an over-canopied site improving by reducing tree view factor would otherwise read "Improve TVF" while the body says "reduce"). |
 
 ## Reasoning Steps
 1. Group matched IOMs by indicator and spatial layer
@@ -987,9 +1031,27 @@ Generate {min_strategies}-{min(max_strategies, 5)} concrete design strategies (m
             primary_sig = sigs[0] if sigs else {}
             pathway = _safe_get(iom, ["operation", "pathway_expanded"], {})
 
+            # v4 polish — direction-aware strategy_name. The previous
+            # hard-coded "Improve <indicator>" was always wrong for IOMs
+            # that decrease the indicator (e.g. Modify × Vegetation × FG ×
+            # Size to REDUCE Tree View Factor when over-canopied), where
+            # the body said "reduce" but the title said "Improve". Now we
+            # pick the verb from iom.direction:
+            #   increase → "Increase"
+            #   decrease → "Reduce"
+            #   maintain → already filtered out further up
+            #   anything else → "Adjust" (safe default for ambiguous IOMs)
+            iom_direction = (iom.get("direction") or "").lower()
+            if iom_direction == "increase":
+                verb = "Increase"
+            elif iom_direction == "decrease":
+                verb = "Reduce"
+            else:
+                verb = "Adjust"
+            indicator_label = iom.get("indicator_name", ind_id)
             strategies.append({
                 "priority": len(strategies) + 1,
-                "strategy_name": f"Improve {iom.get('indicator_name', ind_id)}",
+                "strategy_name": f"{verb} {indicator_label}",
                 "target_indicators": [ind_id],
                 "spatial_location": _safe_get(primary_sig, ["spatial_layer", "name"], "General"),
                 "intervention": {

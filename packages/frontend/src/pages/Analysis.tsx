@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../hooks/useApi';
 import {
   Box,
   Heading,
@@ -53,7 +55,23 @@ function Analysis() {
     zoneAnalysisResult,
     pipelineRun,
     startPipeline,
+    setSingleZoneStrategy,
+    setMultiZoneStrategy,
   } = useAppStore();
+
+  // Re-pickable entry gate — every navigation from Analysis to Reports
+  // resets the per-session path picks (singleZoneStrategy / multiZoneStrategy)
+  // back to null. This forces the multi-zone or single-zone entry-card
+  // picker to re-fire on the Reports page even if the user previously chose
+  // a path in this session, so they can switch from Zone-only to
+  // Within-zone clustering (or vice versa) just by going back and forward
+  // again. Without the reset, the picker only fires once per project mount
+  // — fine for a fresh load, frustrating when iterating.
+  const goToReports = useCallback(() => {
+    setSingleZoneStrategy(null);
+    setMultiZoneStrategy(null);
+    navigate(`/projects/${routeProjectId}/reports`);
+  }, [setSingleZoneStrategy, setMultiZoneStrategy, navigate, routeProjectId]);
 
   // Config state
   const [useLlm, setUseLlm] = useState(true);
@@ -100,6 +118,7 @@ function Analysis() {
     return { totalImages, assignedImages, analyzedImages, zones };
   }, [selectedProject]);
 
+  const queryClient = useQueryClient();
   const handleRunPipeline = useCallback(async () => {
     if (!selectedProjectId || selectedIndicatorIds.length === 0) return;
     const projectName = selectedProject?.project_name || routeProjectId || 'Unknown';
@@ -108,10 +127,25 @@ function Analysis() {
       projectName,
       indicatorIds: selectedIndicatorIds,
       useLlm,
-      onComplete: () => toast({ title: 'Pipeline complete', status: 'success', duration: 3000 }),
+      onComplete: () => {
+        toast({ title: 'Pipeline complete', status: 'success', duration: 3000 });
+        // CRITICAL — refetch the project from /api/projects/{id} so the
+        // frontend's zoneAnalysisResult includes the FULL image_records
+        // payload that the backend just persisted. The SSE result event
+        // intentionally strips image_records to keep its frame small
+        // (large projects can blow past proxy limits), so the in-memory
+        // store after the pipeline ends has zone_analysis.image_records=[].
+        // Without this refetch, navigating to Reports would hit the
+        // imageRecords-empty fallback (rebuildImageRecords) and the
+        // C1/C3/C4 charts would silently disappear because their
+        // isAvailable check requires imageRecords.length > 0.
+        if (selectedProjectId) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.project(selectedProjectId) });
+        }
+      },
       onError: (msg) => toast({ title: msg, status: 'error' }),
     });
-  }, [selectedProjectId, selectedIndicatorIds, useLlm, selectedProject, routeProjectId, startPipeline, toast]);
+  }, [selectedProjectId, selectedIndicatorIds, useLlm, selectedProject, routeProjectId, startPipeline, toast, queryClient]);
 
   // Pipeline ran successfully — user can proceed to Reports even if zone_analysis
   // is empty (e.g. n_zones=1 with nothing to compare). Reports page handles nulls.
@@ -312,15 +346,23 @@ function Analysis() {
             </SimpleGrid>
 
             <Wrap spacing={2} mb={4}>
-              {pipelineResult.steps.map((step: ProjectPipelineProgress, idx: number) => (
-                <WrapItem key={idx}>
-                  <Tooltip label={step.detail}>
-                    <Badge colorScheme={STEP_STATUS_COLORS[step.status] || 'gray'} variant="subtle" px={2} py={1}>
-                      {step.step}: {step.status}
-                    </Badge>
-                  </Tooltip>
-                </WrapItem>
-              ))}
+              {pipelineResult.steps
+                // v4 — hide design_strategies pipeline-stage badge here.
+                // For single-zone projects this stage is intentionally skipped
+                // (strategies are auto-fired on the Reports page after the
+                // user picks Single/Dual View at the entry gate). Showing
+                // "DESIGN_STRATEGIES: SKIPPED" up here just confused users
+                // into thinking something failed.
+                .filter((step: ProjectPipelineProgress) => step.step !== 'design_strategies')
+                .map((step: ProjectPipelineProgress, idx: number) => (
+                  <WrapItem key={idx}>
+                    <Tooltip label={step.detail}>
+                      <Badge colorScheme={STEP_STATUS_COLORS[step.status] || 'gray'} variant="subtle" px={2} py={1}>
+                        {step.step}: {step.status}
+                      </Badge>
+                    </Tooltip>
+                  </WrapItem>
+                ))}
             </Wrap>
 
             {hasResults && (
@@ -328,7 +370,7 @@ function Analysis() {
                 colorScheme="blue"
                 size="lg"
                 rightIcon={<ArrowRight size={18} />}
-                onClick={() => navigate(`/projects/${routeProjectId}/reports`)}
+                onClick={goToReports}
                 w="full"
                 mb={4}
               >
@@ -402,10 +444,9 @@ function Analysis() {
             Back: Prepare
           </Button>
           <Button
-            as={Link}
-            to={`/projects/${routeProjectId}/reports`}
             colorScheme="blue"
             isDisabled={!hasResults}
+            onClick={goToReports}
           >
             Next: Results & Report
           </Button>

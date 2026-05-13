@@ -228,6 +228,26 @@ function ProjectDetail() {
     }
   };
 
+  // Auto-commit pending batch assignment before navigating to Prepare.
+  // Prevents the "I selected images + zone but clicked Next without
+  // hitting Assign" UX trap: previously the navigation happened
+  // immediately and the pending selection was silently discarded, so the
+  // user landed on Prepare with the old (un-updated) zone counts and
+  // assumed the assignment had failed. We treat "selection + target
+  // zone" as intent to assign — commit it, then navigate. If there's no
+  // pending selection, navigate straight away.
+  const goToPrepare = async () => {
+    if (!projectId) return;
+    const hasPendingAssignment = !!targetZoneId && selectedImageIds.size > 0;
+    if (hasPendingAssignment) {
+      // Reuse the proven assignment helper rather than duplicate the
+      // try/catch + invalidation logic. handleBatchAssign clears the
+      // selection on success and toasts on both outcomes.
+      await handleBatchAssign();
+    }
+    navigate(`/projects/${projectId}/vision`);
+  };
+
   const handleReparseGps = async () => {
     if (!projectId) return;
     setReparsingGps(true);
@@ -806,10 +826,10 @@ function ProjectDetail() {
           Back: Project
         </Button>
         <Button
-          as={Link}
-          to={`/projects/${projectId}/vision`}
           colorScheme="blue"
           isDisabled={!isReady}
+          isLoading={batchAssigning}
+          onClick={goToPrepare}
         >
           Next: Prepare
         </Button>
@@ -817,6 +837,12 @@ function ProjectDetail() {
       {!isReady && hasZones && (
         <Text fontSize="xs" color="gray.400" textAlign="right" mt={1}>
           Upload images and assign to zones to continue
+        </Text>
+      )}
+      {!!targetZoneId && selectedImageIds.size > 0 && (
+        <Text fontSize="xs" color="blue.500" textAlign="right" mt={1}>
+          {selectedImageIds.size} pending assignment{selectedImageIds.size === 1 ? '' : 's'}
+          {' '}— will be saved when you click Next.
         </Text>
       )}
     </PageShell>

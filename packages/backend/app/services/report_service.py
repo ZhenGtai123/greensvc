@@ -22,7 +22,7 @@ from app.models.analysis import (
     ProjectContext,
 )
 from app.services.knowledge_base import KnowledgeBase
-from app.services.llm_client import LLMClient
+from app.services.llm_client import LLMClient, suggest_model_upgrade
 
 logger = logging.getLogger(__name__)
 
@@ -107,22 +107,95 @@ the four questions below in this section:
 End with a cross-indicator synthesis paragraph.
 
 ### 3. Spatial Diagnosis and Archetype Analysis
-3.1 Project-level overview (N points, clustering method, silhouette)
-3.2 Per-archetype profiles (indicator table, SVC pattern, key deviations)
-3.3 Cross-archetype comparison
+v4 / Module 10 — Section 3 is the data narrative hub. Each subsection MUST
+open with a chart name + refCode reference (visible to the user on the
+Reports page). Available refCodes:
+  A1 Indicator Registry · A2 Data Quality
+  B1 Zone Ranking · B2 Zone × Indicator · B3 Zone Profile Radar · B4 Zone Deviation Map
+  C1 Indicator Distribution · C2 Per-Indicator Drill-Down · C3 Within-Zone Image Distribution · C4 Indicator Value Map
+  D1 Global Stats · D2 Zone × Indicator Mean Matrix · D3 Indicator Correlation
+  E1 Cluster Centroid Heatmap · E2 Per-Point Silhouette Plot · E3 HDBSCAN Condensed Tree · E4 Cluster Spatial Map
+(E-codes are only available when clustering has been run; cite them only
+in cluster-derived reports.)
+You MAY NOT invent refCodes outside this list. Each claim MUST be traceable
+to one or more of these charts.
+
+3.1 Project-Level Overview — open with refs to A1, A2 and C1
+3.2 Cross-Archetype Findings — open with refs to B1, B2, B3, B4
+3.3 Per-Archetype Profiles — open with refs to C2, C3, C4
+3.4 Indicator Relationships — open with refs to D1, D2, D3
+(Single-zone fallback, see end of prompt: collapse 3.2 into Indicator
+Distribution and Layer Profile (refs C1, C2, C3); collapse 3.3+3.4 into
+Indicator Relationships (refs D1, D3).)
 
 ### 4. Design Strategies
-Per spatial unit, ordered by priority:
-4.X.1 Integrated diagnosis (from Agent A)
-4.X.2 Strategy table (3-5 strategies each with: target indicators, 4-axis
-      signature, causal pathway, evidence basis, expected effects, trade-offs,
-      implementation guidance, supporting IOMs)
-4.X.3 Intra-unit synergies
+Per spatial unit, ordered by priority. Section title varies by mode:
+- Multi-zone, no clustering           → "4. Design Strategies — Per Zone"
+- Multi-zone, within-zone clustering  → "4. Design Strategies — Per Sub-Zone"
+- Single-zone, no clustering          → "4. Design Strategies — Single Spatial Unit"
+- Single-zone, archetype clustering   → "4. Design Strategies — Per Archetype"
+
+**CRITICAL — strategy provenance rule (applies to ALL modes above):**
+The strategies you describe in Section 4 MUST be drawn directly from the
+`stage3_data` payload below — you are NARRATING and INTEGRATING the
+structured strategies that the upstream DesignEngine + IOM matching engine
+already produced. Do NOT invent new strategies, do NOT change priority
+ordering, do NOT replace the target_indicators or signature axes that
+stage3_data attaches to each strategy. If stage3_data is empty for a unit,
+state that explicitly instead of fabricating content.
+
+**EXHAUSTIVE ENUMERATION — NO SHORTCUTS (CRITICAL):**
+You MUST emit one full 4.X subsection per unit in `stage3_data` and one
+full strategy entry per strategy inside each unit's `design_strategies`
+list. Total subsection count = number of units in stage3_data. Total
+strategy entries across Section 4 = sum of `len(unit.design_strategies)`
+for every unit.
+
+The following shortcuts are FORBIDDEN and will fail review:
+  - "Segments X, Y, Z follow an identical diagnostic chain — see above"
+  - "The remaining clusters share the same pattern as Cluster N"
+  - "(Strategy profiles for Segments A, B, C are omitted for brevity)"
+  - Any phrasing that bundles multiple units' strategies into one block,
+    or any phrasing that states some units' strategies "follow" or
+    "mirror" another unit without writing them out.
+Even when two clusters share similar diagnoses, you MUST emit each one's
+own 4.X.1 / 4.X.2 / 4.X.3 block in full. If the diagnoses are genuinely
+near-identical, a one-sentence cross-reference is OK ("Diagnosis closely
+parallels Cluster 3 — see 4.3 for the underlying mechanism") but the
+4.X.2 strategy entries (target_indicators, signature, pathway, expected
+effects, supporting IOMs, implementation guidance, "Diagnosed by:") must
+still be written out for THIS cluster, with THIS cluster's actual values.
+
+**Report length expectation:** Section 4 grows linearly with the unit
+count. For a project with K=8 clusters and 3 strategies each, expect 24
+strategy entries (3 per cluster × 8 clusters). For K=4 clusters, expect
+12. Do not compress.
+
+For each unit, include in the report:
+4.X.1 Integrated diagnosis (from the unit's `diagnosis` field; expand into
+      a paragraph that anchors to the actual chart numbers, not to invented
+      observations).
+4.X.2 Strategy entry. For every strategy in `stage3_data[unit].design_strategies`,
+      surface its: target_indicators, 4-axis signature, pathway,
+      expected_effects, transferability_note, supporting_ioms,
+      implementation_guidance.
+      v4 / Module 10.3.3 — every strategy MUST include a line:
+      "Diagnosed by: <2-4 chart refCodes>" e.g. "Diagnosed by: B2, C2, C3"
+      (or "C1, C3, D1" in single-zone mode, or "E1, E2, C2" in cluster
+      mode). The refCodes must come from Section 3's reference list and
+      MUST cite charts that were actually rendered for this project's mode
+      (no B-codes in single-zone, no E-codes when clustering wasn't run).
+4.X.3 Intra-unit synergies (from how the strategies in this unit interact
+      — derive from the strategies' target_indicators and pathways; do not
+      invent unrelated synergies).
 
 ### 5. Implementation Roadmap
 5.1 Phasing (minimum 3 phases with timeframes)
 5.2 Cross-unit coordination
-5.3 Monitoring framework (indicator, target delta-z, interval, success criterion)
+5.3 Monitoring framework. Each row: indicator, target delta-z, interval,
+    success criterion, AND v4 / Module 10.3.3 — "Reference chart:"
+    listing the chart refCode(s) the user should monitor over time
+    (typically C2, C3, or C4).
 
 ### 6. Evidence Quality Assessment and Limitations
 The Stage 2 payload now exposes a `data_quality_flags` object that you MUST
@@ -162,6 +235,40 @@ flag below with one or two concrete sentences.
 ### Encoding Dictionary Reference
 {encoding_ref}
 
+## Single-Zone Fallback (v4 / Module 11)
+
+If `data_quality_flags.is_single_zone` is True, adapt the report:
+
+### Section 3 (Spatial Diagnosis) — replace Per-Archetype Profiles with:
+3.1 Project-Level Overview (n images, indicators measured, layer coverage)
+3.2 Indicator Distribution and Layer Profile — describe each indicator's
+    distribution across Full / Foreground / Middleground / Background using
+    the `image_distribution_summary` block in the Stage 2 payload (N, mean,
+    std, CV, min, Q1, median, Q3, max). DO NOT discuss archetypes,
+    silhouette, or cross-archetype comparison — there are none.
+3.3 Indicator Relationships — discuss `significant_correlations` only.
+
+### Section 4 — title becomes "Design Strategies — Single Spatial Unit"
+Render the single zone group as one block. STRATEGIES STILL COME FROM
+`stage3_data` (the upstream DesignEngine output) — DO NOT invent
+strategies from the design brief, and DO NOT replace the structured
+output with free-form recommendations. The only adjustment vs.
+multi-archetype mode is the section title and that there's a single
+group instead of N. If `stage3_data` is empty, state this explicitly
+rather than fabricating strategies. "Diagnosed by:" refCodes for this
+mode must be drawn from {{C1, C2, C3, C4, D1, D3}} (no B-codes since no
+cross-zone comparison; no E-codes since no clustering).
+
+### Section 6.3 — REQUIRED single-zone disclaimer:
+"This is a single-zone analysis (n_zones=1). Cross-zone z-score
+standardization is mathematically undefined with one observation; the
+diagnosis is therefore based on image-level descriptive statistics within
+this zone. To enable cross-zone variance analysis, either define a second
+spatial zone in the project setup or run KMeans archetype clustering
+(Reports → Dual View)."
+
+### Avoid mentioning archetypes / clustering / silhouette in single-zone mode.
+
 ## Final Instructions
 1. Write the complete report following the structure above precisely.
 2. Use markdown formatting: ## for main sections, ### for subsections.
@@ -169,6 +276,39 @@ flag below with one or two concrete sentences.
 4. Maintain a formal, analytical tone throughout.
 5. When data is missing, state this explicitly rather than inventing content.
 6. The report should be self-contained.
+7. Honour the Single-Zone Fallback above when `is_single_zone` is True.
+8. **Strategy provenance (CRITICAL)** — Section 4 strategies are NEVER
+   invented. Every strategy you describe MUST originate from a record in
+   `stage3_data[unit].design_strategies`. This rule applies in ALL FOUR
+   modes: (a) single-zone no-clustering, (b) multi-zone no-clustering,
+   (c) single-zone + archetype clustering, (d) multi-zone + within-zone
+   clustering. If `stage3_data` is empty (e.g. DesignEngine produced no
+   IOM matches), say so explicitly — do not paper over with fabricated
+   strategies. The Strategies tab on the Reports page renders the same
+   `stage3_data`; the AI report is the narrative version, not an
+   independent source.
+9. **Chart-grounding (CRITICAL)** — Every "Diagnosed by:" line in
+   Section 4, and every monitoring entry in Section 5.3, MUST cite chart
+   refCodes that are actually rendered in the user's current view:
+     • single-zone, no clustering   → only A1, A2, C1, C3, C4, D1
+     • multi-zone, no clustering    → A1–A2, B1–B4, C1–C4, D1–D3
+     • single-zone + clustering     → A1–A2, B1–B4 (cluster-derived),
+                                       C1–C4, D1–D3, E1–E4
+     • multi-zone + within-zone     → A1–A2, B1–B4 (sub-zone-derived),
+                                       C1–C4, D1–D3, E1–E4
+   Do not cite refCodes the user can't see. Cluster-only charts (E1–E4)
+   may only be cited when `data_quality_flags.zone_source == 'cluster'`.
+10. **Enumerate every cluster — no shortcuts (CRITICAL)** — The user-facing
+   Strategies tab on the Reports page renders one accordion entry per
+   unit in `stage3_data`, with N strategies inside each. The AI report's
+   Section 4 is the prose mirror of that tab and MUST contain the same
+   number of strategy entries. If `stage3_data` has 8 units with 3
+   strategies each, Section 4 contains 24 strategy entries, organized
+   into 8 subsections (4.1, 4.2, … 4.8). Do not collapse, summarize, or
+   "follow same as above" any unit. The user comparing the report against
+   the Strategies tab will catch any missing units immediately. Length
+   budget: target ~120–200 words per strategy entry; do not skip entries
+   to stay under a self-imposed length cap.
 """
 
 
@@ -227,6 +367,45 @@ class ReportService:
         report_text = await self.llm.generate(prompt)
         elapsed = time.time() - t0
 
+        # v4 / Module 13 — capture truncation flag from the LLM client. This
+        # is set as a side-effect of the generate() call (see LLMClient
+        # docstring). When the response was truncated by the output-token
+        # cap, we surface it in the metadata so the frontend can render an
+        # "incomplete report" warning + an upgrade suggestion.
+        truncated = bool(getattr(self.llm, "last_truncated", False))
+        finish_reason = getattr(self.llm, "last_finish_reason", None)
+        output_tokens = getattr(self.llm, "last_output_tokens", None)
+        current_model = getattr(self.llm, "model", "") or ""
+        if truncated:
+            recommended_model, rationale = suggest_model_upgrade(current_model)
+            truncation_warning = {
+                "truncated": True,
+                "finish_reason": finish_reason,
+                "output_tokens": output_tokens,
+                "current_model": current_model,
+                "recommended_model": recommended_model,
+                "rationale": rationale,
+                "user_message": (
+                    f"The AI report was cut off because it hit the output-token "
+                    f"cap of the current model ({current_model}). The trailing "
+                    f"sections (typically later clusters in Section 4) are "
+                    f"missing or incomplete. "
+                    + (
+                        f"Switch to {recommended_model} — {rationale} Then "
+                        f"regenerate the report."
+                        if recommended_model
+                        else rationale
+                    )
+                ),
+            }
+            logger.warning(
+                "Agent C: report truncated by output-token cap (model=%s, "
+                "finish_reason=%s, output_tokens=%s)",
+                current_model, finish_reason, output_tokens,
+            )
+        else:
+            truncation_warning = None
+
         # Quality metrics
         coded_refs = re.findall(r'\([A-Z]{2,5}_[A-Za-z0-9_]+\)', report_text)
         sections = re.findall(r'^#{1,3} ', report_text, re.MULTILINE)
@@ -235,7 +414,7 @@ class ReportService:
         metadata = {
             "version": "6.0",
             "generated_at": datetime.now().isoformat(),
-            "model": "current",
+            "model": current_model or "current",
             "elapsed_seconds": round(elapsed, 1),
             "word_count": len(report_text.split()),
             "char_count": len(report_text),
@@ -249,6 +428,10 @@ class ReportService:
                 "add a second zone or run sub-zone clustering for richer diagnostics."
                 if is_image_level and all_zero_deviation else None
             ),
+            # v4 / Module 13 — present only when truncation was actually
+            # detected. Frontend reads this and renders an orange Alert card
+            # with the recommended model.
+            "truncation_warning": truncation_warning,
             "sections_present": {
                 "executive_summary": "Executive Summary" in report_text or "## 1" in report_text,
                 "indicator_selection": "Indicator Selection" in report_text or "## 2" in report_text,
@@ -394,12 +577,27 @@ class ReportService:
                 ],
             }
 
-        # Layer statistics (compact)
+        # Layer statistics (compact). Both Mean and Std can legitimately be
+        # None (e.g. single-zone projects where some indicators have zero
+        # variance and the analyser can't compute Std). dict.get() falls back
+        # to 0 only when the key is missing, NOT when it's explicitly None,
+        # so we have to coerce here or round() blows up with TypeError.
+        def _round_or_zero(v: object, digits: int = 4) -> float:
+            if v is None or isinstance(v, bool):
+                return 0.0
+            try:
+                return round(float(v), digits)
+            except (TypeError, ValueError):
+                return 0.0
+
         if zone_analysis.layer_statistics:
             ls_compact = {}
             for ind_id, stats in zone_analysis.layer_statistics.items():
                 ls_compact[ind_id] = {
-                    layer: {"Mean": round(s.get("Mean", 0), 4), "Std": round(s.get("Std", 0), 4)}
+                    layer: {
+                        "Mean": _round_or_zero(s.get("Mean"), 4),
+                        "Std": _round_or_zero(s.get("Std"), 4),
+                    }
                     for layer, s in stats.items()
                     if isinstance(s, dict) and "Mean" in s
                 }
@@ -428,6 +626,18 @@ class ReportService:
             zone_analysis, recommendations
         )
 
+        # v4 / Module 11.2.2 — single-zone enrichment.
+        # When the project has only one grouping unit, attach an image-level
+        # descriptive-statistics block per indicator × layer so Agent C has
+        # something to write Section 3.2 against (cross-zone z-scores are
+        # mathematically undefined and would give the LLM nothing to discuss).
+        flags = summary["data_quality_flags"]
+        if flags.get("is_single_zone"):
+            summary["image_distribution_summary"] = self._compute_image_distribution_summary(
+                zone_analysis,
+            )
+            summary["analysis_basis"] = "image-level descriptive (single-zone fallback)"
+
         # Significant correlations
         sig_pairs = []
         corr = zone_analysis.correlation_by_layer or {}
@@ -449,6 +659,59 @@ class ReportService:
             summary["significant_correlations"] = sorted(sig_pairs, key=lambda x: -abs(x["r"]))
 
         return json.dumps(summary, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    def _compute_image_distribution_summary(
+        zone_analysis: ZoneAnalysisResult,
+    ) -> dict:
+        """v4 / Module 11.2.2 — per-indicator × per-layer image-level
+        five-number summary (N, mean, std, CV, min, Q1, median, Q3, max).
+        Used as fallback diagnostic material when n_zones <= 1 (single-zone
+        projects), where cross-zone z-scores are undefined."""
+        summary: dict = {}
+        records = getattr(zone_analysis, "image_records", None) or []
+        if not records:
+            return summary
+        # Group by (indicator_id, layer)
+        from collections import defaultdict
+        buckets: dict = defaultdict(list)
+        for r in records:
+            ind = getattr(r, "indicator_id", None)
+            layer = getattr(r, "layer", None)
+            value = getattr(r, "value", None)
+            if ind is None or layer is None or value is None:
+                continue
+            buckets[(ind, layer)].append(float(value))
+        for (ind, layer), vals in buckets.items():
+            if not vals:
+                continue
+            vals_sorted = sorted(vals)
+            n = len(vals_sorted)
+            mean = sum(vals_sorted) / n
+            variance = sum((v - mean) ** 2 for v in vals_sorted) / n if n > 0 else 0.0
+            std = variance ** 0.5
+            def quantile(p: float) -> float:
+                idx = p * (n - 1)
+                lo = int(idx)
+                hi = min(n - 1, lo + 1)
+                if lo == hi:
+                    return vals_sorted[lo]
+                f = idx - lo
+                return vals_sorted[lo] * (1 - f) + vals_sorted[hi] * f
+            cv = (std / abs(mean) * 100.0) if mean else 0.0
+            ind_summary = summary.setdefault(ind, {})
+            ind_summary[layer] = {
+                "N": n,
+                "mean": round(mean, 4),
+                "std": round(std, 4),
+                "cv_pct": round(cv, 2),
+                "min": round(vals_sorted[0], 4),
+                "q1": round(quantile(0.25), 4),
+                "median": round(quantile(0.5), 4),
+                "q3": round(quantile(0.75), 4),
+                "max": round(vals_sorted[-1], 4),
+            }
+        return summary
 
     @staticmethod
     def _compute_data_quality_flags(

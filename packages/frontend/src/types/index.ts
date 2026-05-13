@@ -63,9 +63,21 @@ export interface Project {
   stage1_summary?: RecommendationSummary | null;
   selected_indicators?: IndicatorRecommendation[];
   zone_analysis_result?: ZoneAnalysisResult | null;
+  /** Legacy single-slot design strategies (last view written). Read at
+   *  hydration as fallback if `design_strategy_results` is empty. */
   design_strategy_result?: DesignStrategyResult | null;
+  /** v4 / Module 14 — per-view design strategies. Keys are 'zones' or
+   *  'clusters'; mirrors `ai_reports` so toggling the segmented control
+   *  on the Reports page swaps both consistently. */
+  design_strategy_results?: Record<string, DesignStrategyResult | null>;
+  /** Legacy single-slot AI report (last view written). Read at hydration as
+   *  fallback if `ai_reports` doesn't have a 'zones' key. */
   ai_report?: string | null;
   ai_report_meta?: Record<string, unknown> | null;
+  /** v4 / Module 12 — per-view AI reports. Keys are 'zones' or 'clusters';
+   *  each can be independently generated and persists across sessions. */
+  ai_reports?: Record<string, string | null>;
+  ai_report_metas?: Record<string, Record<string, unknown> | null>;
   analysis_results_updated_at?: string | null;
 }
 
@@ -449,6 +461,18 @@ export interface ClusteringResult {
   labels_smoothed: number[];
   // Ward hierarchical linkage (for dendrogram): [id1, id2, dist, count]
   dendrogram_linkage: number[][];
+  // ── HDBSCAN-specific (v6.1) ──
+  /** Persistence per cluster (HDBSCAN's stability score). Higher = more
+   *  robust under density variation. Map: cluster_id (string) → score. */
+  cluster_persistence?: Record<string, number>;
+  /** Per-point silhouette coefficient (against final labels). null = noise. */
+  silhouette_per_point?: (number | null)[];
+  /** Number of points HDBSCAN labelled as noise before reassignment. */
+  noise_count?: number;
+  /** Original IDs of noise points (for highlighting in spatial map). */
+  noise_point_ids?: string[];
+  /** HDBSCAN condensed-tree edges for D3 visualization. */
+  condensed_tree?: { parent: number; child: number; lambda_val: number; child_size: number }[];
 }
 
 export interface ClusteringRequest {
@@ -474,8 +498,19 @@ export interface ClusteringResponse {
   segment_diagnostics: ZoneDiagnostic[];
   /** #1 — full Stage 2.5 result computed with each cluster acting as a
    * virtual zone. Drop this into setZoneAnalysisResult to make all charts
-   * (z-score, correlation, radar, layer stats) reflect cluster membership. */
+   * (z-score, correlation, radar, layer stats) reflect cluster membership.
+   * For within-zone clustering this is the 'all_sub_clusters' view (mirror
+   * of analysis_views['all_sub_clusters'] for backward compat). */
   zone_analysis?: ZoneAnalysisResult | null;
+  /** v4 / Phase A — multi-view payload from /clustering/within-zones.
+   * Empty for /clustering/by-project (single-zone) which has no notion of
+   * parent zones. Standard keys:
+   *   'parent_zones'          — N parent zones aggregated
+   *   'all_sub_clusters'      — flat NK sub-clusters (legacy default)
+   *   'within_zone:<zone_id>' — K sub-clusters of one parent zone
+   * The frontend's segmented control reads this dict to populate the
+   * available views in one round-trip. */
+  analysis_views?: Record<string, ZoneAnalysisResult>;
   skipped: boolean;
   reason: string;
   n_points_used?: number;
@@ -542,7 +577,7 @@ export interface ZoneDesignOutput {
   zone_id: string;
   zone_name: string;
   mean_abs_z: number;
-  diagnosis: { integrated_diagnosis?: string; cross_zone_notes?: string | null; iom_queries?: { indicator_id: string; direction: string; direction_rationale: string; priority: number }[] };
+  diagnosis: { integrated_diagnosis?: string; cross_zone_notes?: string | null; iom_queries?: { indicator_id: string; direction: string; direction_rationale: string; priority: number }[]; strategies_fallback_used?: boolean; strategies_retry_used?: boolean };
   overall_assessment: string;
   matched_ioms: MatchedIOM[];
   design_strategies: DesignStrategy[];
@@ -649,6 +684,46 @@ export type ProjectPipelineStreamEvent =
       cached: number;
     }
   | { type: 'result'; data: ProjectPipelineResult }
+  | { type: 'error'; message: string };
+
+/**
+ * SSE events emitted by /api/analysis/design-strategies/stream.
+ *
+ * Flow: ``started`` → repeated ``progress`` events (one per
+ * ``diagnosis``/``strategies``/``unit_done`` sub-step inside the per-zone loop)
+ * → ``result`` (final DesignStrategyResult) → connection closes.
+ * On failure: a single ``error`` event before the connection closes.
+ */
+export type DesignStrategiesStreamEvent =
+  | { type: 'started'; unit_total: number }
+  | {
+      type: 'progress';
+      stage: 'diagnosis' | 'strategies' | 'unit_done';
+      unit_index: number;
+      unit_total: number;
+      unit_id: string;
+      unit_label: string;
+    }
+  | { type: 'result'; data: DesignStrategyResult }
+  | { type: 'error'; message: string };
+
+/**
+ * SSE events emitted by /api/analysis/generate-report/stream.
+ *
+ * Phases: ``started`` → ``progress`` (preparing) → ``progress`` (awaiting LLM)
+ * → ``progress`` (rendering) → ``result``. The LLM call itself is the long
+ * blocking phase and currently isn't token-streamed, so the bar transitions
+ * from "Calling LLM" (indeterminate) to "Finalizing" (determinate done) at
+ * the moment Gemini returns.
+ */
+export type GenerateReportStreamEvent =
+  | { type: 'started' }
+  | {
+      type: 'progress';
+      phase: 'preparing' | 'awaiting_llm' | 'rendering';
+      label: string;
+    }
+  | { type: 'result'; data: ReportResult }
   | { type: 'error'; message: string };
 
 // Encoding dictionary (knowledge-base codebook) types

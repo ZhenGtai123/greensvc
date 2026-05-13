@@ -165,3 +165,43 @@ if __name__ == "__main__":
         print(f" Interpretation: {interpret_csi(result['value'])}")
 
         os.remove(test_path)
+
+
+# =============================================================================
+# LAYER-AWARE CALCULATION (auto-added 2026-05-11)
+# =============================================================================
+def calculate_for_layer(semantic_map_path, mask_path=None):
+    """Layer-aware wrapper. If mask_path provided, masks the semantic map
+    to that layer before computing; else computes whole-image.
+    
+    The default strategy: copy semantic map, set non-mask pixels to 0
+    (which won't match any real ADE20K color), then run calculate_indicator.
+    """
+    import numpy as np
+    from PIL import Image
+    import tempfile, os
+    
+    if not mask_path or not os.path.exists(mask_path):
+        return calculate_indicator(semantic_map_path)
+    
+    try:
+        sem_img = Image.open(semantic_map_path).convert('RGB')
+        sem_arr = np.array(sem_img)
+        with Image.open(mask_path) as m:
+            m = m.convert('L')
+            if m.size != (sem_arr.shape[1], sem_arr.shape[0]):
+                m = m.resize((sem_arr.shape[1], sem_arr.shape[0]), Image.NEAREST)
+            mask_arr = np.array(m) > 127
+        # Apply mask: non-mask pixels set to black (0,0,0)
+        sem_arr[~mask_arr] = 0
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+            Image.fromarray(sem_arr).save(tmp.name)
+            tmp_path = tmp.name
+        try:
+            result = calculate_indicator(tmp_path)
+        finally:
+            try: os.unlink(tmp_path)
+            except: pass
+        return result
+    except Exception as e:
+        return {'success': False, 'value': None, 'error': f'layer-aware wrapper failed: {e}'}

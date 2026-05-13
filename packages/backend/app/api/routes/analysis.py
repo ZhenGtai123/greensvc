@@ -17,7 +17,7 @@ from PIL import Image as PILImage
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.analysis import (
     ZoneAnalysisRequest,
@@ -148,6 +148,20 @@ class ClusteringResponse(BaseModel):
     # z-score / correlation / radar / global stats all reflect cluster
     # membership instead of the original (often single-zone) project layout.
     zone_analysis: Optional[ZoneAnalysisResult] = None
+    # v4 / Phase A — multi-view payload for within-zone clustering. Keyed by
+    # viewId; the frontend's segmented control reads this dict to populate
+    # all available views in one round-trip. Conventions:
+    #   "parent_zones"          → N parent zones aggregated (zone-level view
+    #                             of within-zone clustering)
+    #   "all_sub_clusters"      → flat NK sub-clusters (the legacy view that
+    #                             `zone_analysis` mirrors above for backward
+    #                             compat with older frontend builds)
+    #   "within_zone:<zone_id>" → K sub-clusters of one parent zone, for
+    #                             drill-down. One entry per parent zone that
+    #                             actually got clustered.
+    # Single-zone /clustering/by-project endpoint leaves this empty (its
+    # only view is the legacy `zone_analysis`).
+    analysis_views: dict[str, ZoneAnalysisResult] = Field(default_factory=dict)
     skipped: bool = False
     reason: str = ""
     n_points_used: int = 0
@@ -420,6 +434,412 @@ def run_clustering_by_project(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _build_grouped_zone_analysis(
+    project,
+    img_to_unit: dict[str, "tuple[str, str]"],
+    indicator_definitions: dict[str, IndicatorDefinitionInput],
+    indicator_ids: list[str],
+    analyzer: ZoneAnalyzer,
+    *,
+    zone_source: str = "cluster",
+) -> Optional[ZoneAnalysisResult]:
+    """Generic helper: aggregate per-image indicator values into "zone-level"
+    statistics keyed by an arbitrary unit_id taken from ``img_to_unit``.
+
+    The view-specific builders below all share this aggregation pipeline; they
+    differ only in how each image is mapped to its grouping unit:
+
+      - ``_build_within_zone_cluster_analysis`` → image → ``zone_id__subN``
+      - ``_build_parent_zone_analysis``         → image → ``parent_zone_id``
+      - ``_build_within_zone_subset_analysis``  → image → ``zone_id__subN`` (one zone only)
+
+    Returns None if no image has any indicator value to contribute.
+    """
+    from collections import defaultdict
+
+    grouped: dict[tuple[str, str, str], list[float]] = defaultdict(list)
+    image_records: list[ImageRecord] = []
+    unit_names: dict[str, str] = {}
+
+    for img in project.uploaded_images:
+        unit = img_to_unit.get(img.image_id)
+        if unit is None:
+            continue
+        unit_id, unit_name = unit
+        unit_names[unit_id] = unit_name
+        if not img.metrics_results:
+            continue
+        for ind_id in indicator_ids:
+            val = img.metrics_results.get(ind_id)
+            if val is not None:
+                grouped[(unit_id, ind_id, "full")].append(val)
+                image_records.append(ImageRecord(
+                    image_id=img.image_id, zone_id=unit_id, zone_name=unit_name,
+                    indicator_id=ind_id, layer="full", value=val,
+                    lat=img.latitude, lng=img.longitude,
+                ))
+            for layer in ("foreground", "middleground", "background"):
+                v = img.metrics_results.get(f"{ind_id}__{layer}")
+                if v is not None:
+                    grouped[(unit_id, ind_id, layer)].append(v)
+                    image_records.append(ImageRecord(
+                        image_id=img.image_id, zone_id=unit_id, zone_name=unit_name,
+                        indicator_id=ind_id, layer=layer, value=v,
+                        lat=img.latitude, lng=img.longitude,
+                    ))
+
+    if not grouped:
+        return None
+
+    zone_statistics: list[IndicatorLayerValue] = []
+    for (unit_id, ind_id, layer), values in grouped.items():
+        arr = np.array(values, dtype=float)
+        n = len(values)
+        zone_statistics.append(IndicatorLayerValue(
+            zone_id=unit_id,
+            zone_name=unit_names.get(unit_id, unit_id),
+            indicator_id=ind_id,
+            layer=layer,
+            n_images=n,
+            mean=float(np.mean(arr)),
+            std=float(np.std(arr, ddof=1)) if n > 1 else 0.0,
+            min=float(np.min(arr)),
+            max=float(np.max(arr)),
+            unit=indicator_definitions[ind_id].unit if ind_id in indicator_definitions else "",
+            area_sqm=0,
+        ))
+
+    req = ZoneAnalysisRequest(
+        indicator_definitions=indicator_definitions,
+        zone_statistics=zone_statistics,
+        image_records=image_records,
+    )
+    result = analyzer.analyze(req)
+    result.zone_source = zone_source
+    result.analysis_mode = "zone_level"
+    return result
+
+
+def _build_parent_zone_analysis(
+    project,
+    cluster_results_by_zone: dict[str, "tuple[ClusteringResult, list[ZoneDiagnostic]]"],
+    indicator_definitions: dict[str, IndicatorDefinitionInput],
+    indicator_ids: list[str],
+    analyzer: ZoneAnalyzer,
+) -> Optional[ZoneAnalysisResult]:
+    """Build the "parent_zones" view: each parent zone is a single grouping
+    unit, aggregating across all of that zone's images (including images that
+    fell into different sub-clusters during HDBSCAN). Used by the multi-zone
+    within-zone clustering Reports view to give the user a "here are the N
+    parent zones at a glance" perspective before drilling into sub-clusters.
+    """
+    img_to_unit: dict[str, tuple[str, str]] = {}
+    zone_name_by_id = {z.zone_id: (z.zone_name or z.zone_id) for z in project.spatial_zones}
+    # Only include images that were actually clustered (skip too-small zones
+    # that didn't run HDBSCAN — those would muddy the parent-zone view since
+    # their images aren't part of the within-zone analysis at all).
+    for zone_id, (clustering, _diags) in cluster_results_by_zone.items():
+        zone_name = zone_name_by_id.get(zone_id, zone_id)
+        for pid in clustering.point_ids_ordered:
+            img_to_unit[pid] = (zone_id, zone_name)
+
+    # Use zone_source='zone' (not 'cluster') because in this view each unit
+    # is a real user-defined parent zone, not a cluster-derived virtual zone.
+    return _build_grouped_zone_analysis(
+        project, img_to_unit, indicator_definitions, indicator_ids, analyzer,
+        zone_source="zone",
+    )
+
+
+def _build_within_zone_subset_analysis(
+    project,
+    target_zone_id: str,
+    cluster_results_by_zone: dict[str, "tuple[ClusteringResult, list[ZoneDiagnostic]]"],
+    indicator_definitions: dict[str, IndicatorDefinitionInput],
+    indicator_ids: list[str],
+    analyzer: ZoneAnalyzer,
+) -> Optional[ZoneAnalysisResult]:
+    """Build the "within_zone:<zone_id>" view: K sub-clusters of a single
+    parent zone, with no other zones' sub-clusters mixed in. This is the
+    drill-down view: user picks a specific parent zone from the segmented
+    control's expanded list and sees only its internal heterogeneity.
+    """
+    if target_zone_id not in cluster_results_by_zone:
+        return None
+    img_to_unit: dict[str, tuple[str, str]] = {}
+    zone_name_by_id = {z.zone_id: (z.zone_name or z.zone_id) for z in project.spatial_zones}
+    zone_name = zone_name_by_id.get(target_zone_id, target_zone_id)
+    clustering, _diags = cluster_results_by_zone[target_zone_id]
+    for pid, cid in zip(clustering.point_ids_ordered, clustering.labels_smoothed):
+        sub_id = f"{target_zone_id}__sub{int(cid)}"
+        sub_name = f"{zone_name} · sub-cluster {int(cid)}"
+        img_to_unit[pid] = (sub_id, sub_name)
+
+    return _build_grouped_zone_analysis(
+        project, img_to_unit, indicator_definitions, indicator_ids, analyzer,
+        zone_source="cluster",
+    )
+
+
+def _build_within_zone_cluster_analysis(
+    project,
+    cluster_results_by_zone: dict[str, "tuple[ClusteringResult, list[ZoneDiagnostic]]"],
+    indicator_definitions: dict[str, IndicatorDefinitionInput],
+    indicator_ids: list[str],
+    analyzer: ZoneAnalyzer,
+) -> Optional[ZoneAnalysisResult]:
+    """Build the "all_sub_clusters" view: every sub-cluster across every
+    parent zone treated as a separate grouping unit (NK total).
+
+    For each user zone we already ran HDBSCAN separately and got back a
+    ClusteringResult. This helper maps every image to a sub-zone id of the
+    form ``{zone_id}__sub{cid}``, then delegates aggregation to the shared
+    ``_build_grouped_zone_analysis``.
+
+    The returned ZoneAnalysisResult has ``analysis_mode='zone_level'`` and
+    ``zone_source='cluster'`` so the frontend's existing chart machinery
+    treats every sub-zone exactly like a real zone.
+    """
+    img_to_unit: dict[str, tuple[str, str]] = {}
+    zone_name_by_id = {z.zone_id: (z.zone_name or z.zone_id) for z in project.spatial_zones}
+    for zone_id, (clustering, _diags) in cluster_results_by_zone.items():
+        zone_name = zone_name_by_id.get(zone_id, zone_id)
+        for pid, cid in zip(clustering.point_ids_ordered, clustering.labels_smoothed):
+            sub_zone_id = f"{zone_id}__sub{int(cid)}"
+            sub_zone_name = f"{zone_name} · sub-cluster {int(cid)}"
+            img_to_unit[pid] = (sub_zone_id, sub_zone_name)
+
+    return _build_grouped_zone_analysis(
+        project, img_to_unit, indicator_definitions, indicator_ids, analyzer,
+        zone_source="cluster",
+    )
+
+
+@router.post("/clustering/within-zones", response_model=ClusteringResponse)
+def run_clustering_within_zones(
+    request: ClusteringByProjectRequest,
+    service: ClusteringService = Depends(get_clustering_service),
+    manager: MetricsManager = Depends(get_metrics_manager),
+    analyzer: ZoneAnalyzer = Depends(get_zone_analyzer),
+    _user: UserResponse = Depends(get_current_user),
+):
+    """Within-zone HDBSCAN: cluster each zone's images independently.
+
+    For multi-zone projects where the user wants to surface intra-zone
+    heterogeneity. Output is one composite ZoneAnalysisResult where each
+    sub-cluster appears as a virtual zone (zone_id = `{zone_id}__sub{cid}`).
+    Zones with too few images to cluster (< min_points) are kept whole, with
+    a single sub-zone id `{zone_id}__sub0`.
+    """
+    projects_store = get_projects_store()
+    project = projects_store.get(request.project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {request.project_id}")
+    if not project.spatial_zones or len(project.spatial_zones) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Within-zone clustering requires the project to have ≥ 2 zones. "
+                "Use /clustering/by-project for single-zone projects."
+            ),
+        )
+
+    valid_ids = [ind for ind in request.indicator_ids if manager.has_calculator(ind)]
+    if not valid_ids:
+        raise HTTPException(status_code=400, detail="No valid calculator found for provided indicator_ids")
+
+    indicator_definitions: dict[str, IndicatorDefinitionInput] = {}
+    for ind_id in valid_ids:
+        info = manager.get_calculator(ind_id)
+        if info:
+            indicator_definitions[ind_id] = IndicatorDefinitionInput(
+                id=ind_id,
+                name=info.name,
+                unit=info.unit,
+                target_direction=info.target_direction or "INCREASE",
+                definition=info.definition,
+                category=info.category,
+            )
+
+    # Group images by zone
+    from collections import defaultdict as _dd
+    by_zone: dict[str, list] = _dd(list)
+    for img in project.uploaded_images:
+        if img.zone_id and img.metrics_results:
+            by_zone[img.zone_id].append(img)
+
+    cluster_results_by_zone: dict[str, "tuple[ClusteringResult, list[ZoneDiagnostic]]"] = {}
+    n_total_points = 0
+    n_total_gps = 0
+    n_zones_clustered = 0
+    n_zones_too_small = 0
+
+    for zone_id, imgs in by_zone.items():
+        # Build point_metrics for this zone's images
+        zone_pts: list[dict] = []
+        for img in imgs:
+            row: dict = {"point_id": img.image_id, "zone_id": img.zone_id}
+            if img.latitude is not None and img.longitude is not None:
+                row["lat"] = img.latitude
+                row["lng"] = img.longitude
+                n_total_gps += 1
+            has_any = False
+            for ind_id in valid_ids:
+                key = ind_id if request.layer == "full" else f"{ind_id}__{request.layer}"
+                v = img.metrics_results.get(key)
+                if v is not None:
+                    row[ind_id] = v
+                    has_any = True
+            if has_any:
+                zone_pts.append(row)
+        n_total_points += len(zone_pts)
+
+        if len(zone_pts) < request.min_points:
+            # Too small to cluster — keep zone whole as a single "sub0"
+            n_zones_too_small += 1
+            continue
+
+        try:
+            res = service.cluster(
+                point_metrics=zone_pts,
+                indicator_definitions=indicator_definitions,
+                layer=request.layer,
+                max_k=request.max_k,
+                knn_k=request.knn_k,
+                min_points=request.min_points,
+            )
+            if res is not None:
+                cluster_results_by_zone[zone_id] = res
+                n_zones_clustered += 1
+        except Exception as e:
+            logger.warning("Within-zone clustering failed for zone %s: %s", zone_id, e)
+
+    # Zones that were too small or failed → assign a synthetic single-cluster
+    # result so they still appear as one sub-zone in the output.
+    for zone_id, imgs in by_zone.items():
+        if zone_id in cluster_results_by_zone:
+            continue
+        # Fake a 1-cluster ClusteringResult covering all of this zone's images
+        from app.models.analysis import ClusteringResult, ArchetypeProfile
+        pids = [img.image_id for img in imgs]
+        if not pids:
+            continue
+        labels = [0] * len(pids)
+        cluster_results_by_zone[zone_id] = (
+            ClusteringResult(
+                method="single-cluster fallback (zone too small)",
+                k=1,
+                silhouette_score=0.0,
+                spatial_smooth_k=0,
+                layer_used=request.layer,
+                archetype_profiles=[ArchetypeProfile(
+                    archetype_id=0,
+                    archetype_label=f"{zone_name_by_id_for(project, zone_id)} (whole)",
+                    point_count=len(pids),
+                    centroid_values={},
+                    centroid_z_scores={},
+                )],
+                spatial_segments=[],
+                point_ids_ordered=pids,
+                point_lats=[], point_lngs=[],
+                labels_raw=labels,
+                labels_smoothed=labels,
+                dendrogram_linkage=[],
+            ),
+            [],
+        )
+
+    if not cluster_results_by_zone:
+        return ClusteringResponse(
+            skipped=True,
+            reason=(
+                f"No zone had ≥ {request.min_points} points with indicators. "
+                "Run the project pipeline first."
+            ),
+            n_points_used=n_total_points,
+            n_points_with_gps=n_total_gps,
+        )
+
+    composite_analysis = _build_within_zone_cluster_analysis(
+        project=project,
+        cluster_results_by_zone=cluster_results_by_zone,
+        indicator_definitions=indicator_definitions,
+        indicator_ids=valid_ids,
+        analyzer=analyzer,
+    )
+
+    if composite_analysis is None:
+        return ClusteringResponse(
+            skipped=True,
+            reason="Could not build within-zone composite analysis (no images mapped).",
+            n_points_used=n_total_points,
+        )
+
+    # v4 / Phase A — build the additional views in one pass so the frontend
+    # can switch between them without round-trips. Total cost: same
+    # ZoneAnalyzer pipeline reused per view (~50-200ms each), much cheaper
+    # than the LLM phases that follow.
+    parent_zone_analysis = _build_parent_zone_analysis(
+        project=project,
+        cluster_results_by_zone=cluster_results_by_zone,
+        indicator_definitions=indicator_definitions,
+        indicator_ids=valid_ids,
+        analyzer=analyzer,
+    )
+    per_zone_analyses: dict[str, ZoneAnalysisResult] = {}
+    for zone_id in cluster_results_by_zone:
+        sub_view = _build_within_zone_subset_analysis(
+            project=project,
+            target_zone_id=zone_id,
+            cluster_results_by_zone=cluster_results_by_zone,
+            indicator_definitions=indicator_definitions,
+            indicator_ids=valid_ids,
+            analyzer=analyzer,
+        )
+        if sub_view is not None:
+            per_zone_analyses[zone_id] = sub_view
+
+    # Assemble the analysis_views dict that the frontend's segmented control
+    # reads. Always-present keys: 'all_sub_clusters' (matches the legacy
+    # zone_analysis field). Optional: 'parent_zones' (only if at least one
+    # zone got clustered, which is implied here since we're past the early
+    # return). Per-zone keys are only included when the zone produced a
+    # non-empty sub-view.
+    views: dict[str, ZoneAnalysisResult] = {"all_sub_clusters": composite_analysis}
+    if parent_zone_analysis is not None:
+        views["parent_zones"] = parent_zone_analysis
+    for zone_id, sub_view in per_zone_analyses.items():
+        views[f"within_zone:{zone_id}"] = sub_view
+
+    # Pick the first ClusteringResult for the response's `clustering` field
+    # (frontend expects a single object). Frontend will treat the composite
+    # zone_analysis as the source of truth for charts.
+    first_cl, first_diags = next(iter(cluster_results_by_zone.values()))
+
+    logger.info(
+        "clustering/within-zones: project=%s clustered_zones=%d too_small=%d total_pts=%d views=%s",
+        request.project_id, n_zones_clustered, n_zones_too_small, n_total_points,
+        list(views.keys()),
+    )
+
+    return ClusteringResponse(
+        clustering=first_cl,
+        segment_diagnostics=composite_analysis.segment_diagnostics or first_diags,
+        zone_analysis=composite_analysis,
+        analysis_views=views,
+        n_points_used=n_total_points,
+        n_points_with_gps=n_total_gps,
+    )
+
+
+def zone_name_by_id_for(project, zone_id: str) -> str:
+    """Helper: pull zone_name out of a project for a given zone_id."""
+    for z in project.spatial_zones:
+        if z.zone_id == zone_id:
+            return z.zone_name or zone_id
+    return zone_id
+
+
 # ---------------------------------------------------------------------------
 # Merged Export: indicator_results_merged.json
 # ---------------------------------------------------------------------------
@@ -488,8 +908,27 @@ async def generate_design_strategies(
         store = get_projects_store()
         project = store.get(request.project_id)
         if project is not None:
-            project.design_strategy_result = result.model_dump(mode="json")
-            # Stage 3 changed → existing AI report is now stale
+            payload = result.model_dump(mode="json")
+            # v4 / Module 14 — write to the per-view slot first; mirror to
+            # the legacy single field so older frontend builds keep reading
+            # whichever view was generated most recently.
+            # v4 / Phase C — prefer view_id when present (full multi-view
+            # id like 'parent_zones' or 'within_zone:zone_3'); else fall
+            # back to the legacy 2-state grouping_mode for older clients.
+            slot = (request.view_id or request.grouping_mode) or "zones"
+            project.design_strategy_results = {
+                **(project.design_strategy_results or {}),
+                slot: payload,
+            }
+            project.design_strategy_result = payload
+            # Stage 3 changed → the AI report for the SAME view is now
+            # stale; the OTHER view's AI report is unaffected (it was
+            # generated against its own strategies).
+            (project.ai_reports or {}).pop(slot, None)
+            (project.ai_report_metas or {}).pop(slot, None)
+            # Legacy single field also gets cleared because it mirrors
+            # whichever view was generated last; the per-view dict above
+            # is now the authoritative source.
             project.ai_report = None
             project.ai_report_meta = None
             project.analysis_results_updated_at = datetime.now()
@@ -523,16 +962,205 @@ async def generate_report(
         store = get_projects_store()
         project = store.get(request.project_id)
         if project is not None:
-            project.ai_report = result.content
-            # Stamp the active grouping_mode into the persisted metadata so
-            # hydrateFromProject can detect a stale report after the user
-            # toggles modes (zone <-> cluster) without regenerating.
             meta = dict(result.metadata or {})
             meta["grouping_mode"] = request.grouping_mode
+            # v4 / Module 12 — write to the per-view slot so zones and
+            # clusters narratives persist independently. Mirror to the
+            # legacy single field too so backward-compat readers (older
+            # frontend builds, scripts inspecting project records) still
+            # work — they'll see whichever was last written.
+            # v4 / Phase C — prefer view_id when present (full multi-view
+            # id like 'parent_zones' or 'within_zone:zone_3'); else fall
+            # back to the legacy 2-state grouping_mode for older clients.
+            slot = (request.view_id or request.grouping_mode) or "zones"
+            project.ai_reports = {**(project.ai_reports or {}), slot: result.content}
+            project.ai_report_metas = {**(project.ai_report_metas or {}), slot: meta}
+            project.ai_report = result.content
             project.ai_report_meta = meta
             project.analysis_results_updated_at = datetime.now()
             store.save(project)
     return result
+
+
+# ---------------------------------------------------------------------------
+# SSE streaming variants — emit per-unit progress for the AI Report flow.
+# v4 / Module 13 — the basic non-streaming endpoints above are kept for
+# backward compatibility (and for callers that don't care about progress).
+# ---------------------------------------------------------------------------
+
+
+def _sse_event_stream(producer):
+    """Wrap an async event producer with SSE framing and a top-level error
+    catch so a crash inside the producer surfaces as a structured ``error``
+    event instead of an HTTP 500 mid-stream (which the EventSource client
+    can't display)."""
+
+    async def gen():
+        try:
+            async for event in producer():
+                yield f"data: {_safe_json(event)}\n\n"
+        except Exception as e:
+            logger.error("SSE producer crashed: %s", e, exc_info=True)
+            yield f"data: {_safe_json({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/design-strategies/stream")
+async def generate_design_strategies_stream(
+    request: DesignStrategyRequest,
+    engine: DesignEngine = Depends(get_design_engine),
+    _user: UserResponse = Depends(get_current_user),
+):
+    """SSE streaming version of /design-strategies.
+
+    Emits one ``progress`` event per sub-step inside the per-unit loop
+    (``diagnosis`` → ``strategies`` → ``unit_done`` for each zone/cluster),
+    plus a final ``result`` event carrying the full DesignStrategyResult.
+    The connection closes naturally once result is sent.
+    """
+
+    async def producer() -> AsyncGenerator[dict, None]:
+        # asyncio.Queue lets the LLM coroutine and the SSE generator interleave —
+        # progress events are flushed to the client as they happen, not buffered
+        # until generate_design_strategies returns. We hold the final
+        # DesignStrategyResult in a closure-scoped dict so the persistence
+        # block below can write it to the project store regardless of how
+        # `runner()` exited.
+        queue: asyncio.Queue = asyncio.Queue()
+        DONE = object()
+        captured: dict[str, Any] = {"result": None, "errored": False}
+
+        async def on_progress(event: dict) -> None:
+            await queue.put({"type": "progress", **event})
+
+        async def runner():
+            try:
+                result = await engine.generate_design_strategies(
+                    request, on_progress=on_progress
+                )
+                captured["result"] = result
+                await queue.put({"type": "result", "data": result.model_dump(mode="json")})
+            except Exception as e:
+                captured["errored"] = True
+                logger.error("Design strategy stream runner crashed: %s", e, exc_info=True)
+                await queue.put({"type": "error", "message": str(e)})
+            finally:
+                await queue.put(DONE)
+
+        task = asyncio.create_task(runner())
+        # initial "started" event so the client can render the progress bar
+        # immediately instead of waiting for the first per-unit step.
+        unit_total = len(
+            request.zone_analysis.segment_diagnostics
+            or request.zone_analysis.zone_diagnostics
+            or []
+        )
+        yield {"type": "started", "unit_total": unit_total}
+
+        try:
+            while True:
+                evt = await queue.get()
+                if evt is DONE:
+                    break
+                yield evt
+        finally:
+            if not task.done():
+                task.cancel()
+
+        # Persist on success — mirror the non-streaming endpoint's bookkeeping
+        # so refreshing the page (or switching projects and back) recovers the
+        # generated strategies and forces existing AI reports to be regenerated
+        # against the new strategies.
+        if request.project_id and captured["result"] is not None and not captured["errored"]:
+            store = get_projects_store()
+            project = store.get(request.project_id)
+            if project is not None:
+                payload = captured["result"].model_dump(mode="json")
+                # v4 / Phase C — prefer view_id when present (full multi-view
+                # id like 'parent_zones' or 'within_zone:zone_3'); else fall
+                # back to the legacy 2-state grouping_mode for older clients.
+                slot = (request.view_id or request.grouping_mode) or "zones"
+                project.design_strategy_results = {
+                    **(project.design_strategy_results or {}),
+                    slot: payload,
+                }
+                project.design_strategy_result = payload
+                # Stage 3 changed for THIS view → drop the matching AI
+                # report slot only; the other view's AI report still
+                # corresponds to its own (unchanged) strategies.
+                (project.ai_reports or {}).pop(slot, None)
+                (project.ai_report_metas or {}).pop(slot, None)
+                project.ai_report = None
+                project.ai_report_meta = None
+                project.analysis_results_updated_at = datetime.now()
+                store.save(project)
+
+    return _sse_event_stream(producer)
+
+
+@router.post("/generate-report/stream")
+async def generate_report_stream(
+    request: ReportRequest,
+    report_service: ReportService = Depends(get_report_service),
+    _user: UserResponse = Depends(get_current_user),
+):
+    """SSE streaming version of /generate-report.
+
+    Emits ``started`` → ``progress`` (preparing prompt / awaiting LLM) → ``result``
+    so the frontend can show a determinate progress bar even though the report
+    itself is one big LLM call. Total time is dominated by the LLM round-trip,
+    so the bar moves between known phase boundaries rather than tracking tokens.
+    """
+
+    async def producer() -> AsyncGenerator[dict, None]:
+        yield {"type": "started"}
+
+        # Phase 1: prompt assembly is fast (<100ms) but emit a marker so the
+        # bar shows movement immediately.
+        yield {"type": "progress", "phase": "preparing", "label": "Preparing prompt…"}
+
+        # Phase 2: dispatch the LLM call. We don't have token-level streaming
+        # here yet, but emitting "awaiting_llm" lets the frontend switch to an
+        # indeterminate animation during the wait.
+        yield {"type": "progress", "phase": "awaiting_llm", "label": "Calling LLM…"}
+
+        try:
+            result = await report_service.generate_report(request)
+        except Exception as e:
+            yield {"type": "error", "message": str(e)}
+            return
+
+        # Persist (mirror non-streaming endpoint).
+        if request.project_id:
+            store = get_projects_store()
+            project = store.get(request.project_id)
+            if project is not None:
+                meta = dict(result.metadata or {})
+                meta["grouping_mode"] = request.grouping_mode
+                # v4 / Phase C — prefer view_id when present (full multi-view
+                # id like 'parent_zones' or 'within_zone:zone_3'); else fall
+                # back to the legacy 2-state grouping_mode for older clients.
+                slot = (request.view_id or request.grouping_mode) or "zones"
+                project.ai_reports = {**(project.ai_reports or {}), slot: result.content}
+                project.ai_report_metas = {**(project.ai_report_metas or {}), slot: meta}
+                project.ai_report = result.content
+                project.ai_report_meta = meta
+                project.analysis_results_updated_at = datetime.now()
+                store.save(project)
+
+        yield {"type": "progress", "phase": "rendering", "label": "Finalizing…"}
+        yield {"type": "result", "data": result.model_dump(mode="json")}
+
+    return _sse_event_stream(producer)
 
 
 # ---------------------------------------------------------------------------
@@ -938,50 +1566,38 @@ async def _execute_project_pipeline(
         steps.append(ProjectPipelineProgress(step="zone_analysis", status="skipped", detail="No zone statistics to analyze"))
         yield {"type": "status", "step": "zone_analysis", "status": "skipped", "detail": "No zone statistics to analyze"}
 
-    # 7. Stage 3 — Design strategies (non-fatal)
-    if request.run_stage3 and zone_result:
-        yield {"type": "status", "step": "design_strategies", "status": "running", "detail": "Generating design strategies…"}
-        try:
-            project_context = ProjectContext(
-                project={
-                    "name": project.project_name,
-                    "location": project.project_location or None,
-                },
-                context={
-                    "climate": {"koppen_zone_id": project.koppen_zone_id},
-                    "urban_form": {
-                        "space_type_id": project.space_type_id,
-                        "lcz_type_id": project.lcz_type_id or None,
-                    },
-                    "user": {"age_group_id": project.age_group_id or None},
-                    "country_id": project.country_id or None,
-                },
-                performance_query={
-                    "design_brief": project.design_brief or None,
-                    "dimensions": project.performance_dimensions,
-                    "subdimensions": project.subdimensions,
-                },
-            )
-            design_request = DesignStrategyRequest(
-                zone_analysis=zone_result,
-                project_context=project_context,
-                allowed_indicator_ids=valid_ids,
-                use_llm=request.use_llm,
-                max_ioms_per_query=request.max_ioms_per_query,
-                max_strategies_per_zone=request.max_strategies_per_zone,
-            )
-            design_result = await engine.generate_design_strategies(design_request)
-            ds_detail = f"{len(design_result.zones)} zones with strategies"
-            steps.append(ProjectPipelineProgress(step="design_strategies", status="completed", detail=ds_detail))
-            yield {"type": "status", "step": "design_strategies", "status": "completed", "detail": ds_detail}
-        except Exception as e:
-            logger.error("Stage 3 failed (non-fatal): %s", e, exc_info=True)
-            steps.append(ProjectPipelineProgress(step="design_strategies", status="failed", detail=str(e)))
-            yield {"type": "status", "step": "design_strategies", "status": "failed", "detail": str(e)}
-    elif not request.run_stage3:
-        steps.append(ProjectPipelineProgress(step="design_strategies", status="skipped", detail="Stage 3 disabled"))
-        yield {"type": "status", "step": "design_strategies", "status": "skipped", "detail": "Stage 3 disabled"}
+    # 7. Stage 3 — Design strategies (non-fatal).
+    # v4 / Module 14 — skip Stage 3 in the pipeline for ALL projects (both
+    # single-zone and multi-zone). The user must first pick a path on the
+    # Reports page entry gate; strategies are then generated on demand
+    # for whichever path was picked, with the right grouping_mode and
+    # against the right zone_analysis payload:
+    #
+    #   single-zone path:
+    #     - Single View  → autoFireDesignStrategies on pick → zones slot
+    #     - Dual View    → handleRunClustering → clusters slot
+    #   multi-zone path:
+    #     - Zone-only            → autoFireDesignStrategies on pick → zones slot
+    #     - Within-zone clustering → handleRunWithinZoneClustering → clusters slot
+    #
+    # Pre-generating in the pipeline wastes 60-90s of LLM time whenever
+    # the user picks a path that invalidates the cached strategies (e.g.,
+    # multi-zone user picks Within-zone clustering after pipeline has
+    # already produced zone-level strategies). We previously only skipped
+    # for single-zone (when analysis_mode == 'image_level'); v4 / Module
+    # 14 extends the skip to multi-zone projects too, since their entry
+    # gate also gives the user a clustering vs no-clustering choice.
+    if zone_result is not None:
+        skip_msg = (
+            "Skipped — strategies are generated on demand after you pick a path "
+            "on the Reports page entry gate (Single View / Dual View for "
+            "single-zone, Zone-only / Within-zone for multi-zone)."
+        )
+        steps.append(ProjectPipelineProgress(step="design_strategies", status="skipped", detail=skip_msg))
+        yield {"type": "status", "step": "design_strategies", "status": "skipped", "detail": skip_msg}
     else:
+        # No zone_result → Stage 2.5 was itself skipped/failed. Without
+        # zone diagnostics we can't run Stage 3 even if the user wanted to.
         steps.append(ProjectPipelineProgress(step="design_strategies", status="skipped", detail="No zone analysis result"))
         yield {"type": "status", "step": "design_strategies", "status": "skipped", "detail": "No zone analysis result"}
 
@@ -1006,23 +1622,49 @@ async def _execute_project_pipeline(
     # drop the entire result event. The frontend reconstructs image_records from
     # project.uploaded_images[].metrics_results, which it already has.
     result_dict = final.model_dump(mode="json")
-    za = result_dict.get("zone_analysis")
-    if isinstance(za, dict):
-        za["image_records"] = []
+    # CRITICAL — image_records must be:
+    #   • STRIPPED from the SSE result event (single SSE frame can be 10MB+
+    #     for projects with thousands of images, and intermediate proxies
+    #     truncate large frames). The stripped copy goes out over the wire.
+    #   • PRESERVED in the persisted zone_analysis_result so that when the
+    #     user reloads the Reports page, the GET /api/projects/{id} call
+    #     returns image_records and the frontend ChartContext can render
+    #     C1 / C3 / C4 (distribution violins, within-zone distribution,
+    #     value spatial map) — those charts gate on imageRecords.length.
+    #
+    # Previously a single za dict was mutated in place, which clobbered
+    # image_records in BOTH places and forced the frontend to fall back to
+    # rebuildImageRecords(currentProject) — which only worked when
+    # uploaded_images[].metrics_results was populated, leading to flaky
+    # "Indicator Drill-Down section disappears after refresh" behaviour.
+    za_full = result_dict.get("zone_analysis")
+    za_for_sse: Optional[dict] = None
+    if isinstance(za_full, dict):
+        # Shallow copy + replace image_records with [] only for the SSE copy.
+        za_for_sse = {**za_full, "image_records": []}
 
     # Persist analysis artefacts onto the project so they survive page reloads
     # and project switches. Stored as the same dicts the frontend consumes.
     if zone_result is not None or design_result is not None:
-        project.zone_analysis_result = za if isinstance(za, dict) else None
+        # Save the FULL za (with image_records intact) to the project record.
+        project.zone_analysis_result = za_full if isinstance(za_full, dict) else None
         ds = result_dict.get("design_strategies")
         project.design_strategy_result = ds if isinstance(ds, dict) else None
         # A fresh pipeline run invalidates any previously generated AI report —
-        # the source data has changed.
+        # the source data has changed. Clear both the legacy single-slot and
+        # the per-view dict slots.
         project.ai_report = None
         project.ai_report_meta = None
+        project.ai_reports = {}
+        project.ai_report_metas = {}
         project.analysis_results_updated_at = datetime.now()
         projects_store.save(project)
 
+    # SSE event uses the stripped copy of zone_analysis (image_records=[])
+    # to keep the wire payload small. The persisted project (just saved
+    # above) keeps the full image_records.
+    if za_for_sse is not None:
+        result_dict = {**result_dict, "zone_analysis": za_for_sse}
     yield {"type": "result", "data": result_dict}
 
 

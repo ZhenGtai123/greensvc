@@ -22,6 +22,8 @@ import type {
   ProjectPipelineRequest,
   ProjectPipelineResult,
   ProjectPipelineStreamEvent,
+  DesignStrategiesStreamEvent,
+  GenerateReportStreamEvent,
   ReportRequest,
   ReportResult,
   ClusteringRequest,
@@ -32,6 +34,66 @@ import type {
   EncodingEntry,
   EncodingSections,
 } from '../types';
+
+/**
+ * Consume an SSE stream produced by a FastAPI ``StreamingResponse`` that emits
+ * ``data: {...}\n\n`` JSON lines. Resolves once the stream finishes; rejects on
+ * HTTP error, parse failure, or premature close (no `result`/`error` event).
+ *
+ * Shared by ``runProjectPipelineStream``, ``runDesignStrategiesStream``, and
+ * ``generateReportStream`` — all three follow the exact same wire protocol.
+ */
+async function consumeSseStream<TEvent extends { type: string }>(
+  path: string,
+  body: unknown,
+  onEvent: (event: TEvent) => void,
+  logPrefix: string,
+  prematureCloseMessage: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const baseURL = apiClient.defaults.baseURL || '';
+  const res = await fetch(`${baseURL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let gotResult = false;
+  let gotError = false;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE event boundaries are `\n\n`; everything left after the last
+    // boundary is an unfinished chunk we'll see again on the next read.
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() || '';
+    for (const part of parts) {
+      const line = part.trim();
+      if (line.startsWith('data: ')) {
+        try {
+          const parsed = JSON.parse(line.slice(6)) as TEvent;
+          if (parsed.type === 'result') gotResult = true;
+          if (parsed.type === 'error') gotError = true;
+          onEvent(parsed);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error(`${logPrefix} Failed to parse event:`, line.slice(6, 200), e);
+        }
+      }
+    }
+  }
+  if (!gotResult && !gotError) {
+    throw new Error(prematureCloseMessage);
+  }
+}
 
 // Health & Config
 export const api = {
@@ -296,6 +358,8 @@ export const api = {
       apiClient.post<ClusteringResponse>('/api/analysis/clustering', data),
     runClusteringByProject: (data: ClusteringByProjectRequest) =>
       apiClient.post<ClusteringResponse>('/api/analysis/clustering/by-project', data),
+    runClusteringWithinZones: (data: ClusteringByProjectRequest) =>
+      apiClient.post<ClusteringResponse>('/api/analysis/clustering/within-zones', data),
     exportMerged: (data: MergedExportRequest) =>
       apiClient.post<Record<string, unknown>>('/api/analysis/export-merged', data),
     runDesignStrategies: (data: unknown) =>
@@ -310,51 +374,43 @@ export const api = {
       data: ProjectPipelineRequest,
       onEvent: (event: ProjectPipelineStreamEvent) => void,
       signal?: AbortSignal,
-    ) => {
-      const baseURL = apiClient.defaults.baseURL || '';
-      return fetch(`${baseURL}/api/analysis/project-pipeline/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+    ) =>
+      consumeSseStream<ProjectPipelineStreamEvent>(
+        '/api/analysis/project-pipeline/stream',
+        data,
+        onEvent,
+        '[Pipeline SSE]',
+        'Connection lost during pipeline execution. The server may still be processing — please check and retry.',
         signal,
-      }).then(async (res) => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || `HTTP ${res.status}`);
-        }
-        const reader = res.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let gotResult = false;
-        let gotError = false;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const parts = buffer.split('\n\n');
-          buffer = parts.pop() || '';
-          for (const part of parts) {
-            const line = part.trim();
-            if (line.startsWith('data: ')) {
-              try {
-                const parsed = JSON.parse(line.slice(6));
-                if (parsed.type === 'result') gotResult = true;
-                if (parsed.type === 'error') gotError = true;
-                onEvent(parsed);
-              } catch (e) {
-                console.error('[Pipeline SSE] Failed to parse event:', line.slice(6, 200), e);
-              }
-            }
-          }
-        }
-        // Stream ended without a result — connection was likely dropped by proxy timeout
-        if (!gotResult && !gotError) {
-          throw new Error('Connection lost during pipeline execution. The server may still be processing — please check and retry.');
-        }
-      });
-    },
+      ),
+    runDesignStrategiesStream: (
+      data: unknown,
+      onEvent: (event: DesignStrategiesStreamEvent) => void,
+      signal?: AbortSignal,
+    ) =>
+      consumeSseStream<DesignStrategiesStreamEvent>(
+        '/api/analysis/design-strategies/stream',
+        data,
+        onEvent,
+        '[DesignStrategies SSE]',
+        'Connection lost during strategy generation. The LLM call may still be running on the server — please check and retry.',
+        signal,
+      ),
     generateReport: (data: ReportRequest) =>
       apiClient.post<ReportResult>('/api/analysis/generate-report', data),
+    generateReportStream: (
+      data: ReportRequest,
+      onEvent: (event: GenerateReportStreamEvent) => void,
+      signal?: AbortSignal,
+    ) =>
+      consumeSseStream<GenerateReportStreamEvent>(
+        '/api/analysis/generate-report/stream',
+        data,
+        onEvent,
+        '[Report SSE]',
+        'Connection lost during report generation. The LLM call may still be running on the server — please check and retry.',
+        signal,
+      ),
     chartSummary: (data: {
       chart_id: string;
       chart_title: string;

@@ -79,6 +79,30 @@ class MetricsCalculator:
             # Inject semantic_colors before execution
             module.semantic_colors = self.semantic_colors
 
+            # Some calculators (e.g. IND_GVI_ANG, IND_NAT_LND, IND_DIR_RAT, …)
+            # were originally written for the standalone `shared_layer/` pipeline
+            # and start with a real `from input_layer import semantic_colors`.
+            # In the FastAPI service that module isn't on sys.path, so without
+            # intervention the import raises ModuleNotFoundError, the whole
+            # calculator fails to load, and every calculate() call for that
+            # indicator counts as a failure (visible as the "N failed" badge
+            # in the pipeline UI).
+            #
+            # Fix: register a stub `input_layer` module in sys.modules so the
+            # `from input_layer import semantic_colors` line resolves to the
+            # same dict we just injected as a module attribute. The stub is
+            # registered idempotently and shared across all calculator loads.
+            if "input_layer" not in sys.modules:
+                stub = importlib.util.module_from_spec(
+                    importlib.util.spec_from_loader("input_layer", loader=None)
+                )
+                stub.semantic_colors = self.semantic_colors
+                sys.modules["input_layer"] = stub
+            else:
+                # Keep the stub's semantic_colors fresh in case the dict was
+                # reloaded between calls.
+                sys.modules["input_layer"].semantic_colors = self.semantic_colors
+
             # Execute module — redirect stdout to avoid Windows GBK encoding
             # crashes from emoji characters in calculator print() statements
             old_stdout = sys.stdout
@@ -150,8 +174,17 @@ class MetricsCalculator:
         """
         Calculate indicator within a masked spatial layer.
 
-        Loads the calculator module's TARGET_RGB, counts matching pixels
-        in the semantic map that fall within the mask region.
+        Dispatch priority:
+          1. If the calculator module exposes a custom `calculate_for_layer(
+             semantic_map_path, mask_path)` function, call it directly. This
+             is the contract for TYPE B indicators (entropy / GLCM / depth /
+             color statistics / model composites) whose layer semantics
+             cannot be derived from a simple TARGET_RGB ratio.
+          2. Otherwise, run the default TYPE A pipeline: load TARGET_RGB,
+             count matching pixels inside the mask, return
+             (target / mask_pixels) * 100.
+          3. Last-resort fallback: call the module's whole-image
+             `calculate_indicator(semantic_map_path)` (layer info lost).
         """
         try:
             module = self.load_calculator_module(indicator_id)
@@ -161,6 +194,29 @@ class MetricsCalculator:
                     indicator_id=indicator_id,
                     error=f"Failed to load calculator: {indicator_id}",
                 )
+
+            # --- (1) Per-calculator custom layer function (TYPE B contract) ---
+            custom_fn = getattr(module, "calculate_for_layer", None)
+            if callable(custom_fn):
+                try:
+                    result = custom_fn(semantic_map_path, mask_path)
+                except TypeError:
+                    # Some calculators only take semantic_map_path; fall back
+                    result = module.calculate_indicator(semantic_map_path)
+                if isinstance(result, dict):
+                    return CalculationResult(
+                        success=result.get("success", False),
+                        indicator_id=indicator_id,
+                        indicator_name=module.INDICATOR.get("name", ""),
+                        value=result.get("value"),
+                        unit=module.INDICATOR.get("unit", ""),
+                        target_pixels=result.get("target_pixels"),
+                        total_pixels=result.get("total_pixels"),
+                        error=result.get("error"),
+                        image_path=semantic_map_path,
+                    )
+                # If custom_fn returned a CalculationResult-like object, pass through
+                return result
 
             from PIL import Image
 

@@ -74,8 +74,13 @@ celerybeat.pid
 # Backend runtime caches and uploads
 packages/backend/temp/
 packages/backend/outputs/
-packages/backend/data/chart_summary_cache.sqlite
+packages/backend/data/chart_summary_cache.sqlite*
 packages/backend/data/*.cache.*
+packages/backend/data/.fuse_hidden*
 
 # Vision-side stray files
 packages/backend/data/uploads/
+
+# Knowledge base backup snapshots (keep out of repo)
+packages/backend/data/knowledge_base/_backups/
+*.bak.json

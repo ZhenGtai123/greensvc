@@ -34,6 +34,86 @@ class ZoneAssignment(BaseModel):
     zone_id: Optional[str] = None
 
 
+# ---------------------------------------------------------------------------
+# Analysis-artefact invalidation
+# ---------------------------------------------------------------------------
+#
+# Whenever the project's spatial_zones list is mutated (zone added, removed,
+# reshaped, or images reassigned to different zones), every analysis blob
+# downstream becomes stale:
+#   - zone_analysis_result is computed against zones that no longer exist
+#   - design_strategy_result(s) cite zones / clusters that are stale
+#   - ai_report / ai_reports prose names units that may not match the
+#     project's current spatial_zones
+#
+# Without invalidation the user is left in an inconsistent state where
+# (a) the project record says 2 zones but (b) the cached analysis was run
+# on 1 zone, and the Reports page's entry-gate logic ends up routing them
+# into the wrong path. We invalidate ALL three layers (Stage 2.5 / 3 /
+# narrative) at once because they're a strict dependency chain — if zones
+# change, even a "valid" cached strategy or report would describe the
+# wrong spatial unit.
+#
+# We do not try to be clever about "did anything actually change" (e.g.
+# pure rename vs geometry move): the cost of a false-positive invalidation
+# is one re-run of the pipeline (5-15 minutes); the cost of a missed
+# invalidation is silently wrong analysis. We err on the side of safety.
+def _invalidate_analysis_artefacts(project: ProjectResponse) -> bool:
+    """Wipe Stage 2.5 / 3 / AI report fields. Returns True if anything
+    was actually cleared (so callers can decide whether to log the event).
+
+    Used when something downstream of Stage 1 changes (zones, image set,
+    image-zone assignment, GPS, selected indicators). Stage 1 itself
+    (recommendations / selected_indicators) is preserved — those are still
+    relevant under the new conditions.
+    """
+    had_artefacts = bool(
+        project.zone_analysis_result
+        or project.design_strategy_result
+        or project.design_strategy_results
+        or project.ai_report
+        or project.ai_reports
+    )
+    project.zone_analysis_result = None
+    project.design_strategy_result = None
+    project.design_strategy_results = {}
+    project.ai_report = None
+    project.ai_report_meta = None
+    project.ai_reports = {}
+    project.ai_report_metas = {}
+    return had_artefacts
+
+
+# Stage 1 is the LLM-driven indicator recommendation step. Its inputs are
+# the project's design_brief, performance_dimensions, and target dimensions
+# (passed as part of the brief). When any of those change, the recommended
+# indicators may no longer match the design intent — and selected_indicators
+# (a subset of the recommendations) is also stale by extension. Everything
+# downstream (pipeline metrics, zone analysis, strategies, AI report) was
+# computed against the old indicator set and must be wiped too.
+#
+# We deliberately keep this separate from `_invalidate_analysis_artefacts`
+# because zone/image changes do NOT invalidate Stage 1 (the recommended
+# indicators are still valid for the new spatial layout). Only brief/
+# dimension changes hit Stage 1.
+def _invalidate_stage1_and_downstream(project: ProjectResponse) -> bool:
+    """Wipe Stage 1 recommendations + selected_indicators + everything
+    downstream. Returns True if anything was actually cleared.
+    """
+    had_stage1 = bool(
+        project.stage1_recommendations
+        or project.stage1_relationships
+        or project.stage1_summary
+        or project.selected_indicators
+    )
+    project.stage1_recommendations = []
+    project.stage1_relationships = []
+    project.stage1_summary = None
+    project.selected_indicators = []
+    had_downstream = _invalidate_analysis_artefacts(project)
+    return had_stage1 or had_downstream
+
+
 class BatchImageDelete(BaseModel):
     image_ids: List[str]
 from app.core.config import get_settings
@@ -188,6 +268,25 @@ async def update_project(project_id: str, updates: ProjectUpdate, _user: UserRes
     # Apply updates
     update_data = updates.model_dump(exclude_unset=True)
 
+    # Stage 1 invalidation — design_brief, performance_dimensions, and the
+    # project-level target dimensions feed directly into the Stage 1 LLM
+    # prompt that produces stage1_recommendations. If any of these change,
+    # the cached recommendations were derived from a stale prompt and must
+    # be discarded along with the entire downstream pipeline.
+    #
+    # Snapshot the current values before applying the update so we can do a
+    # precise old-vs-new compare. Only fire the invalidation when the value
+    # actually changed (no-op writes from the UI shouldn't nuke caches).
+    stage1_input_fields = ('design_brief', 'performance_dimensions', 'target_dimensions')
+    stage1_input_changed = False
+    for field in stage1_input_fields:
+        if field in update_data:
+            old_value = getattr(project, field, None)
+            new_value = update_data[field]
+            if old_value != new_value:
+                stage1_input_changed = True
+                break
+
     # Handle spatial_zones conversion separately
     if 'spatial_zones' in update_data:
         zones = []
@@ -203,6 +302,49 @@ async def update_project(project_id: str, updates: ProjectUpdate, _user: UserRes
             zones.append(zone)
         project.spatial_zones = zones
         del update_data['spatial_zones']
+
+        # Orphan-image cascade-delete — when the wizard removes a zone, any
+        # image previously assigned to that zone gets DELETED entirely (file
+        # + record), per product semantics: removing a zone removes its
+        # images too. Without this:
+        #   - orphans still count as "Assigned" in the project header
+        #     (artificially inflating the count)
+        #   - they flow into the analysis pipeline, which then operates on
+        #     images whose zone is gone
+        # Mirrors the delete-image / batch-delete pattern: os.remove the
+        # file, drop from uploaded_images list. Images with zone_id=None
+        # (truly ungrouped, never assigned) are preserved — the cascade
+        # only applies to images that were tied to a removed zone.
+        new_zone_ids = {z.zone_id for z in zones}
+        kept: list = []
+        deleted_orphan_ids: list[str] = []
+        deleted_orphan_zones: set[str] = set()
+        for img in project.uploaded_images:
+            if img.zone_id is not None and img.zone_id not in new_zone_ids:
+                try:
+                    os.remove(img.filepath)
+                except Exception:
+                    pass  # missing file is non-fatal
+                deleted_orphan_ids.append(img.image_id)
+                deleted_orphan_zones.add(img.zone_id)
+            else:
+                kept.append(img)
+        if deleted_orphan_ids:
+            project.uploaded_images = kept
+            logger.info(
+                "Project %s: deleted %d images orphaned by spatial_zones update "
+                "(zones removed: %s)",
+                project_id, len(deleted_orphan_ids),
+                sorted(deleted_orphan_zones),
+            )
+
+        # Zones changed → wipe Stage 2.5 / 3 / AI report. The user must
+        # re-run the pipeline before any analysis appears in Reports.
+        if _invalidate_analysis_artefacts(project):
+            logger.info(
+                "Project %s: invalidated analysis artefacts after spatial_zones update",
+                project_id,
+            )
 
     # Handle spatial_relations separately
     if 'spatial_relations' in update_data:
@@ -221,6 +363,18 @@ async def update_project(project_id: str, updates: ProjectUpdate, _user: UserRes
     # Apply remaining simple field updates
     for field, value in update_data.items():
         setattr(project, field, value)
+
+    # Run the Stage 1 invalidation AFTER the update is applied, so the diff
+    # we already detected acts on the now-current state. The helper wipes
+    # stage1_* fields plus all downstream artefacts (zone_analysis, design
+    # strategies, AI report) — the user must re-run Get Recommendations,
+    # Pipeline, and Reports.
+    if stage1_input_changed and _invalidate_stage1_and_downstream(project):
+        logger.info(
+            "Project %s: invalidated Stage 1 + downstream after design_brief / "
+            "dimensions update",
+            project_id,
+        )
 
     project.updated_at = datetime.now()
     store.save(project)
@@ -260,6 +414,12 @@ async def add_zone(
     )
 
     project.spatial_zones.append(zone)
+    # Zones changed → invalidate cached analysis (see helper docstring).
+    if _invalidate_analysis_artefacts(project):
+        logger.info(
+            "Project %s: invalidated analysis artefacts after add_zone",
+            project_id,
+        )
     project.updated_at = datetime.now()
     store.save(project)
     return zone
@@ -267,7 +427,7 @@ async def add_zone(
 
 @router.delete("/{project_id}/zones/{zone_id}")
 async def delete_zone(project_id: str, zone_id: str):
-    """Remove a spatial zone"""
+    """Remove a spatial zone (and any images assigned to it)."""
     store = get_project_store()
     project = store.get(project_id)
     if not project:
@@ -275,11 +435,35 @@ async def delete_zone(project_id: str, zone_id: str):
 
     project.spatial_zones = [z for z in project.spatial_zones if z.zone_id != zone_id]
 
-    # Unassign images from deleted zone
+    # Cascade-delete images that were assigned to this zone (file + record).
+    # Mirrors the wizard PUT path's orphan-cleanup: removing a zone removes
+    # its images too. Previously this endpoint only set zone_id=None, which
+    # diverged from the wizard's semantics and left orphan images
+    # contaminating the "Assigned" count and the pipeline.
+    kept = []
+    deleted_image_ids: list[str] = []
     for img in project.uploaded_images:
         if img.zone_id == zone_id:
-            img.zone_id = None
+            try:
+                os.remove(img.filepath)
+            except Exception:
+                pass
+            deleted_image_ids.append(img.image_id)
+        else:
+            kept.append(img)
+    if deleted_image_ids:
+        project.uploaded_images = kept
+        logger.info(
+            "Project %s: cascade-deleted %d images with delete_zone %s",
+            project_id, len(deleted_image_ids), zone_id,
+        )
 
+    # Zones changed → invalidate cached analysis.
+    if _invalidate_analysis_artefacts(project):
+        logger.info(
+            "Project %s: invalidated analysis artefacts after delete_zone %s",
+            project_id, zone_id,
+        )
     project.updated_at = datetime.now()
     store.save(project)
     return {"success": True, "zone_id": zone_id}
@@ -371,6 +555,19 @@ async def upload_images(
         project.uploaded_images.append(image)
         uploaded.append(image)
 
+    # New images mean the cached pipeline metrics, zone analysis, and AI
+    # report no longer reflect the full image set — they were computed
+    # against a smaller list. Wipe the downstream artefacts so the Reports
+    # page surfaces "needs re-run" instead of silently mixing old analysis
+    # with newly added images. Stage 1 (recommendations + selected
+    # indicators) stays put; uploading images doesn't change which
+    # indicators are relevant.
+    if uploaded and _invalidate_analysis_artefacts(project):
+        logger.info(
+            "Project %s: invalidated analysis artefacts after uploading %d images",
+            project_id, len(uploaded),
+        )
+
     project.updated_at = datetime.now()
     store.save(project)
     return {
@@ -437,11 +634,19 @@ async def batch_assign_zones(
     updated = 0
     for item in assignments:
         img = image_lookup.get(item.image_id)
-        if img:
+        if img and img.zone_id != item.zone_id:
             img.zone_id = item.zone_id
             updated += 1
 
     if updated > 0:
+        # Image-to-zone mapping changed → zone-level statistics are now
+        # stale (different sets of images contribute to each zone). Same
+        # invariant as zones-list mutation: invalidate Stage 2.5 / 3 / AI.
+        if _invalidate_analysis_artefacts(project):
+            logger.info(
+                "Project %s: invalidated analysis artefacts after batch reassigning %d images",
+                project_id, updated,
+            )
         project.updated_at = datetime.now()
         store.save(project)
 
@@ -462,7 +667,16 @@ async def assign_image_to_zone(
 
     for img in project.uploaded_images:
         if img.image_id == image_id:
+            zone_changed = img.zone_id != zone_id
             img.zone_id = zone_id
+            if zone_changed:
+                # Image moved to a different zone → zone-level statistics
+                # are stale for both the source and destination zone.
+                if _invalidate_analysis_artefacts(project):
+                    logger.info(
+                        "Project %s: invalidated analysis artefacts after reassigning image %s",
+                        project_id, image_id,
+                    )
             project.updated_at = datetime.now()
             store.save(project)
             return {"success": True, "image_id": image_id, "zone_id": zone_id}
@@ -502,6 +716,13 @@ async def batch_delete_images(
 
     if deleted_ids:
         project.uploaded_images = remaining
+        # Removing images shrinks the per-zone image set, so all
+        # downstream stats are stale.
+        if _invalidate_analysis_artefacts(project):
+            logger.info(
+                "Project %s: invalidated analysis artefacts after batch-deleting %d images",
+                project_id, len(deleted_ids),
+            )
         project.updated_at = datetime.now()
         store.save(project)
 
@@ -529,6 +750,12 @@ async def delete_image(project_id: str, image_id: str, _user: UserResponse = Dep
             except Exception:
                 pass
             project.uploaded_images.pop(i)
+            # Removing an image changes per-zone counts → stats stale.
+            if _invalidate_analysis_artefacts(project):
+                logger.info(
+                    "Project %s: invalidated analysis artefacts after deleting image %s",
+                    project_id, image_id,
+                )
             project.updated_at = datetime.now()
             store.save(project)
             return {"success": True, "image_id": image_id}
@@ -578,6 +805,15 @@ async def reparse_image_gps(
             updated += 1
 
     if updated > 0:
+        # GPS coordinates feed into spatial analysis (zone bounds checks,
+        # spatial scatter charts, GPS-based clustering). New coordinates →
+        # cached zone_analysis is computed against the wrong spatial
+        # context, so invalidate the same way as image-level changes.
+        if _invalidate_analysis_artefacts(project):
+            logger.info(
+                "Project %s: invalidated analysis artefacts after re-parsing GPS for %d images",
+                project_id, updated,
+            )
         project.updated_at = datetime.now()
         store.save(project)
 
@@ -605,7 +841,27 @@ async def update_selected_indicators(
     if not project:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
 
+    # Snapshot the previous selection so we can detect a real change. The
+    # toggle UI fires this endpoint per click (debounced), and many writes
+    # are no-ops when the user re-selects the same indicators — those
+    # shouldn't blow away cached analysis.
+    prev_ids = {s.get("indicator_id") for s in (project.selected_indicators or [])}
+    new_ids = {s.get("indicator_id") for s in (indicators or [])}
+    selection_changed = prev_ids != new_ids
+
     project.selected_indicators = indicators
+
+    # Selection changed → cached pipeline output and everything downstream
+    # was computed against a different indicator set. Wipe analysis +
+    # strategies + AI report so the user is forced to re-run the pipeline
+    # with the new selection. Stage 1 recommendations themselves remain
+    # valid (we're choosing a subset of the same recommendation list).
+    if selection_changed and _invalidate_analysis_artefacts(project):
+        logger.info(
+            "Project %s: invalidated analysis artefacts after selected_indicators change",
+            project_id,
+        )
+
     project.updated_at = datetime.now()
     store.save(project)
     return {"success": True, "count": len(indicators)}

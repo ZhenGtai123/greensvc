@@ -7,6 +7,9 @@ import {
   HStack,
   FormControl,
   FormLabel,
+  FormHelperText,
+  Alert,
+  AlertIcon,
   Input,
   Textarea,
   Select,
@@ -348,6 +351,9 @@ function ProjectWizard() {
                   onChange={(e) => setProjectName(e.target.value)}
                   placeholder="e.g., Central Park Renovation"
                 />
+                <FormHelperText fontSize="xs">
+                  Shown on every report cover, AI report title, and PDF filename. 4–8 words; avoid abbreviations.
+                </FormHelperText>
               </FormControl>
               <FormControl>
                 <FormLabel>Project Location</FormLabel>
@@ -356,6 +362,9 @@ function ProjectWizard() {
                   onChange={(e) => setProjectLocation(e.target.value)}
                   placeholder="e.g., Shenzhen, China"
                 />
+                <FormHelperText fontSize="xs">
+                  Display only — does not feed any algorithm. Use "City, Country" form.
+                </FormHelperText>
               </FormControl>
             </SimpleGrid>
           </CardBody>
@@ -386,6 +395,9 @@ function ProjectWizard() {
                     {findEntry(koppenEntries, koppenZone)!.definition}
                   </Text>
                 )}
+                <FormHelperText fontSize="xs">
+                  Drives Stage 1 indicator transferability weighting and Stage 3 strategy filtering — strongly recommended.
+                </FormHelperText>
               </FormControl>
               <FormControl>
                 <LabelWithInfo
@@ -400,6 +412,9 @@ function ProjectWizard() {
                     <option key={c.code} value={c.code}>{c.name}</option>
                   ))}
                 </Select>
+                <FormHelperText fontSize="xs">
+                  Pairs with Climate Zone for Stage 3 transferability weighting.
+                </FormHelperText>
               </FormControl>
               <FormControl>
                 <LabelWithInfo
@@ -419,6 +434,9 @@ function ProjectWizard() {
                     {findEntry(spaceTypeEntries, spaceType)!.definition}
                   </Text>
                 )}
+                <FormHelperText fontSize="xs">
+                  Decides which Stage 4 IOM intervention prototypes apply (street vs park vs plaza). Pick the dominant type if mixed.
+                </FormHelperText>
               </FormControl>
               <FormControl>
                 <LabelWithInfo
@@ -438,6 +456,9 @@ function ProjectWizard() {
                     {findEntry(lczEntries, lczType)!.definition}
                   </Text>
                 )}
+                <FormHelperText fontSize="xs">
+                  Finer-grained than Köppen — Stage 1 uses it to filter indicator baselines (dense urban vs forest).
+                </FormHelperText>
               </FormControl>
               <FormControl>
                 <LabelWithInfo
@@ -452,6 +473,9 @@ function ProjectWizard() {
                     <option key={a.code} value={a.code}>{a.name}</option>
                   ))}
                 </Select>
+                <FormHelperText fontSize="xs">
+                  Influences Stage 4 strategy preferences (older users → accessibility/rest; younger → activity/social).
+                </FormHelperText>
               </FormControl>
             </SimpleGrid>
           </CardBody>
@@ -471,6 +495,9 @@ function ProjectWizard() {
                 placeholder="Describe the performance objectives, constraints, and expected outcomes..."
                 rows={3}
               />
+              <FormHelperText fontSize="xs">
+                Fed directly into Stage 1 LLM indicator recommendation and Stage 3 Agent A diagnosis. 200–500 words covering: (1) current problem, (2) design constraints, (3) expected outcome. The more specific, the better the recommendations.
+              </FormHelperText>
             </FormControl>
 
             <HStack mb={2} spacing={1} align="center">
@@ -627,6 +654,9 @@ function ProjectWizard() {
                           onChange={(e) => updateZone(zone.id, { name: e.target.value })}
                           placeholder="e.g., Entrance Plaza"
                         />
+                        <FormHelperText fontSize="2xs">
+                          Shown on all chart labels, strategy group titles, and report archetypes. Use a spatial name, not "Zone 1".
+                        </FormHelperText>
                       </FormControl>
                       <FormControl>
                         <FormLabel fontSize="sm">Area (m²)</FormLabel>
@@ -637,6 +667,9 @@ function ProjectWizard() {
                           onChange={(e) => updateZone(zone.id, { area: parseFloat(e.target.value) || undefined })}
                           placeholder="Optional"
                         />
+                        <FormHelperText fontSize="2xs">
+                          Display-only metadata. Does not currently feed any algorithm — leave blank if unknown.
+                        </FormHelperText>
                       </FormControl>
                       <FormControl>
                         <FormLabel fontSize="sm">Status</FormLabel>
@@ -696,6 +729,40 @@ function ProjectWizard() {
           </CardBody>
         </Card>
 
+
+        {/* v4 / Module 11.3.3 — soft-required-fields warning. The 5 listed
+            fields aren't strictly required (only Project Name + at least one
+            Zone Name are blocking), but skipping them materially degrades
+            downstream LLM recommendations. The alert shows what's missing
+            and what each gap costs; the save button stays enabled. */}
+        {(() => {
+          const missing: string[] = [];
+          if (!koppenZone) missing.push('Köppen Climate Zone — Stage 1 transferability weighting');
+          if (!lczType) missing.push('Local Climate Zone (LCZ) — indicator baseline filtering');
+          if (!spaceType) missing.push('Space Type — Stage 4 IOM filtering');
+          if (!designBrief.trim()) missing.push('Design Brief — Stage 1 indicator recommendation prompt');
+          if (selectedDimensions.length === 0) missing.push('Performance Dimensions — Stage 1 indicator filter');
+          if (missing.length === 0) return null;
+          return (
+            <Alert status="warning" borderRadius="md" alignItems="flex-start">
+              <AlertIcon />
+              <Box>
+                <Text fontWeight="bold" fontSize="sm">
+                  Recommended fields are empty (save still allowed)
+                </Text>
+                <Text fontSize="xs" color="gray.700" mt={1}>
+                  These fields aren't strictly required, but leaving them blank
+                  materially affects downstream analysis quality:
+                </Text>
+                <Box as="ul" pl={4} mt={1} fontSize="xs">
+                  {missing.map((m, i) => (
+                    <Box as="li" key={i} listStyleType="disc">{m}</Box>
+                  ))}
+                </Box>
+              </Box>
+            </Alert>
+          );
+        })()}
 
         {/* Action Buttons */}
         <HStack justify="space-between">

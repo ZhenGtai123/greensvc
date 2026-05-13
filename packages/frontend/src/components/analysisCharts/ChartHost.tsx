@@ -51,8 +51,16 @@ interface ChartHostProps {
    * report export to ensure all charts are mounted before capture. */
   forceMount?: boolean;
   /** Fired exactly once when the chart body actually hydrates (lazy-mount or
-   * forceMount). Used by the page-level loading progress bar. */
+   * forceMount). Used by the page-level loading progress bar.
+   *
+   * v4 / Module 3 — semantic note: for our chart family (recharts +
+   * inline SVG via D3 helpers) "hydrated" reliably means "drawn on screen
+   * by next paint" because none of our render functions schedule async
+   * tile fetches or post-mount layout shifts (we don't use Plotly /
+   * Leaflet / Mapbox). For consumers that prefer the cleaner name, an
+   * `onRendered` alias is also accepted. */
   onMount?: (id: string) => void;
+  onRendered?: (id: string) => void;
   /** Project slug used as the prefix for export filenames. Falls back to
    * "project" when missing. */
   projectSlug?: string | null;
@@ -245,7 +253,7 @@ export interface ChartHostHandle {
  */
 export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
   function ChartHost(
-    { descriptor, ctx, onHide, projectId, projectContext, showAiSummary = true, forceMount = false, onMount, projectSlug, groupingMode = 'zones' },
+    { descriptor, ctx, onHide, projectId, projectContext, showAiSummary = true, forceMount = false, onMount, onRendered, projectSlug, groupingMode = 'zones' },
     ref,
   ) {
     const cardRef = useRef<HTMLDivElement | null>(null);
@@ -287,14 +295,72 @@ export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
     // Fire onMount exactly once per chart instance once we've actually rendered
     // the body (either via intersection or forced). The ref guard prevents
     // double-fire across re-renders or strict-mode double effects.
+    //
+    // v4 polish — defer the actual fire to a double-rAF tick so the parent's
+    // "all charts ready" flag flips AFTER the chart's SVG/Canvas has had a
+    // chance to paint, not just after React commits its tree. Without this
+    // buffer, the Skeleton overlay disappears the instant the component
+    // mounts but the heavy charts (Recharts violins, D3 trees, GPS
+    // scatters) haven't actually drawn yet — the user sees a flash of empty
+    // space then watches charts pop in one by one. Two rAFs guarantee the
+    // browser has run at least one full layout + paint cycle.
+    //
+    // CAREFUL: onMount / onRendered are NOT in the deps array. Parents
+    // typically pass useCallback-wrapped handlers but those identity can
+    // still change on prop / state changes upstream. If we put them in the
+    // deps, every parent re-render would tear down our scheduled rAF and
+    // re-schedule it, and at high enough re-render rates the rAF never
+    // gets a chance to fire — the Rendering charts… 0/N progress would
+    // stick at 0 forever (the bug we're fixing here). Using a ref to read
+    // the latest callbacks at fire-time keeps the effect stable.
+    const onMountRef = useRef(onMount);
+    const onRenderedRef = useRef(onRendered);
+    onMountRef.current = onMount;
+    onRenderedRef.current = onRendered;
+
     useEffect(() => {
       if (!effectiveMounted) return;
       if (reportedMountRef.current) return;
-      reportedMountRef.current = true;
-      onMount?.(descriptor.id);
-    }, [effectiveMounted, descriptor.id, onMount]);
+      // CRITICAL: only set reportedMountRef.current = true AFTER the rAF
+      // actually fires. If we set it before, React 18 strict mode in dev
+      // (which runs every effect → cleanup → effect again) cancels the
+      // first scheduled rAF and the second effect bails on the
+      // already-true ref → onMount never fires → "Rendering charts… 0/N"
+      // sticks at 0 forever. Using a `cancelled` flag inside the closure
+      // to bail rAF callbacks if the effect was torn down.
+      let cancelled = false;
+      let raf1 = 0;
+      let raf2 = 0;
+      raf1 = requestAnimationFrame(() => {
+        if (cancelled) return;
+        raf2 = requestAnimationFrame(() => {
+          if (cancelled) return;
+          reportedMountRef.current = true;
+          onMountRef.current?.(descriptor.id);
+          onRenderedRef.current?.(descriptor.id);
+        });
+      });
+      return () => {
+        cancelled = true;
+        if (raf1) cancelAnimationFrame(raf1);
+        if (raf2) cancelAnimationFrame(raf2);
+      };
+    }, [effectiveMounted, descriptor.id]);
 
-    const summaryPayload = descriptor.summaryPayload?.(ctx) ?? {
+    // v4 polish — gate summaryPayload behind isAvailable. Many chart-level
+    // summaryPayload functions assume the data they need is present (e.g.
+    // `ctx.zoneAnalysisResult!.zone_statistics`) — a reasonable assumption
+    // that's true when isAvailable returns true. But ChartHost used to call
+    // summaryPayload unconditionally, so any chart whose data was wiped
+    // (Layer 1 invalidation cascading from a zone add/delete, etc.) would
+    // throw a TypeError from inside summaryPayload and crash the whole
+    // React tree (white screen). Honour isAvailable here so each chart
+    // only computes its summary payload when its data is actually present.
+    const isChartAvailable = descriptor.isAvailable?.(ctx) ?? true;
+    const summaryPayload = (isChartAvailable
+      ? descriptor.summaryPayload?.(ctx)
+      : null
+    ) ?? {
       chart_id: descriptor.id,
       title: descriptor.title,
     };
@@ -382,6 +448,16 @@ export const ChartHost = forwardRef<ChartHostHandle, ChartHostProps>(
         ref={cardRef}
         role="region"
         aria-label={descriptor.title}
+        // v4 polish — Chakra's Card has `overflow: hidden` by default so the
+        // border-radius can clip child content. That defeats our heatmap
+        // rotated-label rendering: the SVG is sized correctly and has
+        // `overflow: visible`, but the Card was still cropping the labels'
+        // top half (where the "IND_" prefix lives) at the Card's top edge.
+        // Setting overflow:visible at the Card level lets the rotated labels
+        // render fully. The minor cost is rounded-corner content can spill
+        // past the corner radius if a chart paints near the edge — none of
+        // our charts do.
+        overflow="visible"
       >
         <CardHeader pb={2}>
           <HStack justify="space-between" align="start">
