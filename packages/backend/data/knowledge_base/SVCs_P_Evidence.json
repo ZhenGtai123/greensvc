@@ -28244,90 +28244,6 @@
     ]
   },
   {
-    "evidence_id": "SVCs_P_Chen2023_EDG_DEN_L15_pp_beautiful",
-    "source": {
-      "citation": "Chen, S., & Biljecki, F. (2023). Automatic assessment of public open spaces using street view imagery. Cities, 137, 104329.",
-      "doi": "10.1016/j.cities.2023.104329",
-      "year": 2023,
-      "page_reference": "llf_edge_no_pixel Ratio of pixels classified as edge."
-    },
-    "indicator": {
-      "indicator_id": "IND_EDG_DEN",
-      "indicator_category_id": "CAT_CFG",
-      "formula_source": "Chen, S., & Biljecki, F. (2023). Automatic assessment of public open spaces using street view imagery. Cities, 137, 104329.",
-      "measurement": {
-        "method_id": "MTH_DLV",
-        "unit_id": "UNT_PCT",
-        "data_source_id": "SRC_GSV",
-        "tool_id": "TOL_SEG"
-      },
-      "formula_as_reported": "EdgeDensity = N(edge pixels) / N(total pixels)",
-      "variables_as_reported": "N(.) = pixel count; edge pixels from low-level edge detection on the SVI",
-      "svc_matrix_expansion_ref": {
-        "indicator_id": "IND_EDG_DEN",
-        "semantic_layer_scope": [
-          "OBJ_VEG",
-          "OBJ_BLT",
-          "OBJ_GRD",
-          "OBJ_WAT"
-        ],
-        "spatial_layer_scope": [
-          "TER_FG",
-          "TER_MG",
-          "TER_BG"
-        ],
-        "morphological_layer_scope": [
-          "VAR_TEX"
-        ]
-      }
-    },
-    "performance": {
-      "dimension_id": "PRF_AES",
-      "subdimension_id": "PRS_AES_PREF",
-      "outcome_measure": "Low-level visual feature used in perception modelling: predictor of Place Pulse  [PP-expansion: beautiful]",
-      "outcome_type_id": "OUT_OBJ",
-      "theoretical_basis_id": "THR_NA",
-      "framework_mapping_basis": "direct",
-      "dimension_name": "Indicator definition (formula record only)"
-    },
-    "relationship": {
-      "type_id": "REL_DES",
-      "direction_id": "DIR_NA",
-      "effect_size": {
-        "value": "NUM_NA",
-        "threshold": "NUM_NA",
-        "unit": "NA",
-        "unit_id": "UNT_NA",
-        "type": "Descriptive summary",
-        "description": "Place Pulse beautiful dimension stub; paper measures this but specific effect not extracted",
-        "note": "[PP-expansion stub from SVCs_P_Chen2023_EDG_DEN_L15 - dim=beautiful]"
-      },
-      "statistical": {
-        "p_value": "",
-        "significance_id": "SIG_NA",
-        "test_type_id": "TST_NA",
-        "test_description": "Definition record only"
-      },
-      "description": "Edge Pixel Density defined/used by paper; no inferential association recorded in this minimal record."
-    },
-    "study_design": {
-      "design_type_id": "DES_CRS",
-      "sample_size": 800,
-      "sample_unit_id": "SPU_IMG",
-      "setting_type_id": "SET_STR",
-      "country_id": "CNT_MUL"
-    },
-    "quality": {
-      "evidence_tier_id": "TIR_T2",
-      "confidence_grade_id": "CON_LOW"
-    },
-    "is_descriptive_statistic": true,
-    "descriptive_content": "Formula record from L15 ingestion of new indicator IND_EDG_DEN; paper Chen and Biljecki - 2023 - Automatic assessment of public open spaces using stre.",
-    "linked_iom_ids": [
-      "I_SVCs_Chen2023_EDG_DEN_L15_pp_beautiful"
-    ]
-  },
-  {
     "evidence_id": "SVCs_P_Chen2023_EDG_DEN_L15_pp_depressing",
     "source": {
       "citation": "Chen, S., & Biljecki, F. (2023). Automatic assessment of public open spaces using street view imagery. Cities, 137, 104329.",
@@ -28383,7 +28299,7 @@
         "unit": "NA",
         "unit_id": "UNT_NA",
         "type": "Descriptive summary",
-        "description": "Place Pulse depressing dimension stub; paper measures this but specific effect not extracted",
+        "description": "Descriptive: paper provides formula but no inferential effect",
         "note": "[PP-expansion stub from SVCs_P_Chen2023_EDG_DEN_L15 - dim=depressing]"
       },
       "statistical": {
@@ -28409,90 +28325,6 @@
     "descriptive_content": "Formula record from L15 ingestion of new indicator IND_EDG_DEN; paper Chen and Biljecki - 2023 - Automatic assessment of public open spaces using stre.",
     "linked_iom_ids": [
       "I_SVCs_Chen2023_EDG_DEN_L15_pp_depressing"
-    ]
-  },
-  {
-    "evidence_id": "SVCs_P_Chen2023_EDG_DEN_L15_pp_boring",
-    "source": {
-      "citation": "Chen, S., & Biljecki, F. (2023). Automatic assessment of public open spaces using street view imagery. Cities, 137, 104329.",
-      "doi": "10.1016/j.cities.2023.104329",
-      "year": 2023,
-      "page_reference": "llf_edge_no_pixel Ratio of pixels classified as edge."
-    },
-    "indicator": {
-      "indicator_id": "IND_EDG_DEN",
-      "indicator_category_id": "CAT_CFG",
-      "formula_source": "Chen, S., & Biljecki, F. (2023). Automatic assessment of public open spaces using street view imagery. Cities, 137, 104329.",
-      "measurement": {
-        "method_id": "MTH_DLV",
-        "unit_id": "UNT_PCT",
-        "data_source_id": "SRC_GSV",
-        "tool_id": "TOL_SEG"
-      },
-      "formula_as_reported": "EdgeDensity = N(edge pixels) / N(total pixels)",
-      "variables_as_reported": "N(.) = pixel count; edge pixels from low-level edge detection on the SVI",
-      "svc_matrix_expansion_ref": {
-        "indicator_id": "IND_EDG_DEN",
-        "semantic_layer_scope": [
-          "OBJ_VEG",
-          "OBJ_BLT",
-          "OBJ_GRD",
-          "OBJ_WAT"
-        ],
-        "spatial_layer_scope": [
-          "TER_FG",
-          "TER_MG",
-          "TER_BG"
-        ],
-        "morphological_layer_scope": [
-          "VAR_TEX"
-        ]
-      }
-    },
-    "performance": {
-      "dimension_id": "PRF_SOC",
-      "subdimension_id": "PRS_SOC_VITL",
-      "outcome_measure": "Low-level visual feature used in perception modelling: predictor of Place Pulse  [PP-expansion: boring]",
-      "outcome_type_id": "OUT_OBJ",
-      "theoretical_basis_id": "THR_NA",
-      "framework_mapping_basis": "direct",
-      "dimension_name": "Indicator definition (formula record only)"
-    },
-    "relationship": {
-      "type_id": "REL_DES",
-      "direction_id": "DIR_NA",
-      "effect_size": {
-        "value": "NUM_NA",
-        "threshold": "NUM_NA",
-        "unit": "NA",
-        "unit_id": "UNT_NA",
-        "type": "Descriptive summary",
-        "description": "Place Pulse boring dimension stub; paper measures this but specific effect not extracted",
-        "note": "[PP-expansion stub from SVCs_P_Chen2023_EDG_DEN_L15 - dim=boring]"
-      },
-      "statistical": {
-        "p_value": "",
-        "significance_id": "SIG_NA",
-        "test_type_id": "TST_NA",
-        "test_description": "Definition record only"
-      },
-      "description": "Edge Pixel Density defined/used by paper; no inferential association recorded in this minimal record."
-    },
-    "study_design": {
-      "design_type_id": "DES_CRS",
-      "sample_size": 800,
-      "sample_unit_id": "SPU_IMG",
-      "setting_type_id": "SET_STR",
-      "country_id": "CNT_MUL"
-    },
-    "quality": {
-      "evidence_tier_id": "TIR_T2",
-      "confidence_grade_id": "CON_LOW"
-    },
-    "is_descriptive_statistic": true,
-    "descriptive_content": "Formula record from L15 ingestion of new indicator IND_EDG_DEN; paper Chen and Biljecki - 2023 - Automatic assessment of public open spaces using stre.",
-    "linked_iom_ids": [
-      "I_SVCs_Chen2023_EDG_DEN_L15_pp_boring"
     ]
   },
   {
@@ -28549,7 +28381,7 @@
         "unit": "R2 reduction (%) when variable removed from regression model",
         "unit_id": "UNT_PCT",
         "type": "Lasso linear-regression coefficient (sign positive); reported as variance-explained reduction when variable is dropped",
-        "description": "Place Pulse wealthy dimension stub; paper measures this but specific effect not extracted",
+        "description": "Descriptive: paper provides formula but no inferential effect",
         "note": "[PP-expansion stub from SVCs_P_Larkin2021_VIB_GRN_L15 - dim=wealthy]"
       },
       "statistical": {
@@ -28631,7 +28463,7 @@
         "unit": "R2 reduction (%) when variable removed from regression model",
         "unit_id": "UNT_PCT",
         "type": "Lasso linear-regression coefficient (sign positive); reported as variance-explained reduction when variable is dropped",
-        "description": "Place Pulse lively dimension stub; paper measures this but specific effect not extracted",
+        "description": "Descriptive: paper provides formula but no inferential effect",
         "note": "[PP-expansion stub from SVCs_P_Larkin2021_VIB_GRN_L15 - dim=lively]"
       },
       "statistical": {
@@ -28713,7 +28545,7 @@
         "unit": "R2 reduction (%) when variable removed from regression model",
         "unit_id": "UNT_PCT",
         "type": "Lasso linear-regression coefficient (sign positive); reported as variance-explained reduction when variable is dropped",
-        "description": "Place Pulse beautiful dimension stub; paper measures this but specific effect not extracted",
+        "description": "Descriptive: paper provides formula but no inferential effect",
         "note": "[PP-expansion stub from SVCs_P_Larkin2021_VIB_GRN_L15 - dim=beautiful]"
       },
       "statistical": {
@@ -28795,7 +28627,7 @@
         "unit": "R2 reduction (%) when variable removed from regression model",
         "unit_id": "UNT_PCT",
         "type": "Lasso linear-regression coefficient (sign positive); reported as variance-explained reduction when variable is dropped",
-        "description": "Place Pulse depressing dimension stub; paper measures this but specific effect not extracted",
+        "description": "Descriptive: paper provides formula but no inferential effect",
         "note": "[PP-expansion stub from SVCs_P_Larkin2021_VIB_GRN_L15 - dim=depressing]"
       },
       "statistical": {
@@ -28821,88 +28653,6 @@
     "descriptive_content": "Visible vibrant green space differs significantly between top-quartile (q4) and bottom-quartile (q1) safety perception locations (q4 mean = 19.10%, SD = 13.10; q1 mean = 12.09%, SD = 12.12; t-test difference = 7.01, p < 0.001). The same pattern holds for lively and beauty quartiles. Among image-based features, vibrant green space (alongside visible green space and visible trees) was repeatedly highlighted as one of the variables that differed most strongly between high and low perception quartiles. In Lasso regression models, vibrant green space was retained as a statistically significant predictor of safety, lively, and beauty perceptions; spatial cluster of greenspace + vibrant greenspace + visible greenspace together reduced explained variation by 2.51%, 2.80%, and 0.76% for safety, lively, and beauty respectively when removed.",
     "linked_iom_ids": [
       "I_SVCs_Larkin2021_VIB_GRN_L15_pp_depressing"
-    ]
-  },
-  {
-    "evidence_id": "SVCs_P_Larkin2021_VIB_GRN_L15_pp_boring",
-    "source": {
-      "citation": "Larkin, A., Gu, X., Chen, L., & Hystad, P. (2021). Predicting perceptions of the built environment using GIS, satellite and street view image approaches. Landscape and Urban Planning, 216, 104257.",
-      "doi": "10.1016/j.landurbplan.2021.104257",
-      "year": 2021,
-      "page_reference": "Section 2.5 (definition); Tables 3 and 4 (descriptives); Section 3.4 and Section 3.2 (regression contribution); pp. 3-7"
-    },
-    "indicator": {
-      "indicator_id": "IND_VIB_GRN",
-      "indicator_category_id": "CAT_CMP",
-      "formula_source": "Larkin, A., Gu, X., Chen, L., & Hystad, P. (2021). Predicting perceptions of the built environment using GIS, satellite and street view image approaches. Landscape and Urban Planning, 216, 104257.",
-      "measurement": {
-        "method_id": "MTH_SEM",
-        "unit_id": "UNT_PCT",
-        "data_source_id": "SRC_GSV",
-        "tool_id": "TOL_PSP"
-      },
-      "formula_as_reported": "VibrantGreen = N(pixels labelled vegetation AND HSV in healthy-green range) / N(total pixels)",
-      "variables_as_reported": "N(.) = pixel count; semantic class 'vegetation' from PSPNet; HSV range thresholds for healthy green hues",
-      "svc_matrix_expansion_ref": {
-        "indicator_id": "IND_VIB_GRN",
-        "semantic_layer_scope": [
-          "OBJ_VEG"
-        ],
-        "spatial_layer_scope": [
-          "TER_FG",
-          "TER_MG",
-          "TER_BG"
-        ],
-        "morphological_layer_scope": [
-          "VAR_COL"
-        ]
-      }
-    },
-    "performance": {
-      "dimension_id": "PRF_SOC",
-      "subdimension_id": "PRS_SOC_VITL",
-      "outcome_measure": "TrueSkill perception scores for three Place Pulse 2.0 dimensions (safety, lively [PP-expansion: boring]",
-      "outcome_type_id": "OUT_PSY",
-      "theoretical_basis_id": "THR_UNSPECIFIED",
-      "subdimension_label": "Overall visual-spatial quality score",
-      "framework_mapping_basis": "direct",
-      "dimension_name": "Indicator definition (formula record only)"
-    },
-    "relationship": {
-      "type_id": "REL_REG",
-      "direction_id": "DIR_POS",
-      "effect_size": {
-        "value": "NUM_NA",
-        "threshold": "NUM_NA",
-        "unit": "R2 reduction (%) when variable removed from regression model",
-        "unit_id": "UNT_PCT",
-        "type": "Lasso linear-regression coefficient (sign positive); reported as variance-explained reduction when variable is dropped",
-        "description": "Place Pulse boring dimension stub; paper measures this but specific effect not extracted",
-        "note": "[PP-expansion stub from SVCs_P_Larkin2021_VIB_GRN_L15 - dim=boring]"
-      },
-      "statistical": {
-        "p_value": "<0.05",
-        "significance_id": "SIG_05",
-        "test_type_id": "TST_OLS",
-        "test_description": "Definition record only"
-      },
-      "description": "Vibrant Green Space defined/used by paper; no inferential association recorded in this minimal record."
-    },
-    "study_design": {
-      "design_type_id": "DES_CRS",
-      "sample_size": 110000,
-      "sample_unit_id": "SPU_IMG",
-      "setting_type_id": "SET_STR",
-      "country_id": "CNT_MUL"
-    },
-    "quality": {
-      "evidence_tier_id": "TIR_T2",
-      "confidence_grade_id": "CON_LOW"
-    },
-    "is_descriptive_statistic": true,
-    "descriptive_content": "Visible vibrant green space differs significantly between top-quartile (q4) and bottom-quartile (q1) safety perception locations (q4 mean = 19.10%, SD = 13.10; q1 mean = 12.09%, SD = 12.12; t-test difference = 7.01, p < 0.001). The same pattern holds for lively and beauty quartiles. Among image-based features, vibrant green space (alongside visible green space and visible trees) was repeatedly highlighted as one of the variables that differed most strongly between high and low perception quartiles. In Lasso regression models, vibrant green space was retained as a statistically significant predictor of safety, lively, and beauty perceptions; spatial cluster of greenspace + vibrant greenspace + visible greenspace together reduced explained variation by 2.51%, 2.80%, and 0.76% for safety, lively, and beauty respectively when removed.",
-    "linked_iom_ids": [
-      "I_SVCs_Larkin2021_VIB_GRN_L15_pp_boring"
     ]
   },
   {
@@ -28957,7 +28707,7 @@
       "direction_id": "DIR_POS",
       "effect_size": {
         "value": "NUM_NA",
-        "description": "Place Pulse depressing dimension stub; paper measures this but specific effect not extracted",
+        "description": "Cluster 2 (Nature) has highest GVI (0.586) and highest Beauty (0.708)",
         "ci_lower": "NUM_NA",
         "ci_upper": "NUM_NA",
         "threshold": "NUM_NA",
@@ -28989,6 +28739,172 @@
     "descriptive_content": "Not applicable; this record primarily stores inferential evidence rather than descriptive-only content.",
     "linked_iom_ids": [
       "I_SVCs_Liang2023_1_pp_depressing"
+    ]
+  },
+  {
+    "evidence_id": "SVCs_P_Chen2023_EDG_DEN_L15_pp_beautiful",
+    "source": {
+      "citation": "Chen, S., & Biljecki, F. (2023). Automatic assessment of public open spaces using street view imagery. Cities, 137, 104329.",
+      "doi": "10.1016/j.cities.2023.104329",
+      "year": 2023,
+      "page_reference": "llf_edge_no_pixel Ratio of pixels classified as edge."
+    },
+    "indicator": {
+      "indicator_id": "IND_EDG_DEN",
+      "indicator_category_id": "CAT_CFG",
+      "formula_source": "Chen, S., & Biljecki, F. (2023). Automatic assessment of public open spaces using street view imagery. Cities, 137, 104329.",
+      "measurement": {
+        "method_id": "MTH_DLV",
+        "unit_id": "UNT_PCT",
+        "data_source_id": "SRC_GSV",
+        "tool_id": "TOL_SEG"
+      },
+      "formula_as_reported": "EdgeDensity = N(edge pixels) / N(total pixels)",
+      "variables_as_reported": "N(.) = pixel count; edge pixels from low-level edge detection on the SVI",
+      "svc_matrix_expansion_ref": {
+        "indicator_id": "IND_EDG_DEN",
+        "semantic_layer_scope": [
+          "OBJ_VEG",
+          "OBJ_BLT",
+          "OBJ_GRD",
+          "OBJ_WAT"
+        ],
+        "spatial_layer_scope": [
+          "TER_FG",
+          "TER_MG",
+          "TER_BG"
+        ],
+        "morphological_layer_scope": [
+          "VAR_TEX"
+        ]
+      }
+    },
+    "performance": {
+      "dimension_id": "PRF_AES",
+      "subdimension_id": "PRS_AES_PREF",
+      "outcome_measure": "Low-level visual feature used in perception modelling: predictor of Place Pulse  [PP-expansion: beautiful]",
+      "outcome_type_id": "OUT_OBJ",
+      "theoretical_basis_id": "THR_NA",
+      "framework_mapping_basis": "direct",
+      "dimension_name": "Indicator definition (formula record only)"
+    },
+    "relationship": {
+      "type_id": "REL_DES",
+      "direction_id": "DIR_NA",
+      "effect_size": {
+        "value": "NUM_NA",
+        "threshold": "NUM_NA",
+        "unit": "NA",
+        "unit_id": "UNT_NA",
+        "type": "Descriptive summary",
+        "description": "Descriptive: paper provides formula but no inferential effect",
+        "note": "[PP-expansion stub from SVCs_P_Chen2023_EDG_DEN_L15 - dim=beautiful] (3-pass vote: 2/3 ADD)"
+      },
+      "statistical": {
+        "p_value": "",
+        "significance_id": "SIG_NA",
+        "test_type_id": "TST_NA",
+        "test_description": "Definition record only"
+      },
+      "description": "Edge Pixel Density defined/used by paper; no inferential association recorded in this minimal record."
+    },
+    "study_design": {
+      "design_type_id": "DES_CRS",
+      "sample_size": 800,
+      "sample_unit_id": "SPU_IMG",
+      "setting_type_id": "SET_STR",
+      "country_id": "CNT_MUL"
+    },
+    "quality": {
+      "evidence_tier_id": "TIR_T2",
+      "confidence_grade_id": "CON_LOW"
+    },
+    "is_descriptive_statistic": true,
+    "descriptive_content": "Formula record from L15 ingestion of new indicator IND_EDG_DEN; paper Chen and Biljecki - 2023 - Automatic assessment of public open spaces using stre.",
+    "linked_iom_ids": [
+      "I_SVCs_Chen2023_EDG_DEN_L15_pp_beautiful"
+    ]
+  },
+  {
+    "evidence_id": "SVCs_P_Larkin2021_VIB_GRN_L15_pp_safety",
+    "source": {
+      "citation": "Larkin, A., Gu, X., Chen, L., & Hystad, P. (2021). Predicting perceptions of the built environment using GIS, satellite and street view image approaches. Landscape and Urban Planning, 216, 104257.",
+      "doi": "10.1016/j.landurbplan.2021.104257",
+      "year": 2021,
+      "page_reference": "Section 2.5 (definition); Tables 3 and 4 (descriptives); Section 3.4 and Section 3.2 (regression contribution); pp. 3-7"
+    },
+    "indicator": {
+      "indicator_id": "IND_VIB_GRN",
+      "indicator_category_id": "CAT_CMP",
+      "formula_source": "Larkin, A., Gu, X., Chen, L., & Hystad, P. (2021). Predicting perceptions of the built environment using GIS, satellite and street view image approaches. Landscape and Urban Planning, 216, 104257.",
+      "measurement": {
+        "method_id": "MTH_SEM",
+        "unit_id": "UNT_PCT",
+        "data_source_id": "SRC_GSV",
+        "tool_id": "TOL_PSP"
+      },
+      "formula_as_reported": "VibrantGreen = N(pixels labelled vegetation AND HSV in healthy-green range) / N(total pixels)",
+      "variables_as_reported": "N(.) = pixel count; semantic class 'vegetation' from PSPNet; HSV range thresholds for healthy green hues",
+      "svc_matrix_expansion_ref": {
+        "indicator_id": "IND_VIB_GRN",
+        "semantic_layer_scope": [
+          "OBJ_VEG"
+        ],
+        "spatial_layer_scope": [
+          "TER_FG",
+          "TER_MG",
+          "TER_BG"
+        ],
+        "morphological_layer_scope": [
+          "VAR_COL"
+        ]
+      }
+    },
+    "performance": {
+      "dimension_id": "PRF_SOC",
+      "subdimension_id": "PRS_SOC_SAFE",
+      "outcome_measure": "TrueSkill perception scores for three Place Pulse 2.0 dimensions (safety, lively [PP-expansion: safety]",
+      "outcome_type_id": "OUT_PSY",
+      "theoretical_basis_id": "THR_UNSPECIFIED",
+      "subdimension_label": "Overall visual-spatial quality score",
+      "framework_mapping_basis": "direct",
+      "dimension_name": "Indicator definition (formula record only)"
+    },
+    "relationship": {
+      "type_id": "REL_REG",
+      "direction_id": "DIR_POS",
+      "effect_size": {
+        "value": "NUM_NA",
+        "threshold": "NUM_NA",
+        "unit": "R2 reduction (%) when variable removed from regression model",
+        "unit_id": "UNT_PCT",
+        "type": "Lasso linear-regression coefficient (sign positive); reported as variance-explained reduction when variable is dropped",
+        "description": "Descriptive: paper provides formula but no inferential effect",
+        "note": "[PP-expansion stub from SVCs_P_Larkin2021_VIB_GRN_L15 - dim=safety] (final reconstruction)"
+      },
+      "statistical": {
+        "p_value": "<0.05",
+        "significance_id": "SIG_05",
+        "test_type_id": "TST_OLS",
+        "test_description": "Definition record only"
+      },
+      "description": "Vibrant Green Space defined/used by paper; no inferential association recorded in this minimal record."
+    },
+    "study_design": {
+      "design_type_id": "DES_CRS",
+      "sample_size": 110000,
+      "sample_unit_id": "SPU_IMG",
+      "setting_type_id": "SET_STR",
+      "country_id": "CNT_MUL"
+    },
+    "quality": {
+      "evidence_tier_id": "TIR_T2",
+      "confidence_grade_id": "CON_LOW"
+    },
+    "is_descriptive_statistic": true,
+    "descriptive_content": "Visible vibrant green space differs significantly between top-quartile (q4) and bottom-quartile (q1) safety perception locations (q4 mean = 19.10%, SD = 13.10; q1 mean = 12.09%, SD = 12.12; t-test difference = 7.01, p < 0.001). The same pattern holds for lively and beauty quartiles. Among image-based features, vibrant green space (alongside visible green space and visible trees) was repeatedly highlighted as one of the variables that differed most strongly between high and low perception quartiles. In Lasso regression models, vibrant green space was retained as a statistically significant predictor of safety, lively, and beauty perceptions; spatial cluster of greenspace + vibrant greenspace + visible greenspace together reduced explained variation by 2.51%, 2.80%, and 0.76% for safety, lively, and beauty respectively when removed.",
+    "linked_iom_ids": [
+      "I_SVCs_Larkin2021_VIB_GRN_L15_pp_safety"
     ]
   }
 ]

@@ -46,6 +46,7 @@ import { Grid as VirtualGrid } from 'react-window';
 import { ScanSearch, Download, Eye, Archive, Lightbulb } from 'lucide-react';
 import JSZip from 'jszip';
 import { useSemanticConfig, useProject, useRecommendIndicators, useCalculators, useVisionHealth } from '../hooks/useApi';
+import type { RecommendStage } from '../hooks/useApi';
 import api from '../api';
 import type { SemanticClass, UploadedImage, IndicatorRecommendation } from '../types';
 import PageShell from '../components/PageShell';
@@ -1432,32 +1433,104 @@ function VisionAnalysis() {
               </Button>
 
               {(recommendMutation.isPending || isResumingRecommendation) && (
-                <Alert
-                  status={isResumingRecommendation ? 'warning' : 'info'}
+                <Box
                   mt={2}
-                  alignItems="flex-start"
+                  p={3}
+                  borderRadius="md"
+                  borderLeft="3px solid"
+                  bg={isResumingRecommendation ? 'orange.50' : 'blue.50'}
+                  borderColor={isResumingRecommendation ? 'orange.300' : 'blue.300'}
                 >
-                  <AlertIcon />
-                  <Box flex={1}>
-                    <HStack justify="space-between" align="baseline" mb={0.5}>
-                      <Text fontSize="xs" fontWeight="bold">
-                        {isResumingRecommendation
-                          ? 'Resuming Stage 1 recommendation…'
-                          : `Analyzing ${project?.performance_dimensions?.length || 0} dimension${(project?.performance_dimensions?.length || 0) === 1 ? '' : 's'}`}
-                      </Text>
-                      {recElapsedLabel && (
-                        <Badge fontSize="2xs" colorScheme={isResumingRecommendation ? 'orange' : 'blue'}>
-                          {recElapsedLabel} elapsed
-                        </Badge>
-                      )}
-                    </HStack>
-                    <Text fontSize="xs" color="gray.600">
+                  <HStack justify="space-between" align="baseline" mb={1.5}>
+                    <Text fontSize="xs" fontWeight="bold">
                       {isResumingRecommendation
-                        ? 'Reattaching to the running backend call — your previous request is still being processed.'
-                        : 'LLM is analyzing dimensions. This typically takes 2-4 minutes; safe to refresh or navigate.'}
+                        ? 'Resuming Stage 1 recommendation…'
+                        : `Analyzing ${project?.performance_dimensions?.length || 0} dimension${(project?.performance_dimensions?.length || 0) === 1 ? '' : 's'}`}
                     </Text>
-                  </Box>
-                </Alert>
+                    {recElapsedLabel && (
+                      <Badge fontSize="2xs" colorScheme={isResumingRecommendation ? 'orange' : 'blue'}>
+                        {recElapsedLabel} elapsed
+                      </Badge>
+                    )}
+                  </HStack>
+
+                  {isResumingRecommendation ? (
+                    // After a hard refresh we can't reattach to the original
+                    // SSE stream, so stage events are not available. Fall
+                    // back to a generic indeterminate bar + elapsed time —
+                    // the result will land in the store when the backend
+                    // call finishes (Layer 1 dedup ensures it's the same
+                    // call, not a duplicate).
+                    <>
+                      <Progress
+                        size="xs"
+                        isIndeterminate
+                        colorScheme="orange"
+                        borderRadius="sm"
+                        mb={1.5}
+                      />
+                      <Text fontSize="xs" color="gray.600">
+                        Reattaching to the running backend call — your previous request is still being processed.
+                      </Text>
+                    </>
+                  ) : (
+                    // Live recommendation in flight — drive the bar from
+                    // the SSE progress state. Once the stream enters the
+                    // `generating` stage, the percent advances with each
+                    // chunk so the user sees the LLM actually producing
+                    // tokens rather than wondering if it's hung.
+                    <>
+                      <Progress
+                        size="xs"
+                        value={recommendMutation.progress.percent}
+                        colorScheme={recommendMutation.progress.stage === 'error' ? 'red' : 'blue'}
+                        hasStripe
+                        isAnimated
+                        borderRadius="sm"
+                        mb={1.5}
+                      />
+
+                      {/* Stage breadcrumb — bold the active one. Each step
+                          corresponds to a distinct backend phase that
+                          emits its own status event. */}
+                      <HStack spacing={2} mb={1.5} fontSize="2xs">
+                        {([
+                          { key: 'retrieving', label: '1. Retrieving evidence' },
+                          { key: 'cards', label: '2. Building cards' },
+                          { key: 'generating', label: '3. LLM generating' },
+                        ] as const).map((step, idx, arr) => {
+                          const stageOrder: RecommendStage[] = ['idle', 'retrieving', 'cards', 'generating', 'done'];
+                          const currentIdx = stageOrder.indexOf(recommendMutation.progress.stage);
+                          const stepIdx = stageOrder.indexOf(step.key as RecommendStage);
+                          const isActive = recommendMutation.progress.stage === step.key;
+                          const isDone = currentIdx > stepIdx;
+                          return (
+                            <HStack key={step.key} spacing={1} flex={1}>
+                              <Text
+                                color={isDone ? 'green.600' : isActive ? 'blue.700' : 'gray.500'}
+                                fontWeight={isActive ? 'bold' : 'normal'}
+                              >
+                                {isDone ? '✓ ' : ''}{step.label}
+                              </Text>
+                              {idx < arr.length - 1 && <Text color="gray.400">›</Text>}
+                            </HStack>
+                          );
+                        })}
+                      </HStack>
+
+                      <HStack justify="space-between">
+                        <Text fontSize="xs" color="gray.700">
+                          {recommendMutation.progress.statusMessage || 'Starting…'}
+                        </Text>
+                        {recommendMutation.progress.chunkChars > 0 && (
+                          <Text fontSize="2xs" color="gray.500">
+                            {recommendMutation.progress.chunkChars.toLocaleString()} chars · {Math.round(recommendMutation.progress.percent)}%
+                          </Text>
+                        )}
+                      </HStack>
+                    </>
+                  )}
+                </Box>
               )}
 
               {/* Results — accordion with details. Hide recommendations whose
