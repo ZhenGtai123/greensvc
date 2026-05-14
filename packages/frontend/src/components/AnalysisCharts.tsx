@@ -2346,11 +2346,12 @@ function renderCrossScatter(
         getColor={getColor}
         getTooltip={(p) => `${p.label || ''} (${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}): ${valueFn(p)}`}
         baseDotRadius={5.5}
-        // For the categorical "dominant indicator" view, sequential path
-        // colouring is misleading (the dominant indicator changes step-by-
-        // step and a connected line implies a transition). Force dots so
-        // each point's category remains independently readable.
-        forceDotMode={mode === 'categorical'}
+        // Categorical mode (Dominant Indicator) renders as path too: the
+        // colour of each segment is the dominant indicator at that point,
+        // so contiguous runs of a single colour show stretches of road
+        // where one indicator consistently leads. The hard colour
+        // boundaries between adjacent segments are informative —
+        // they pinpoint exactly where the dominant indicator switches.
       />
 
       {bbox.inliers.length > 0 && bbox.outliers.map((p, i) => {
