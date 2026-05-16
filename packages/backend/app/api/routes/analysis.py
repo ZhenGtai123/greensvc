@@ -422,6 +422,51 @@ def run_clustering_by_project(
             # re-run the analyzer. Log and return without zone_analysis so
             # the FE falls back to legacy partial-replacement behaviour.
             logger.error("Cluster-as-zone analysis failed: %s", e, exc_info=True)
+
+        # v4.1 — PERSIST the clustering payload into the project's
+        # zone_analysis_result so the nature-bundle export (and any other
+        # backend consumer) can render the 8 cluster-diagnostic charts.
+        # Previously only the frontend kept this state in React; the bundle
+        # export read from the DB and saw an empty `clustering` field, so
+        # the backend silently skipped all E-section charts and the
+        # frontend fell back to live-DOM Recharts SVGs — locking users
+        # into the OLD chart style for everything cluster-related until
+        # the FE was rebuilt.
+        try:
+            # v4.7 — STOP overwriting zone_analysis_result.
+            # Persist the cluster-rebuilt payload under the
+            # `cluster_view` sub-key so the original zone-level result
+            # (e.g. 1 user zone) survives. The Reports page reads
+            # top-level fields and now sees the correct zone count;
+            # the nature-bundle endpoint switches to `cluster_view`
+            # when the request asks for cluster mode.
+            if project.zone_analysis_result is None:
+                project.zone_analysis_result = {}
+            if cluster_zone_analysis is not None:
+                project.zone_analysis_result["cluster_view"] = (
+                    cluster_zone_analysis.model_dump()
+                )
+            # Also keep the raw clustering payload + segment_diagnostics
+            # at the top level so cluster-diagnostic charts (silhouette,
+            # dendrogram, etc.) that consume `zar.clustering` directly
+            # still find it in zone view too.
+            project.zone_analysis_result["clustering"] = (
+                clustering_result.model_dump()
+            )
+            project.zone_analysis_result["segment_diagnostics"] = [
+                s.model_dump() for s in segment_diagnostics
+            ]
+            projects_store.save(project)
+            logger.info(
+                "Clustering persisted to project %s (k=%d, n_points=%d)",
+                project.id, clustering_result.k,
+                len(clustering_result.point_ids_ordered),
+            )
+        except Exception as e:
+            # Non-fatal — bundle export will fall back to FE Recharts.
+            logger.error("Failed to persist clustering to project: %s",
+                         e, exc_info=True)
+
         return ClusteringResponse(
             clustering=clustering_result,
             segment_diagnostics=segment_diagnostics,
@@ -1416,6 +1461,19 @@ async def _execute_project_pipeline(
     img_idx = 0
     for img in calc_images:
         image_path = img.mask_filepaths["semantic_map"]
+        # v8.0 — pull the ORIGINAL photograph too. Calculators that compute
+        # photographic features (colorfulness, brightness, GLCM texture,
+        # Canny edges, HSV saturation) need the unmodified RGB photo; the
+        # semantic map's discrete class palette compresses every output to
+        # near-constant values and made IND_BEA_VIS, IND_BRIGHT, IND_CSI
+        # etc. produce values that looked identical across the 1254-image
+        # West Lake project. We pass photo_path alongside image_path so
+        # each calculator can pick the one it actually needs.
+        photo_path = img.filepath
+        # v8.0 — also expose the depth map (Depth Anything output, grayscale)
+        # for indicators that compute distance/depth statistics, not class
+        # ratios. Mapped by the vision pipeline alongside semantic_map.
+        depth_path = img.mask_filepaths.get("depth_map")
 
         # Fast inline validation: check if semantic_map is single-color.
         # A single-color PNG compresses extremely well, so use file size as
@@ -1461,7 +1519,15 @@ async def _execute_project_pipeline(
             else:
                 calc_run += 1
                 try:
-                    result = calculator.calculate(ind_id, image_path)
+                    # v8.0 — full-image (non-layered) calc routed through
+                    # calculate_for_layer with mask_path=None so photo_path
+                    # propagation behaves identically to the layered path.
+                    # This keeps the photo-vs-semantic dispatch in one place.
+                    result = calculator.calculate_for_layer(
+                        ind_id, image_path, None,
+                        original_photo_path=photo_path,
+                        depth_map_path=depth_path,
+                    )
                     if result.success and result.value is not None:
                         img.metrics_results[ind_id] = result.value
                         calc_ok += 1
@@ -1484,7 +1550,11 @@ async def _execute_project_pipeline(
                     continue
                 calc_run += 1
                 try:
-                    result = calculator.calculate_for_layer(ind_id, image_path, mask_path)
+                    result = calculator.calculate_for_layer(
+                        ind_id, image_path, mask_path,
+                        original_photo_path=photo_path,
+                        depth_map_path=depth_path,
+                    )
                     if result.success and result.value is not None:
                         img.metrics_results[layer_key] = result.value
                         calc_ok += 1

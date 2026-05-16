@@ -18,12 +18,13 @@ import {
   Cell,
   ResponsiveContainer,
   ErrorBar,
+  LabelList,
   LineChart,
   Line,
   ReferenceLine,
 } from 'recharts';
 import type { EnrichedZoneStat, ZoneDiagnostic, ArchetypeProfile, UploadedImage, ImageRecord, GlobalIndicatorStats, DataQualityRow, IndicatorDefinitionInput } from '../types';
-import { divergingColor, directionalColor, magnitudeColor } from '../utils/palette';
+import { divergingColor, directionalColor, magnitudeColor, parulaColor } from '../utils/palette';
 
 // Shared color palette for zones
 const ZONE_COLORS = [
@@ -397,6 +398,28 @@ export function ZonePriorityChart({ diagnostics }: ZonePriorityChartProps) {
           {data.map((entry, i) => (
             <Cell key={i} fill={deviationBarColor(entry.mean_abs_z)} />
           ))}
+          {/* v4.1 — value + n on each bar tip so the chart reads without
+             requiring tooltip interaction. */}
+          <LabelList
+            dataKey="mean_abs_z"
+            position="right"
+            content={(props: { x?: number | string; y?: number | string;
+                               width?: number | string; height?: number | string;
+                               value?: number | string; index?: number }) => {
+              const x = Number(props.x); const y = Number(props.y);
+              const w = Number(props.width); const h = Number(props.height);
+              const i = props.index;
+              if (Number.isNaN(x) || Number.isNaN(y) || i == null) return null;
+              const d = data[i];
+              return (
+                <text x={x + w + 6} y={y + h / 2}
+                      dominantBaseline="central"
+                      fontSize={11} fill="#1a202c" fontWeight={600}>
+                  {d.mean_abs_z.toFixed(2)} · n={d.point_count}
+                </text>
+              );
+            }}
+          />
         </Bar>
       </BarChart>
     </ResponsiveContainer>
@@ -1680,24 +1703,59 @@ interface ClusterSizeChartProps {
 }
 
 export function ClusterSizeChart({ archetypes }: ClusterSizeChartProps) {
+  // v4.1 — vertical bars (already vertical) with always-visible per-bar
+  // count + share% labels. The user previously had to hover to see the
+  // value; the label is now baked into the chart so the bundle SVG export
+  // shows the same numbers without requiring tooltip interaction.
   const data = useMemo(() => {
-    return archetypes.map(a => ({
+    const total = archetypes.reduce((s, a) => s + a.point_count, 0) || 1;
+    return archetypes.map((a) => ({
       name: a.archetype_label,
       count: a.point_count,
+      sharePct: (a.point_count / total) * 100,
+      archetype_id: a.archetype_id,
     }));
   }, [archetypes]);
 
   if (data.length === 0) return null;
 
   return (
-    <ResponsiveContainer width="100%" height={250}>
-      <BarChart data={data} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={data} margin={{ left: 10, right: 10, top: 30, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-        <YAxis tick={{ fontSize: 10 }} label={{ value: 'Points', angle: -90, position: 'insideLeft', fontSize: 10 }} />
-        <Tooltip />
+        <YAxis tick={{ fontSize: 10 }}
+               label={{ value: 'Image count (points)', angle: -90,
+                        position: 'insideLeft', fontSize: 10 }} />
+        <Tooltip
+          formatter={(v: number, _n: string, ctx: { payload?: { sharePct?: number } }) =>
+            [`${v} · ${(ctx.payload?.sharePct ?? 0).toFixed(1)}%`, 'Count']
+          }
+        />
         <Bar dataKey="count" name="Points" barSize={40}>
-          {data.map((_, i) => <Cell key={i} fill={getZoneColor(i)} />)}
+          {data.map((d, i) =>
+            <Cell key={i} fill={getZoneColor(d.archetype_id ?? i)} />)}
+          <LabelList
+            dataKey="count"
+            position="top"
+            content={(props: { x?: number | string; y?: number | string;
+                               width?: number | string; value?: number | string;
+                               index?: number }) => {
+              const x = Number(props.x);
+              const y = Number(props.y);
+              const w = Number(props.width);
+              const i = props.index;
+              if (Number.isNaN(x) || Number.isNaN(y) || i == null) return null;
+              const d = data[i];
+              return (
+                <text x={x + w / 2} y={y - 8}
+                      textAnchor="middle" fontSize={10}
+                      fill="#1a202c" fontWeight={600}>
+                  {d.count} · {d.sharePct.toFixed(1)}%
+                </text>
+              );
+            }}
+          />
         </Bar>
       </BarChart>
     </ResponsiveContainer>
@@ -2161,8 +2219,16 @@ interface ValueSpatialMapProps {
   colorblindMode?: boolean;
 }
 
-function gradientForDirection(t: number, dir: string, colorblindMode = false): string {
-  return directionalColor(t, dir, colorblindMode);
+/** Default value-map gradient. We switched away from the direction-keyed
+ * green / red / blue scheme to MATLAB's **parula** (R2014b+ default) so
+ * the four-layer small-multiples for a single indicator (Full / FG / MG /
+ * BG) all share the same perceptually-uniform sweep — the reader can
+ * compare layers by eye without having to mentally rescale a different
+ * hue range per panel. INCREASE / DECREASE semantics remain available
+ * via the `targetDirection` prop and are surfaced in the legend caption;
+ * the colorblind fallback uses viridis (same trajectory, CB-safe). */
+function gradientForDirection(t: number, _dir: string, colorblindMode = false): string {
+  return parulaColor(t, !!colorblindMode);
 }
 
 export function ValueSpatialMap({
@@ -2212,7 +2278,8 @@ export function ValueSpatialMap({
     <Box>
       <Text fontSize="sm" fontWeight="bold" mb={1}>{indicatorId}</Text>
       <Text fontSize="xs" color="gray.500" mb={1}>
-        Color = indicator value ({layer} layer · {targetDirection.toLowerCase()} = better-darker · range p5–p95)
+        Color = indicator value · MATLAB parula colormap · {layer} layer ·{' '}
+        {targetDirection.toLowerCase()} target · p5–p95 range
       </Text>
       <Box overflowX="auto" bg="gray.50" borderRadius="md" p={1}>
         <svg width={svgW} height={svgH} style={{ fontFamily: 'system-ui, sans-serif', overflow: 'visible' }}>

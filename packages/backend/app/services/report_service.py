@@ -175,16 +175,53 @@ For each unit, include in the report:
 4.X.1 Integrated diagnosis (from the unit's `diagnosis` field; expand into
       a paragraph that anchors to the actual chart numbers, not to invented
       observations).
-4.X.2 Strategy entry. For every strategy in `stage3_data[unit].design_strategies`,
-      surface its: target_indicators, 4-axis signature, pathway,
-      expected_effects, transferability_note, supporting_ioms,
-      implementation_guidance.
-      v4 / Module 10.3.3 — every strategy MUST include a line:
-      "Diagnosed by: <2-4 chart refCodes>" e.g. "Diagnosed by: B2, C2, C3"
-      (or "C1, C3, D1" in single-zone mode, or "E1, E2, C2" in cluster
-      mode). The refCodes must come from Section 3's reference list and
-      MUST cite charts that were actually rendered for this project's mode
-      (no B-codes in single-zone, no E-codes when clustering wasn't run).
+4.X.2 Strategy entries. For every strategy in
+      `stage3_data[unit].design_strategies`, render the entry below in
+      the **EXACT same skeleton** — same field order, same labels, same
+      number of bullets — regardless of project mode (single-zone vs.
+      cluster vs. multi-zone). The reader should be able to scroll
+      Section 4 and read every strategy at the same depth of detail;
+      cluster-mode reports must NOT be terser than single-zone reports.
+      Granularity target = the platform's Design Strategies tab card,
+      which surfaces all of these fields on screen.
+
+      v4.6 / Module 10.3.4 — MANDATORY per-strategy skeleton (verbatim
+      labels, in this order; if a field is missing in `stage3_data`,
+      write "—" or quote the missing field so the reader sees the gap
+      explicitly):
+
+      **Strategy N (Priority N · Grade <confidence> · <target_indicators[0]>) — <strategy_name>**
+
+      - *Location:* <spatial_location>  (e.g. Foreground / Middleground /
+        Background / Full layer)
+      - *Intervention:* <intervention.object> × <intervention.variable> →
+        <intervention.action>. <one-sentence intervention.description>.
+      - *Signature:* `<signatures[0].operation>` × `<signatures[0].semantic>`
+        × `<signatures[0].spatial>` × `<signatures[0].morphological>`
+        (cite up to 3 signatures when present, comma-separated).
+      - *Pathway:* one paragraph paraphrasing `pathway` — what mechanism
+        actually delivers the indicator change, in plain language.
+      - *Expected effects:* bullet list, one bullet per entry in
+        `expected_effects`, formatted as
+          `<indicator> <direction> <magnitude> (<note>)`.
+      - *Tradeoffs:* paraphrase `potential_tradeoffs` (or
+        `transferability_note` if tradeoffs are empty). State "—" only
+        when both are empty.
+      - *Implementation guidance:* paraphrase `implementation_guidance`
+        in 1-3 sentences; do not pad with generic best-practice prose.
+      - *Supporting IOMs:* comma-separated list from `supporting_ioms`
+        (these are the IOM record IDs that ground the strategy in the
+        knowledge base; cite the first 5 if there are more).
+      - *Diagnosed by:* <2-4 chart refCodes>. e.g. "B2, C2, C3" in
+        multi-zone mode, "C1, C3, D1" in single-zone mode,
+        "E1, E2, C2" in cluster mode. RefCodes must come from
+        Section 3's reference list AND be valid for this project's view
+        (no B-codes in single-zone, no E-codes when clustering wasn't run).
+
+      Do NOT collapse this skeleton into a flat one-line paragraph for
+      cluster-mode units. The Strategies tab on the Reports page renders
+      every cluster's strategies at this granularity; the report's
+      Section 4 must mirror that 1:1.
 4.X.3 Intra-unit synergies (from how the strategies in this unit interact
       — derive from the strategies' target_indicators and pathways; do not
       invent unrelated synergies).
@@ -307,8 +344,22 @@ spatial zone in the project setup or run KMeans archetype clustering
    into 8 subsections (4.1, 4.2, … 4.8). Do not collapse, summarize, or
    "follow same as above" any unit. The user comparing the report against
    the Strategies tab will catch any missing units immediately. Length
-   budget: target ~120–200 words per strategy entry; do not skip entries
-   to stay under a self-imposed length cap.
+   budget: target ~180–260 words per strategy entry (the
+   Location / Intervention / Signature / Pathway / Expected effects /
+   Tradeoffs / Implementation / Supporting IOMs / Diagnosed-by skeleton
+   is dense — keeping every bullet present is more important than
+   keeping the entry short).
+11. **Uniform Strategy skeleton (CRITICAL)** — The 9-bullet skeleton in
+   4.X.2 above is the SAME for every project mode and every strategy.
+   In particular: do NOT emit a richer block for single-zone single-
+   spatial-unit projects and a leaner block for cluster-mode projects.
+   If a stage3 field is empty, print "—" so the reader can see the gap;
+   never silently omit a bullet. The skeleton's bullet order, labels,
+   and italic emphasis are part of the contract — the report is read
+   side-by-side with the Strategies tab, so the labels must match
+   ("Location", "Intervention", "Signature", "Pathway", "Expected
+   effects", "Tradeoffs", "Implementation guidance", "Supporting IOMs",
+   "Diagnosed by").
 """
 
 
@@ -846,16 +897,32 @@ class ReportService:
                         for s in m.signatures[:3]
                     ],
                 })
-            # All strategies
+            # All strategies. EVERY field the Design Strategies tab shows
+            # on screen is included here so Section 4 of the report can
+            # match the tab's granularity 1:1 — same Location / Intervention
+            # (Object × Variable × Action) / Signatures / Pathway / Expected
+            # Effects / Tradeoffs / Implementation Guidance / Supporting IOMs.
             for s in zone.design_strategies:
                 unit_data["design_strategies"].append({
                     "priority": s.priority,
                     "strategy_name": s.strategy_name,
                     "target_indicators": s.target_indicators,
+                    # Location + Intervention — the platform Design Strategies
+                    # card surfaces these explicitly (Location: Background /
+                    # Object: Built Structure / Variable: Shape / Action: Modify).
+                    "spatial_location": s.spatial_location,
+                    "intervention": s.intervention,
                     "signatures": s.signatures[:3],
                     "pathway": s.pathway,
+                    # Grade / confidence chip ("GRADE A - STRONG" in the UI).
                     "confidence": s.confidence,
+                    # Tradeoffs (rendered as a yellow caution row in the UI)
+                    # and transferability — both must flow into the report
+                    # so a reviewer reading the prose sees the same caveats
+                    # that someone clicking through the Strategies tab does.
+                    "potential_tradeoffs": s.potential_tradeoffs,
                     "transferability_note": s.transferability_note,
+                    "boundary_effects": s.boundary_effects,
                     "expected_effects": s.expected_effects,
                     "supporting_ioms": s.supporting_ioms,
                     "implementation_guidance": s.implementation_guidance,

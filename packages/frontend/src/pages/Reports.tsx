@@ -41,6 +41,7 @@ import {
   AccordionPanel,
   AccordionIcon,
   Tooltip,
+  useToast,
 } from '@chakra-ui/react';
 import { Download, FileText, FileImage, FileSpreadsheet, CheckCircle, AlertTriangle, Sparkles, RefreshCw } from 'lucide-react';
 import useAppStore from '../store/useAppStore';
@@ -709,6 +710,10 @@ function Reports() {
   const { projectId: routeProjectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const toast = useAppToast();
+  // Native Chakra toast for the long-running bundle progress flow — we need
+  // .update()/.close() on a stable id, which useAppToast's callable wrapper
+  // does not expose. Other toasts in this file keep using useAppToast.
+  const rawToast = useToast();
   const queryClient = useQueryClient();
 
   const {
@@ -1866,10 +1871,44 @@ function Reports() {
 
   // Capture all exportByDefault charts. Sets `exporting` so lazy-loaded cards
   // and the clustering accordion render before html2canvas runs.
+  //
+  // v4.3 — also pre-fetch the backend's matplotlib SVGs from
+  // /api/projects/{id}/nature-bundle.zip and pass them through as
+  // `matplotlibSvgs`. captureChartsForReport will rasterise these instead
+  // of html2canvas-screenshotting the Recharts DOM, so the AI report's
+  // embedded charts share the same Nature-grade style as the standalone
+  // bundle.
   const captureChartsForDownload = useCallback(async (): Promise<CapturedChart[]> => {
     if (!hasAnalysis) return [];
     setExporting(true);
     try {
+      // Pre-load matplotlib SVGs (best effort — falls back to html2canvas
+      // for any chart_id the backend didn't render).
+      const matplotlibSvgs = new Map<string, string>();
+      if (routeProjectId) {
+        try {
+          const baseURL =
+            (import.meta.env.VITE_API_URL as string | undefined) ||
+            'http://localhost:8080';
+          const res = await fetch(
+            `${baseURL}/api/projects/${routeProjectId}/nature-bundle.zip?view=${groupingMode}`,
+            { method: 'GET' },
+          );
+          if (res.ok) {
+            const JSZipMod = (await import('jszip')).default;
+            const zip = await JSZipMod.loadAsync(await res.blob());
+            await Promise.all(
+              Object.values(zip.files).map(async (entry) => {
+                if (entry.dir) return;
+                const m = /\/charts\/([^/]+)\.svg$/.exec(entry.name);
+                if (m) matplotlibSvgs.set(m[1], await entry.async('string'));
+              }),
+            );
+          }
+        } catch (e) {
+          console.warn('[capture] could not pre-load nature-bundle:', e);
+        }
+      }
       // Two paint frames — first lets React commit `exporting=true`,
       // second lets ChartHosts unfold lazy bodies + the accordion.
       await waitForPaint();
@@ -1879,11 +1918,12 @@ function Reports() {
         ctx: chartCtx,
         refs: chartRefs.current,
         captionFor,
+        matplotlibSvgs: matplotlibSvgs.size > 0 ? matplotlibSvgs : undefined,
       });
     } finally {
       setExporting(false);
     }
-  }, [hasAnalysis, chartCtx, captionFor]);
+  }, [hasAnalysis, chartCtx, captionFor, routeProjectId]);
 
   // Downloads — v4 / Module 10.3.1: handleDownloadMarkdown / handleDownloadPdf
   // are kept for potential reuse but are no longer wired to UI buttons. The
@@ -1934,17 +1974,184 @@ function Reports() {
       // by aria-label. aria-label matching breaks when chart titles contain
       // characters CSS attribute selectors don't like (apostrophes, quotes,
       // backslashes), and refs are O(1) without any DOM scan.
+      // Pull the LLM "What this means" interpretation for each chart out of
+      // the React Query cache. Each card's useChartSummary uses a key of
+      // ['chart-summary', chartId, projectId, groupingMode, payload]; we look
+      // up the most recent successful entry for (chartId × projectId ×
+      // groupingMode) and attach it to the bundle as summaries/*.json so the
+      // paper-writer has the model's reading alongside the figure itself.
+      const summaryQueries = queryClient
+        .getQueryCache()
+        .findAll({ queryKey: ['chart-summary'] });
+      const summaryByChartId = new Map<string, Record<string, unknown>>();
+      for (const q of summaryQueries) {
+        const key = q.queryKey as unknown[];
+        // [tag, chartId, projectId, groupingMode, payload]
+        if (key[2] !== routeProjectId) continue;
+        if (key[3] !== groupingMode) continue;
+        const data = q.state.data as Record<string, unknown> | undefined;
+        if (!data) continue;
+        const chartId = String(key[1] ?? '');
+        if (!chartId) continue;
+        // Prefer the most recently updated entry if there are multiple
+        // (different payload snapshots).
+        const existing = summaryByChartId.get(chartId);
+        if (
+          !existing ||
+          (q.state.dataUpdatedAt ?? 0) >
+            (Number(existing.__dataUpdatedAt) || 0)
+        ) {
+          summaryByChartId.set(chartId, {
+            ...data,
+            __dataUpdatedAt: q.state.dataUpdatedAt,
+          });
+        }
+      }
+
+      // v4.6 — pre-warm any summary not yet in the React Query cache.
+      // useChartSummary fires lazily (only on panel-open), so users who
+      // export without scrolling through every clustering panel would
+      // be missing ~8 summaries. Fan them out in parallel here.
+      const missingForPrewarm = cards.filter((c) => {
+        const has = summaryByChartId.has(c.id);
+        const fn = (c as { summaryPayload?: (ctx: unknown) => unknown }).summaryPayload;
+        return !has && typeof fn === 'function';
+      });
+      if (missingForPrewarm.length > 0) {
+        toast({
+          title: `Generating ${missingForPrewarm.length} chart summaries…`,
+          status: 'info',
+          duration: 2500,
+        });
+        await Promise.all(
+          missingForPrewarm.map(async (c) => {
+            try {
+              const fn = (c as { summaryPayload: (ctx: unknown) => Record<string, unknown> | null }).summaryPayload;
+              const payload = fn(chartCtx);
+              if (payload == null) return;
+              const resp = await api.analysis.chartSummary({
+                chart_id: c.id,
+                chart_title: c.title,
+                chart_description:
+                  (c as { description?: string | null }).description ?? null,
+                project_id: routeProjectId ?? '',
+                payload,
+                project_context: chartProjectContext,
+                grouping_mode: groupingMode,
+              });
+              if (resp?.data) {
+                summaryByChartId.set(
+                  c.id,
+                  resp.data as unknown as Record<string, unknown>,
+                );
+              }
+            } catch (err) {
+              console.warn(`[bundle] pre-warm summary for ${c.id} failed:`, err);
+            }
+          }),
+        );
+      }
+
       const artifacts = cards.map((c) => {
         const handle = chartRefs.current.get(c.id);
         const tab = c.exportRows ? c.exportRows(chartCtx) : null;
+        const summary = summaryByChartId.get(c.id) ?? null;
+        if (summary) {
+          // Drop internal sort key before serializing.
+          delete (summary as Record<string, unknown>).__dataUpdatedAt;
+        }
         return {
           chartId: c.id,
           title: c.title,
           node: handle?.getNode() ?? null,
           rows: tab?.rows,
           columns: tab?.columns,
+          aiSummary: summary,
         };
       });
+      // Progress toast — closeable, live-updating "n / N" indicator that
+      // also shows the current chart id so users on slow machines can see
+      // the bundle is making forward progress.
+      const progressId = 'export-bundle-progress';
+      if (rawToast.isActive(progressId)) rawToast.close(progressId);
+      rawToast({
+        id: progressId,
+        title: 'Fetching server-rendered nature SVGs…',
+        description: `${groupingMode} view`,
+        status: 'info',
+        duration: null,
+        isClosable: false,
+        position: 'top-right',
+      });
+
+      // Pull the publication-grade SVGs from the backend so every chart
+      // in the bundle is rendered by matplotlib (Liberation Sans + elite
+      // muted palette, no HTML-legend overflow). If the server is
+      // unreachable we silently fall back to the live-DOM capture so the
+      // bundle is never empty.
+      const natureSvgs = new Map<string, string>();
+      if (routeProjectId) {
+        try {
+          const baseURL =
+            (import.meta.env.VITE_API_URL as string | undefined) ||
+            'http://localhost:8080';
+          const res = await fetch(
+            `${baseURL}/api/projects/${routeProjectId}/nature-bundle.zip?view=${groupingMode}`,
+            { method: 'GET' },
+          );
+          if (res.ok) {
+            const JSZipMod = (await import('jszip')).default;
+            const zip = await JSZipMod.loadAsync(await res.blob());
+            await Promise.all(
+              Object.values(zip.files).map(async (entry) => {
+                if (entry.dir) return;
+                const mSvg = /\/charts\/([^/]+)\.svg$/.exec(entry.name);
+                if (mSvg) {
+                  natureSvgs.set(mSvg[1], await entry.async('string'));
+                  return;
+                }
+                // v4.2 — also harvest the per-chart LLM summaries the
+                // backend now writes to summaries/<chart_id>.json. Without
+                // this the FE's exportBundle would discard them (it only
+                // writes summaries from React Query cache, which is empty
+                // unless the user clicked "What this means" on every card).
+                const mSum = /\/summaries\/([^/]+)\.json$/.exec(entry.name);
+                if (mSum) {
+                  try {
+                    const text = await entry.async('string');
+                    const obj = JSON.parse(text) as Record<string, unknown>;
+                    if (!summaryByChartId.has(mSum[1])) {
+                      summaryByChartId.set(mSum[1], obj);
+                    }
+                  } catch (e) {
+                    console.warn('[bundle] failed to parse summary',
+                                 mSum[1], e);
+                  }
+                }
+              }),
+            );
+          } else {
+            console.warn(
+              '[bundle] nature-bundle endpoint returned',
+              res.status,
+              '— falling back to live-DOM SVGs',
+            );
+          }
+        } catch (e) {
+          console.warn(
+            '[bundle] nature-bundle fetch failed; falling back to DOM:',
+            e,
+          );
+        }
+      }
+
+      rawToast.update(progressId, {
+        title: `Building bundle… 0 / ${artifacts.length}`,
+        description: natureSvgs.size > 0
+          ? `Nature SVGs: ${natureSvgs.size} · ${groupingMode} view`
+          : `${groupingMode} view (live-DOM SVGs)`,
+      });
+
       const result = await exportBundle({
         charts: artifacts,
         projectSlug: currentProject?.project_name ?? 'project',
@@ -1952,20 +2159,35 @@ function Reports() {
         groupingMode,
         aiReport: aiReport ?? null,
         aiReportMeta: aiReportMeta ?? null,
+        chartSvgOverrides: natureSvgs.size > 0 ? natureSvgs : undefined,
         extraMetadata: {
           zone_count: zoneAnalysisResult.zone_diagnostics?.length ?? 0,
           analysis_mode: zoneAnalysisResult.analysis_mode,
           zone_source: zoneAnalysisResult.zone_source,
           design_strategies_present: !!designStrategyResult,
+          nature_svg_count: natureSvgs.size,
+        },
+        onProgress: ({ current, total, title }) => {
+          rawToast.update(progressId, {
+            title: `Building bundle… ${current} / ${total}`,
+            description: title,
+          });
         },
       });
+      rawToast.close(progressId);
       toast({
         title: `Bundle ready: ${result.filename}`,
-        description: `${result.charts} chart(s) · ${result.csvs} CSV(s)`,
+        description:
+          `${result.charts} chart(s) · ${result.csvs} CSV` +
+          (result.pngs > 0 ? ` · ${result.pngs} PNG` : '') +
+          ` · ${result.summaries} AI summary`,
         status: 'success',
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Bundle export failed';
+      if (rawToast.isActive('export-bundle-progress')) {
+        rawToast.close('export-bundle-progress');
+      }
       toast({ title: message, status: 'error' });
     }
   }, [
@@ -1977,7 +2199,10 @@ function Reports() {
     aiReport,
     aiReportMeta,
     designStrategyResult,
+    queryClient,
+    routeProjectId,
     toast,
+    rawToast,
   ]);
 
   const handleExportJson = () => {
@@ -2289,7 +2514,7 @@ function Reports() {
             </Button>
           </Tooltip>
           <Tooltip
-            label="ZIP bundle: every chart as SVG + CSV, the AI report, and metadata.json. Filename includes the active grouping mode so zone-mode and cluster-mode bundles don't overwrite each other."
+            label="ZIP bundle: every chart redrawn server-side by matplotlib (Nature-grade SVGs) + CSV tables + per-chart LLM interpretation + the AI report. Filename includes the active grouping mode so zone-mode and cluster-mode bundles don't overwrite each other."
             placement="bottom"
             hasArrow
           >
@@ -3725,7 +3950,6 @@ function Reports() {
                         <VStack align="stretch" spacing={2}>
                           {indicatorRelationships.map((rel, i) => (
                             <HStack key={i} fontSize="sm" spacing={2}>
-                              <Badge colorScheme="blue">{rel.indicator_a}</Badge>
                               <Badge colorScheme={rel.relationship_type === 'synergistic' ? 'green' : rel.relationship_type === 'inverse' ? 'red' : 'gray'}>{rel.relationship_type}</Badge>
                               <Badge colorScheme="blue">{rel.indicator_b}</Badge>
                               {rel.explanation && <Text fontSize="xs" color="gray.500" noOfLines={1} flex={1}>{rel.explanation}</Text>}

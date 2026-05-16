@@ -1192,6 +1192,27 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     isAvailable: (ctx) =>
       !!ctx.effectiveClustering &&
       ctx.effectiveClustering.archetype_profiles.length > 0,
+    summaryPayload: (ctx) => {
+      const cl = ctx.effectiveClustering;
+      if (!cl) return null;
+      // Per cluster: top-3 most positive z indicators + top-3 most negative.
+      const profiles = cl.archetype_profiles.map((a) => {
+        const entries = Object.entries(a.centroid_z_scores ?? {});
+        const sorted = [...entries].sort((x, y) => y[1] - x[1]);
+        return {
+          archetype_id: a.archetype_id,
+          archetype_label: a.archetype_label,
+          point_count: a.point_count,
+          top3_high: sorted.slice(0, 3).map(([k, v]) => ({ indicator: k, z: Number(v.toFixed(2)) })),
+          top3_low:  sorted.slice(-3).map(([k, v]) => ({ indicator: k, z: Number(v.toFixed(2)) })),
+        };
+      });
+      return {
+        analysis_mode: ctx.analysisMode,
+        n_clusters: cl.archetype_profiles.length,
+        profiles,
+      };
+    },
     render: (ctx) => (
       <ClusterCentroidHeatmap archetypes={ctx.effectiveClustering!.archetype_profiles} />
     ),
@@ -1207,6 +1228,39 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     isAvailable: (ctx) =>
       !!ctx.effectiveClustering?.silhouette_per_point &&
       ctx.effectiveClustering.silhouette_per_point.length > 0,
+    summaryPayload: (ctx) => {
+      const cl = ctx.effectiveClustering;
+      if (!cl?.silhouette_per_point) return null;
+      const sils = cl.silhouette_per_point;
+      const labels = cl.labels_smoothed ?? [];
+      const byCluster = new Map<number, number[]>();
+      for (let i = 0; i < sils.length; i++) {
+        const c = labels[i] ?? -1;
+        if (c < 0) continue;
+        const list = byCluster.get(c) ?? [];
+        list.push(sils[i]);
+        byCluster.set(c, list);
+      }
+      const perCluster = Array.from(byCluster.entries()).map(([cid, vals]) => {
+        const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const nNeg = vals.filter((v) => v < 0).length;
+        return {
+          cluster_id: cid,
+          n: vals.length,
+          mean_silhouette: Number(mean.toFixed(3)),
+          pct_negative: Number((100 * nNeg / vals.length).toFixed(1)),
+        };
+      }).sort((a, b) => a.cluster_id - b.cluster_id);
+      const overall = sils.length
+        ? Number((sils.reduce((a, b) => a + b, 0) / sils.length).toFixed(3))
+        : 0;
+      return {
+        analysis_mode: ctx.analysisMode,
+        n_points: sils.length,
+        overall_mean_silhouette: overall,
+        per_cluster: perCluster,
+      };
+    },
     render: (ctx) => {
       const cl = ctx.effectiveClustering!;
       return (
@@ -1231,6 +1285,19 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     isAvailable: (ctx) =>
       !!ctx.effectiveClustering?.condensed_tree &&
       ctx.effectiveClustering.condensed_tree.length > 0,
+    summaryPayload: (ctx) => {
+      const cl = ctx.effectiveClustering;
+      if (!cl) return null;
+      const edges = cl.condensed_tree ?? [];
+      return {
+        analysis_mode: ctx.analysisMode,
+        method: cl.method,
+        n_edges: edges.length,
+        has_condensed_tree: edges.length > 0,
+        n_clusters: cl.archetype_profiles.length,
+        cluster_persistence: cl.cluster_persistence ?? null,
+      };
+    },
     render: (ctx) => (
       <HDBSCANCondensedTree
         edges={ctx.effectiveClustering!.condensed_tree ?? []}
@@ -1249,6 +1316,22 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     isAvailable: (ctx) =>
       !!ctx.effectiveClustering?.silhouette_scores &&
       ctx.effectiveClustering.silhouette_scores.length > 1,
+    summaryPayload: (ctx) => {
+      const cl = ctx.effectiveClustering;
+      if (!cl?.silhouette_scores) return null;
+      const scores = cl.silhouette_scores.map((s) => ({
+        k: s.k,
+        silhouette: Number((s.silhouette ?? 0).toFixed(3)),
+      }));
+      const sorted = [...scores].sort((a, b) => b.silhouette - a.silhouette);
+      return {
+        analysis_mode: ctx.analysisMode,
+        selected_k: cl.k,
+        peak_k: sorted[0]?.k ?? null,
+        peak_silhouette: sorted[0]?.silhouette ?? null,
+        scores,
+      };
+    },
     render: (ctx) => (
       <SilhouetteCurve
         scores={ctx.effectiveClustering!.silhouette_scores}
@@ -1266,6 +1349,21 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     isAvailable: (ctx) =>
       !!ctx.effectiveClustering?.dendrogram_linkage &&
       ctx.effectiveClustering.dendrogram_linkage.length > 0,
+    summaryPayload: (ctx) => {
+      const cl = ctx.effectiveClustering;
+      if (!cl?.dendrogram_linkage) return null;
+      const linkage = cl.dendrogram_linkage;
+      const distances = linkage.map((row) => row[2]);
+      const maxD = distances.length ? Math.max(...distances) : 0;
+      const cutD = 0.7 * maxD;
+      return {
+        analysis_mode: ctx.analysisMode,
+        n_leaves: linkage.length + 1,
+        max_linkage_distance: Number(maxD.toFixed(2)),
+        cut_threshold: Number(cutD.toFixed(2)),
+        n_clusters_at_cut: cl.archetype_profiles.length,
+      };
+    },
     render: (ctx) => <Dendrogram linkage={ctx.effectiveClustering!.dendrogram_linkage} />,
   },
   {
@@ -1280,6 +1378,22 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
       ctx.effectiveClustering.point_lats.length > 0 &&
       !!ctx.effectiveClustering.labels_raw &&
       ctx.effectiveClustering.labels_raw.length > 0,
+    summaryPayload: (ctx) => {
+      const cl = ctx.effectiveClustering;
+      if (!cl?.labels_raw || !cl.labels_smoothed) return null;
+      const raw = cl.labels_raw;
+      const sm  = cl.labels_smoothed;
+      const n = Math.min(raw.length, sm.length);
+      let changed = 0;
+      for (let i = 0; i < n; i++) if (raw[i] !== sm[i]) changed++;
+      return {
+        analysis_mode: ctx.analysisMode,
+        n_points: n,
+        n_changed: changed,
+        pct_changed: Number((100 * changed / Math.max(1, n)).toFixed(1)),
+        has_gps: (cl.point_lats?.length ?? 0) > 0,
+      };
+    },
     render: (ctx) => {
       const cl = ctx.effectiveClustering!;
       return (
@@ -1304,6 +1418,25 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     viableInModes: ['cluster'],
     isAvailable: (ctx) =>
       !!ctx.effectiveClustering && ctx.effectiveClustering.archetype_profiles.length > 0,
+    summaryPayload: (ctx) => {
+      const cl = ctx.effectiveClustering;
+      if (!cl) return null;
+      const profiles = cl.archetype_profiles.map((a) => {
+        const entries = Object.entries(a.centroid_values ?? {});
+        const sorted = [...entries].sort((x, y) => (y[1] as number) - (x[1] as number));
+        return {
+          archetype_id: a.archetype_id,
+          archetype_label: a.archetype_label,
+          point_count: a.point_count,
+          peak_indicators: sorted.slice(0, 3).map(([k, v]) => ({ indicator: k, value: Number((v as number).toFixed(3)) })),
+        };
+      });
+      return {
+        analysis_mode: ctx.analysisMode,
+        n_clusters: cl.archetype_profiles.length,
+        profiles,
+      };
+    },
     render: (ctx) => (
       <ArchetypeRadarChart archetypes={ctx.effectiveClustering!.archetype_profiles} />
     ),
@@ -1317,6 +1450,23 @@ export const CHART_REGISTRY: ChartDescriptor[] = [
     viableInModes: ['cluster'],
     isAvailable: (ctx) =>
       !!ctx.effectiveClustering && ctx.effectiveClustering.archetype_profiles.length > 0,
+    summaryPayload: (ctx) => {
+      const cl = ctx.effectiveClustering;
+      if (!cl) return null;
+      const total = cl.archetype_profiles.reduce((s, a) => s + a.point_count, 0) || 1;
+      const sizes = cl.archetype_profiles.map((a) => ({
+        archetype_id: a.archetype_id,
+        archetype_label: a.archetype_label,
+        count: a.point_count,
+        share_pct: Number((100 * a.point_count / total).toFixed(1)),
+      }));
+      return {
+        analysis_mode: ctx.analysisMode,
+        n_clusters: cl.archetype_profiles.length,
+        total_points: total,
+        sizes,
+      };
+    },
     render: (ctx) => <ClusterSizeChart archetypes={ctx.effectiveClustering!.archetype_profiles} />,
   },
 ];

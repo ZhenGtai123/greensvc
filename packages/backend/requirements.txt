@@ -32,6 +32,11 @@ hdbscan==0.8.40
 opencv-python-headless==4.13.0.92
 pillow==12.1.1
 
+# Nature-style chart redraw (used by the /nature-bundle export endpoint)
+# Same matplotlib version we use to lock the Liberation Sans fallback in
+# the paper figures so server-side SVGs match the editorial pipeline 1:1.
+matplotlib==3.10.1
+
 # LLM SDKs
 google-genai==1.65.0
 openai==2.24.0
